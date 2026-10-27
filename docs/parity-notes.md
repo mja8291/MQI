@@ -1,0 +1,34 @@
+# Parity notes: v1 → v2
+
+The v1 reference is `mja8291/tcf` at master `0a4a75c` (`reference/`). Each entry says what v1 does, what v2 does, and who decided.
+
+## Decisions taken
+
+| # | Area | v1 | v2 | Decided |
+| --- | --- | --- | --- | --- |
+| D1 | Sign-up (FR-AUTH-1/2) | Self sign-up; admin sets Approved=YES in the `Users` tab | Self sign-up kept (`auth.signup` → pending row in `Users v2`). Admin approves or revokes in-app and can issue a temporary password (forced change). | User, 28 Oct |
+| D2 | Downloads (FR-EXP-1/2) | Any approved user downloads any survey and the all-responses export | Same, via `surveys.get` and `export.rows`. `sync.pull` keeps only the user's own survey list on the phone. | User, 28 Oct |
+| D3 | v2-only tabs | (n/a) | `Users v2`, `Credentials`, `Sessions`, `Files`, `ChangeLog`, `AuditLog` and `ErrorLog` live in a separate **MQI v2 System** spreadsheet in the v2 Drive root, not next to the response tabs, so people who can open the responses never see password hashes. | Proposed 28 Oct (user gave the v2 Drive root) |
+| D4 | Head-of-line blocking (FR-OFF-4) | A failure stops the queue run | A permanently rejected survey is marked failed and the queue continues. Only LOCK_TIMEOUT, RATE_LIMITED and INTERNAL retry. | Brief |
+| D5 | Sign-in switch (FR-AUTH-11) | Off until AUTH_SECRET is set | Always on | Brief |
+| D6 | School list before sign-in (FR-AUTH-5) | Public | Needs a session; sign-in always comes before a survey | Proposed |
+| D7 | Session storage (FR-AUTH-6) | HttpOnly cookie, sliding 60 days | HMAC token in IndexedDB, 60 days, re-issued by `auth.whoami`; protected by a strict CSP | Brief |
+| D8 | Write mode | `USER_ENTERED` (formula injection possible) | RAW. Columns v1 stored as numbers are sent as numbers (`packages/shared/src/sheets.ts` `NUMERIC_COLUMNS`), so cells keep their type. | Brief |
+| D9 | Appending next to v1 | Sheets API `values.append` | Sheets Advanced Service `values.append` (RAW, INSERT_ROWS): the old app takes no script lock, so `getLastRow()+1` could overwrite its rows | Proposed |
+| D10 | Photo rows | Written at submit (link already known) | Note rows are written with the survey. Each photo's row is written when its upload completes, so photo rows can appear minutes after the location rows. | Proposed |
+| D11 | Method 1 | Can finish Method 1 drafts | v2 cannot see v1 drafts, so Method 1 is read-only history (exports and dashboard) | Proposed |
+| D12 | New column | (none) | `Source App`: blank on v1 rows, `v2` on v2 rows, appended at the end of `Method 2 Responses` | Brief |
+| D13 | Reviewer role | Not enforced | Reviewer cannot submit surveys; downloads and dashboard only | Proposed |
+
+## Golden parity
+
+- Production (`MQI Analysis`, `1Hv2lOEx…PCM4`) holds about 246 location rows in **18 Method 2 surveys**: 15 legacy (blank version), 1 at `2026-10-27` and 2 at `2026-10-28`. That is fewer than the brief's 50, so the suite uses all of them.
+- Four real surveys are checked in so far (two legacy, two at `2026-10-28`, names removed). All reproduce overall, divisions, band, Major/Minor and all seven critical items exactly.
+- **To finish:** export the full workbook (see `tools/fixtures/src/export.ts`) and re-run `npm test`.
+- Precision is the stored integer. The sheet keeps `Math.round(score)`, so "to the decimal" is not checkable against stored values. The Excel export recomputes unrounded values from formulas, and Phase 5 compares those.
+
+## Observations (v1 behaviour kept, not "fixed")
+
+- **O1.** Legacy (blank-version) rows written before about 2026-08-20 have a different Timestamp on each location row of the same survey (for example `92d33d63…`). v1 later wrote one batched timestamp. v2 writes one timestamp per survey, as current v1 does.
+- **O2.** The blank-version Method 2 list changed several times between 9 Aug and 27 Oct (`git log -- src/lib/data/method2-items.ts`), but v1 freezes only its final pre-27 Oct state as "legacy". A blank-version survey from before such an edit could recompute differently. Any fixture that fails will be listed here, not patched.
+- **O3.** Rows written at `2026-10-28` reuse legacy columns with identical names (`Plaster`, `Masonry`, `Internal Flooring condition`). This is harmless, because the version decides which columns are read.

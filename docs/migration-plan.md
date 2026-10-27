@@ -85,6 +85,25 @@ Every phase ends with `typecheck`, `lint`, `test` and `build` green, and one com
 | Staging | a second Hosting site or Hosting channel on tcf-mqi-app-761a8 (I propose `tcf-mqi-app-761a8-staging`) | staging Apps Script project (versioned deployment) | **copies** of the response spreadsheet, the schools spreadsheet and the photo folder, owned by the department account |
 | Production | tcf-mqi-app-761a8.web.app | production Apps Script deployment | the live spreadsheet (append-only for v2) and the department Drive folder |
 
+## 7a. Drive layout (decided 28 Oct)
+
+The v2 root folder is `1wCWvRxaik6h2dsm2ExX9cSqJ84vDs9Cm`, owned by the department account. `setup()` creates the missing pieces inside it and never renames or deletes anything:
+
+```
+<v2 root>/
+  01 Production/
+     MQI v2 System (spreadsheet)    Users v2, Credentials, Sessions, Files, ChangeLog, AuditLog, ErrorLog
+     Survey Photos/{Region}/{Campus}/{YYYY-MM-DD} MQI Survey - {id8}/[{Floor} - {Type} - {Name}/]{Item}.jpg
+  02 Staging/
+     MQI Responses (STAGING)        copy of the production responses spreadsheet
+     MQI v2 System (STAGING)
+     Survey Photos/
+  03 Backups/                       dated copies of the System spreadsheet before each schema upgrade
+  04 Exports/                       reserved for admin exports
+```
+
+**A change from the brief:** the v2-only tabs (especially `Credentials`) go in a separate **MQI v2 System** spreadsheet that only the department account can open, not alongside the response tabs. Reviewers who can open the responses spreadsheet would otherwise see password hashes and session data. Survey rows still go to the **existing** `Method 2 Responses` and `MQI Survey Attachments` tabs, and the existing responses spreadsheet stays where it is. This is recorded in `docs/parity-notes.md`.
+
 ## 8. Risks
 
 - **Concurrent v1/v2 appends.** Handled by Advanced Service append (§4.1) and covered by a test.

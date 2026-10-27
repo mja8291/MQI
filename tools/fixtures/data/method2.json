@@ -1,0 +1,221 @@
+[
+ {
+  "surveyId": "92d33d63-4b53-42bf-8c6c-689061a60b82",
+  "rubricVersion": "",
+  "timestamp": "2026-08-18T08:06:01.848Z",
+  "locations": [
+   {
+    "id": "0",
+    "floorLevel": "External",
+    "type": "Exterior Facade",
+    "name": "Exterior Facade 1",
+    "scores": {
+     "External Fascade (Exterior Finish)": "Poor",
+     "Cracks visibility in columns": "Ok",
+     "Cracks visibility in walls": "Ok",
+     "Signage *": "Ok",
+     "Plaster": "Ok",
+     "Masonry": "Ok",
+     "CC Jaali": "Ok"
+    }
+   },
+   {
+    "id": "1",
+    "floorLevel": "External",
+    "type": "External Development",
+    "name": "External Development 1",
+    "scores": {
+     "Water Supply line *": "Poor",
+     "Sewerage Line functionality *": "Ok",
+     "Motor (Water pump) *": "Ok",
+     "Boundary wall": "Ok",
+     "Main Gate": "Ok"
+    }
+   }
+  ],
+  "stored": {
+   "overall": 70,
+   "functionality": 65,
+   "safety": 75,
+   "aesthetics": 69,
+   "major": 70,
+   "minor": 68,
+   "ratingBand": "Good",
+   "criticalItems": {
+    "Cracks visibility in roof": null,
+    "Green board *": null,
+    "Roof Screeding/roof drainage": null,
+    "Roof leakage/seepage": null,
+    "Visibility of dampness": null,
+    "Internal Paint": null,
+    "External Fascade (Exterior Finish)": 50
+   }
+  }
+ },
+ {
+  "surveyId": "66369838-00fb-4658-ae43-139246f110c7",
+  "rubricVersion": "",
+  "timestamp": "2026-08-18T09:49:10.886Z",
+  "locations": [
+   {
+    "id": "0",
+    "floorLevel": "Ground",
+    "type": "Other Room (Staff, Principal, Admin, Store etc.)",
+    "name": "Principal Room",
+    "scores": {
+     "Motor (Water pump) *": "N/A",
+     "Fans *": "Good",
+     "Fan Dimmers *": "Good",
+     "Electrical Wiring/Connections": "Good",
+     "Windows/Ventilator & panes *": "Ok",
+     "Cabinet *": "Good",
+     "Soft board *": "Good",
+     "Doors *": "Ok",
+     "Furniture condition *": "Ok",
+     "Internal Paint": "Ok",
+     "Cracks visibility in roof": "Ok",
+     "Cracks visibility in columns": "Ok",
+     "Cracks visibility in walls": "Ok",
+     "Internal Flooring condition": "Ok",
+     "Roof leakage/seepage": "Poor",
+     "Visibility of dampness": "Poor",
+     "Plaster": "Ok",
+     "Masonry": "Ok",
+     "CC Jaali": "N/A"
+    }
+   },
+   {
+    "id": "1",
+    "floorLevel": "Ground",
+    "type": "Classroom",
+    "name": "KG A",
+    "scores": {
+     "Fans *": "Poor",
+     "Light Switch Buttons *": "Ok",
+     "Bulbs *": "Ok",
+     "Fan Dimmers *": "N/A",
+     "Electrical Wiring/Connections": "Ok",
+     "Windows/Ventilator & panes *": "Ok",
+     "Cabinet *": "Ok",
+     "Soft board *": "Ok",
+     "Doors *": "Ok",
+     "Furniture condition *": "Ok",
+     "Green board *": "Good",
+     "Internal Paint": "Ok",
+     "Cracks visibility in roof": "Ok",
+     "Cracks visibility in columns": "Ok",
+     "Cracks visibility in walls": "Ok",
+     "Internal Flooring condition": "Ok",
+     "Roof leakage/seepage": "Poor",
+     "Visibility of dampness": "Poor",
+     "Plaster": "Ok",
+     "Masonry": "Ok"
+    }
+   }
+  ],
+  "stored": {
+   "overall": 77,
+   "functionality": 86,
+   "safety": 70,
+   "aesthetics": 75,
+   "major": 72,
+   "minor": 83,
+   "ratingBand": "Good",
+   "criticalItems": {
+    "Cracks visibility in roof": 75,
+    "Green board *": 100,
+    "Roof Screeding/roof drainage": null,
+    "Roof leakage/seepage": 50,
+    "Visibility of dampness": 50,
+    "Internal Paint": 75,
+    "External Fascade (Exterior Finish)": null
+   }
+  }
+ },
+ {
+  "surveyId": "4ef6d6b7-d47d-4f62-9700-46607e94df4c",
+  "rubricVersion": "2026-10-28",
+  "timestamp": "2026-10-27T19:27:10.150Z",
+  "locations": [
+   {
+    "id": "0",
+    "floorLevel": "Ground",
+    "type": "Classroom",
+    "name": "Class 1 A",
+    "scores": {
+     "Concrete/Plaster Soundness": "Good",
+     "Ceiling Condition i.e. cracks & seepage": "Good",
+     "Wall/Column Condition i.e. cracks": "Good",
+     "Green board/Softboard/Cabinet": "Good",
+     "Electrical Fixtures + Switch/Dimmer Sheet": "Good",
+     "Internal Flooring condition": "Good",
+     "Furniture Condition": "Good",
+     "Door/Windows/Ventilators": "Good",
+     "Paint": "Good",
+     "Plaster": "Good"
+    }
+   }
+  ],
+  "stored": {
+   "overall": 100,
+   "functionality": 100,
+   "safety": 100,
+   "aesthetics": 100,
+   "major": 100,
+   "minor": 100,
+   "ratingBand": "Excellent",
+   "criticalItems": {
+    "Cracks visibility in roof": 100,
+    "Green board *": 100,
+    "Roof Screeding/roof drainage": null,
+    "Roof leakage/seepage": 100,
+    "Visibility of dampness": 100,
+    "Internal Paint": 100,
+    "External Fascade (Exterior Finish)": null
+   }
+  }
+ },
+ {
+  "surveyId": "460f7228-a4e7-48c8-a9d5-7e2d6b735575",
+  "rubricVersion": "2026-10-28",
+  "timestamp": "2026-10-27T19:48:37.701Z",
+  "locations": [
+   {
+    "id": "0",
+    "floorLevel": "Ground",
+    "type": "Classroom",
+    "name": "Class 1 A",
+    "scores": {
+     "Concrete/Plaster Soundness": "Good",
+     "Ceiling Condition i.e. cracks & seepage": "Good",
+     "Wall/Column Condition i.e. cracks": "Good",
+     "Green board/Softboard/Cabinet": "Good",
+     "Electrical Fixtures + Switch/Dimmer Sheet": "Good",
+     "Internal Flooring condition": "Good",
+     "Furniture Condition": "Good",
+     "Door/Windows/Ventilators": "Good",
+     "Paint": "Good",
+     "Plaster": "Good"
+    }
+   }
+  ],
+  "stored": {
+   "overall": 100,
+   "functionality": 100,
+   "safety": 100,
+   "aesthetics": 100,
+   "major": 100,
+   "minor": 100,
+   "ratingBand": "Excellent",
+   "criticalItems": {
+    "Cracks visibility in roof": 100,
+    "Green board *": 100,
+    "Roof Screeding/roof drainage": null,
+    "Roof leakage/seepage": 100,
+    "Visibility of dampness": 100,
+    "Internal Paint": 100,
+    "External Fascade (Exterior Finish)": null
+   }
+  }
+ }
+]

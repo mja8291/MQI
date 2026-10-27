@@ -17,13 +17,9 @@ Sign in as **tcfengineeringdepartment@gmail.com** for every Google step unless i
 
    An ID is the part of the URL between `/d/` and `/edit`.
 2. **Read access for fixtures.** The Google Sheets connector in this app must be signed in with an account that can **view** the production responses spreadsheet. If it can't, share that sheet as *Viewer* with the connector's account, or export the three tabs as .xlsx into this project's `tools/fixtures/raw/` folder yourself.
-3. **Staging copies** (File → Make a copy, owned by the department account):
-   - `MQI Responses (STAGING)`: a copy of the production responses spreadsheet
-   - `MQI Schools (STAGING)`: a copy of the schools spreadsheet (or reuse production read-only; say which)
-   - a new Drive folder, `MQI v2 Photos (STAGING)`
-
-   Send me the three IDs. For a folder, the ID is the part of the URL after `/folders/`.
-4. **Production photo folder:** create the Drive folder `MQI v2 Survey Photos` and send me its ID. Use it only at cutover.
+3. **v2 root folder: done.** `1wCWvRxaik6h2dsm2ExX9cSqJ84vDs9Cm`. `setup()` creates `01 Production`, `02 Staging`, `03 Backups` and `04 Exports`, the System spreadsheets and the photo folders inside it. You don't need to create any other folders.
+4. **Staging responses copy:** `setup()` on the **staging** script copies the production responses spreadsheet into `02 Staging` itself (a read of production, then a new file). If you'd rather make the copy yourself, put it in `02 Staging` and send me its ID. The schools spreadsheet is read-only for both environments, so no copy is needed.
+5. **Connector access (optional).** The Google Drive/Sheets connector in this app can't see the v2 folder, so it's signed in with a different account. To let me read the production responses sheet for fixtures, share it as **Viewer** with that account, or export it as .xlsx into `tools/fixtures/raw/`.
 5. **Access check:** the department account must be able to edit the production responses spreadsheet and read the schools spreadsheet.
 6. **Drive space:** check free space at https://one.google.com/storage. Photos use roughly 300 KB each, so 60 photos per survey is about 18 MB.
 
