@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "types": ["node", "google-apps-script"] },
+  "include": ["src", "build.mjs"]
+}

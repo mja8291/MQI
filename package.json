@@ -1,0 +1,35 @@
+{
+  "name": "tcf-mqi-v2",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @mqi/web",
+    "dev:api": "npm run dev -w @mqi/gas",
+    "build": "npm run build -w @mqi/gas && npm run build -w @mqi/web",
+    "typecheck": "tsc -p packages/shared && tsc -p apps/gas && tsc -p apps/web && tsc -p apps/web/tsconfig.sw.json && tsc -p tools/fixtures",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "npm run e2e -w @mqi/web",
+    "check": "npm run typecheck && npm run lint && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "globals": "^16.0.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.46.0",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

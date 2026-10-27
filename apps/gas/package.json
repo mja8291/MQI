@@ -1,0 +1,19 @@
+{
+  "name": "@mqi/gas",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/dev/server.ts",
+    "build": "node build.mjs",
+    "push:staging": "npm run build && clasp push -P .clasp.staging.json --force",
+    "push:prod": "npm run build && clasp push -P .clasp.prod.json --force"
+  },
+  "dependencies": { "@mqi/shared": "*", "zod": "^4.3.0" },
+  "devDependencies": {
+    "@google/clasp": "^3.4.0",
+    "@types/google-apps-script": "^2.0.13",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.23.0"
+  }
+}

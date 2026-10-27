@@ -1,0 +1,11 @@
+{
+  "projects": { "default": "tcf-mqi-app-761a8" },
+  "targets": {
+    "tcf-mqi-app-761a8": {
+      "hosting": {
+        "prod": ["tcf-mqi-app-761a8"],
+        "staging": ["tcf-mqi-app-761a8-staging"]
+      }
+    }
+  }
+}

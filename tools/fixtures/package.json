@@ -1,0 +1,9 @@
+{
+  "name": "@mqi/fixtures",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": { "export": "tsx src/export.ts" },
+  "dependencies": { "@mqi/shared": "*" },
+  "devDependencies": { "tsx": "^4.23.0" }
+}

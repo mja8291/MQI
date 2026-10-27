@@ -1,0 +1,26 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+.firebase/
+*.log
+.env
+.env.*
+!apps/web/env/.env
+!apps/web/env/.env.*
+!.env.example
+
+# Read-only clone of the v1 app (mja8291/tcf @ master). Never committed.
+reference/
+
+# Raw production exports; only the sanitised fixtures under tools/fixtures/data are committed.
+tools/fixtures/raw/
+
+# clasp project bindings hold script IDs per environment.
+apps/gas/.clasp*.json
+!apps/gas/.clasp.example.json
+.clasprc.json
+
+# Local dev fake data.
+apps/gas/.dev-data/
