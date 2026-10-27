@@ -117,7 +117,7 @@ function survey(overrides: Partial<SubmittedSurvey> = {}): SubmittedSurvey {
     siteChecks: { roofAccessType: 'Ladder', overflowDisposal: 'Provided', roofClean: 'Yes', rainSpoutsClear: 'Yes', riskFactors: [], riskFactorOther: '' },
     complaints: '=HYPERLINK("http://x")',
     declaration: true,
-    locations,
+    locations: locations as SubmittedSurvey['locations'],
     reviewPhotos: {},
     startTime: '2026-10-28T04:00:00.000Z',
     endTime: '2026-10-28T05:00:00.000Z',

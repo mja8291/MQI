@@ -2,9 +2,21 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { fileURLToPath } from 'node:url';
+
+const src = (p: string) => fileURLToPath(new URL(`./src/${p}`, import.meta.url));
 
 export default defineConfig({
   envDir: 'env',
+  // v1 screens are ported with their imports intact: @/ is src/, next/* are small shims.
+  resolve: {
+    alias: [
+      { find: 'next/navigation', replacement: src('shims/next-navigation.ts') },
+      { find: 'next/link', replacement: src('shims/next-link.tsx') },
+      { find: 'next/image', replacement: src('shims/next-image.tsx') },
+      { find: /^@\//, replacement: src('') },
+    ],
+  },
   plugins: [
     react(),
     tailwindcss(),

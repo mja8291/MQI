@@ -34,7 +34,8 @@ function login(email: string, password = DEV_PASSWORD): string {
   return ok(call<WhoAmI>('auth.login', { email, password })).sessionToken;
 }
 
-function location(name: string, type: Method2Location['type'], scores: Method2Location['scores'], photos: Method2Location['photos'] = {}, notes: Record<string, string> = {}): Method2Location {
+type Loc = SubmittedSurvey['locations'][number];
+function location(name: string, type: Method2Location['type'], scores: Method2Location['scores'], photos: Loc['photos'] = {}, notes: Record<string, string> = {}): Loc {
   return { id: name, floorLevel: type === 'Roof' ? 'Roof' : 'Ground', type, name, scores, photos, notes };
 }
 

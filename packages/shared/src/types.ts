@@ -178,7 +178,7 @@ export interface Method2Location {
   classroomSection?: string;
   scores: Record<string, Condition>;
   /** Multiple photos per item are allowed; each is an attachment id (see PhotoRef). */
-  photos: Record<string, PhotoRef[]>;
+  photos: Record<string, readonly unknown[]>;
   notes: Record<string, string>;
 }
 

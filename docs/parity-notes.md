@@ -32,3 +32,17 @@ The v1 reference is `mja8291/tcf` at master `0a4a75c` (`reference/`). Each entry
 - **O1.** Legacy (blank-version) rows written before about 2026-08-20 have a different Timestamp on each location row of the same survey (for example `92d33d63…`). v1 later wrote one batched timestamp. v2 writes one timestamp per survey, as current v1 does.
 - **O2.** The blank-version Method 2 list changed several times between 9 Aug and 27 Oct (`git log -- src/lib/data/method2-items.ts`), but v1 freezes only its final pre-27 Oct state as "legacy". A blank-version survey from before such an edit could recompute differently. Any fixture that fails will be listed here, not patched.
 - **O3.** Rows written at `2026-10-28` reuse legacy columns with identical names (`Plaster`, `Masonry`, `Internal Flooring condition`). This is harmless, because the version decides which columns are read.
+- **O4.** A draft export (Review → Excel/PDF before submitting) lists no photo links in v2: photos stay on the phone until the survey is submitted. v1 listed links for photos that had already uploaded.
+
+## Phase 4 (web app) decisions
+
+| # | Area | v1 | v2 |
+| --- | --- | --- | --- |
+| W1 | Photo attach | Uploaded to Drive on attach, with a per-photo Uploading/Retry state | Compressed in a Web Worker (1600 px, ≤ 300 KB, EXIF orientation), saved on the phone under a UUID v7 attachment id, then uploaded by the sync engine after the survey reaches the server, in resumable 2 MB chunks. The per-photo Retry control is gone, because nothing uploads at attach time. |
+| W2 | Submit | POST, then queued on failure | Always committed locally first (record + outbox entry + draft removal in one transaction), validated with the same shared rules the server uses, then sent. Done shows Sending → Survey submitted, or Saved offline. |
+| W3 | Method 1 screens | Kept to finish v1 drafts | Removed (unreachable in v2, D11) |
+| W4 | Unload flush (FR-OFF-7) | Async IndexedDB write on pagehide | Synchronous transaction on the open connection; an async write was shown (end-to-end test) to be lost on an immediate reload |
+| W5 | Reconnect | Flush on the online event | The online event sends at once, ignoring backoff; failures while the phone reports offline add no backoff |
+| W6 | Service worker | Self-updating; reload on activate | Updates are offered by a banner and applied when the user taps Update or the server answers UPGRADE_REQUIRED. A worker claiming the page on first install never reloads it mid-survey (also found by the end-to-end test). |
+| W7 | Dashboard offline | Cached /api/dashboard in the SW | Last dashboard kept in IndexedDB and cleared on sign-out |
+| W8 | Admin | Sheet edits | In-app "Manage users" (approve, set role, revoke, temporary password), admins only |
