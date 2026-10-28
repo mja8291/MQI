@@ -1,53 +1,65 @@
 # What you need to do, create and connect
 
-Steps you must do yourself, in order. Everything else I build and test locally against an in-memory Sheets/Drive fake, so nothing here blocks Phases 1–5 code. They block **pushing to GitHub**, **fixtures from real data** and **deploying staging**.
+All code for Phases 1–8 is written and tested locally against an in-memory Sheets/Drive fake. What's left needs your accounts, your decisions, or both. Do the steps in order. Sign in as **tcfengineeringdepartment@gmail.com** for every Google step unless it says otherwise.
 
-Sign in as **tcfengineeringdepartment@gmail.com** for every Google step unless it says otherwise.
+## Already done (no action)
 
-## A. GitHub (needed for CI, Phase 1)
+- v2 Drive root folder `1wCWvRxaik6h2dsm2ExX9cSqJ84vDs9Cm`: `setup()` builds `01 Production`, `02 Staging`, `03 Backups`, `04 Exports` and the System spreadsheets inside it.
+- Production responses spreadsheet identified: **MQI Analysis** `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4` (read-only so far).
+- Firebase project `tcf-mqi-app-761a8` is connected on this PC.
 
-1. Create an **empty private** repo `mja8291/tcf-mqi-v2` at https://github.com/new. Leave README, .gitignore and licence unticked.
-2. Tell me when it exists. I'll add the remote and push. Git Credential Manager will open a browser for you to sign in on the first push.
+## 1. GitHub (CI)
 
-## B. Google Sheets and Drive (needed for Phase 2 fixtures and Phase 3 staging)
+1. Create an **empty private** repo `mja8291/tcf-mqi-v2` (no README, .gitignore or licence).
+2. Tell me, and I'll add the remote and push. Git Credential Manager asks you to sign in on the first push. CI then runs typecheck, lint, tests, build and end-to-end on every push.
 
-1. **Production IDs (read-only for me).** Send me:
-   - the MQI responses spreadsheet ID (the one with `Method 2 Responses`, `Method 1 Responses` and `MQI Survey Attachments`)
-   - the schools spreadsheet ID and its tab name (default `Schools (All Units)`).
+## 2. Send me one ID
 
-   An ID is the part of the URL between `/d/` and `/edit`.
-2. **Read access for fixtures.** The Google Sheets connector in this app must be signed in with an account that can **view** the production responses spreadsheet. If it can't, share that sheet as *Viewer* with the connector's account, or export the three tabs as .xlsx into this project's `tools/fixtures/raw/` folder yourself.
-3. **v2 root folder: done.** `1wCWvRxaik6h2dsm2ExX9cSqJ84vDs9Cm`. `setup()` creates `01 Production`, `02 Staging`, `03 Backups` and `04 Exports`, the System spreadsheets and the photo folders inside it. You don't need to create any other folders.
-4. **Staging responses copy:** `setup()` on the **staging** script copies the production responses spreadsheet into `02 Staging` itself (a read of production, then a new file). If you'd rather make the copy yourself, put it in `02 Staging` and send me its ID. The schools spreadsheet is read-only for both environments, so no copy is needed.
-5. **Connector access (optional).** The Google Drive/Sheets connector in this app can't see the v2 folder, so it's signed in with a different account. To let me read the production responses sheet for fixtures, share it as **Viewer** with that account, or export it as .xlsx into `tools/fixtures/raw/`.
-5. **Access check:** the department account must be able to edit the production responses spreadsheet and read the schools spreadsheet.
-6. **Drive space:** check free space at https://one.google.com/storage. Photos use roughly 300 KB each, so 60 photos per survey is about 18 MB.
+- The **schools spreadsheet** ID (v1's `SCHOOLS_SPREADSHEET_ID`, in Vercel → mqi-survey-app → Settings → Environment Variables) and its tab name if it isn't `Schools (All Units)`.
 
-## C. Apps Script (needed for Phase 3 staging deploy)
+## 3. Full golden fixtures (about 2 minutes)
 
-1. Turn on the Apps Script API: https://script.google.com/home/usersettings → *Google Apps Script API* → **On**.
-2. When I tell you (after Phase 3 code is green), run this in the Terminal panel and sign in as the department account in the browser that opens:
+Production holds 18 Method 2 surveys; 4 are in the tests now.
+
+1. Open **MQI Analysis** → File → Download → Microsoft Excel (.xlsx).
+2. Save it as `tools/fixtures/raw/MQI-Analysis.xlsx` in this project (the folder is gitignored, so it never leaves this PC).
+3. Tell me, and I'll run the exporter and the golden suite on all 18 surveys and report any that differ.
+
+## 4. Apps Script (staging first)
+
+1. Turn on the Apps Script API: https://script.google.com/home/usersettings → **On**.
+2. In the Terminal panel, run this and sign in as the department account:
    ```bash
-   npx clasp login
+   cd apps/gas && npx clasp login
    ```
-   I then create the staging script with `clasp create` and push it.
-3. **Once, in the Apps Script editor** (I'll send the link):
-   1. Open *Project Settings → Script Properties* and add the values I give you: the spreadsheet and folder IDs, `ADMIN_EMAIL` and `ADMIN_NAME`.
-   2. Run `setup()` from the editor and **accept the permission prompt** (Sheets, Drive, external requests). It creates the v2 tabs, generates the signing secret and password pepper, and prints the first admin's temporary password to the log.
-   3. Deploy → New deployment → Web app, *Execute as: Me*, *Who has access: Anyone*. Send me the `/exec` URL. I can also do this with `clasp deploy` once you've authorised.
-4. Decide who the first **Administrator** is (email and name). I suggest you.
+3. Tell me, and I'll create the staging script and push the code.
+4. In the Apps Script editor (I'll send the link), open Project Settings → Script Properties and add:
+   - `ENV_NAME` = `staging`
+   - `SCHOOLS_SPREADSHEET_ID` = (from step 2)
+   - `SOURCE_RESPONSES_SPREADSHEET_ID` = `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4`
+   - `ADMIN_EMAIL` and `ADMIN_NAME` = the first administrator (suggest you)
+5. Run `setup()` and accept the permission prompt. Copy the temporary admin password from the execution log.
+6. Run `benchmarkPasswordHash()` and send me the printed table (it goes in the README).
+7. I deploy the web app; you send me nothing more for this step.
 
-## D. Firebase (already connected)
+## 5. Staging pilot
 
-`firebase login` already works on this PC, with project `tcf-mqi-app-761a8` and site `tcf-mqi-app-761a8`. I'll create a second Hosting site, `tcf-mqi-app-761a8-staging`, for staging unless you'd rather use a preview channel. Nothing is needed from you.
+Work through `docs/pilot-checklist.md` on two phones, then send me the results.
 
-## E. Android TWA (Phase 6, later)
+## 6. Android TWA (Phase 6)
 
-- Choose a package name, for example `org.tcf.mqi.v2`. It must differ from the current app's.
-- Install JDK 17 and Android command-line tools (Bubblewrap can download them), or let me generate the project for you to build in Android Studio.
-- Get the release signing SHA-256, either from Play Console → App integrity, or from the keystore you create.
+Decide the **package name** (it must differ from the current app's, for example `org.tcf.mqi.v2`), then follow `android/README.md`. It needs JDK 17 and Bubblewrap. Send me the signing SHA-256 (and Play's app-signing SHA-256 if Play re-signs).
 
-## F. Cutover (Phase 8, later)
+## 7. Production and cutover (Phase 8)
 
-- The cutover date, and the order surveyors move in.
-- Who sends the user notice.
+Read `docs/cutover-plan.md`, then decide:
+
+- the cutover date;
+- the order users move in;
+- who sends the user notice.
+
+Production setup repeats step 4 with `ENV_NAME` = `production` and `RESPONSES_SPREADSHEET_ID` = `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4`. Nothing happens in production until you approve.
+
+## 8. Drive space
+
+Check free space at https://one.google.com/storage. Photos use about 300 KB each, so a 60-photo survey is about 18 MB.

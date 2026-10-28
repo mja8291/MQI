@@ -24,3 +24,11 @@ apps/gas/.clasp*.json
 
 # Local dev fake data.
 apps/gas/.dev-data/
+
+# Android signing material (android/README.md)
+android/*.keystore
+android/*.jks
+android/app/
+android/build/
+android/*.apk
+android/*.aab

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -6,7 +6,32 @@ import { fileURLToPath } from 'node:url';
 
 const src = (p: string) => fileURLToPath(new URL(`./src/${p}`, import.meta.url));
 
-export default defineConfig({
+/**
+ * Digital Asset Links for the v2 Android TWA (android/README.md): served at
+ * /.well-known/assetlinks.json only when both the package name and the signing SHA-256 are set
+ * for this mode, so a placeholder can never be published.
+ */
+function assetLinks(mode: string): Plugin {
+  const env = loadEnv(mode, 'env', 'TWA_');
+  const pkg = env.TWA_PACKAGE_NAME?.trim();
+  const fingerprints = (env.TWA_SHA256_FINGERPRINTS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  return {
+    name: 'mqi-assetlinks',
+    apply: 'build',
+    generateBundle() {
+      if (!pkg || !fingerprints.length) return;
+      const statement = [
+        {
+          relation: ['delegate_permission/common.handle_all_urls'],
+          target: { namespace: 'android_app', package_name: pkg, sha256_cert_fingerprints: fingerprints },
+        },
+      ];
+      this.emitFile({ type: 'asset', fileName: '.well-known/assetlinks.json', source: JSON.stringify(statement, null, 2) + '\n' });
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   envDir: 'env',
   // v1 screens are ported with their imports intact: @/ is src/, next/* are small shims.
   resolve: {
@@ -18,6 +43,7 @@ export default defineConfig({
     ],
   },
   plugins: [
+    assetLinks(mode),
     react(),
     tailwindcss(),
     VitePWA({
@@ -58,4 +84,4 @@ export default defineConfig({
   server: { port: 5173, strictPort: true },
   preview: { port: 4173, strictPort: true },
   build: { target: 'es2022', sourcemap: true, chunkSizeWarningLimit: 1200 },
-});
+}));

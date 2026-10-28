@@ -1,0 +1,22 @@
+{
+  "packageId": "SET_PACKAGE_NAME",
+  "host": "tcf-mqi-app-761a8.web.app",
+  "name": "TCF MQI Survey",
+  "launcherName": "MQI Survey",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#0e5c4d",
+  "navigationColor": "#0e5c4d",
+  "backgroundColor": "#f1f4ee",
+  "enableNotifications": false,
+  "startUrl": "/",
+  "iconUrl": "https://tcf-mqi-app-761a8.web.app/icons/icon-512.png",
+  "maskableIconUrl": "https://tcf-mqi-app-761a8.web.app/icons/icon-maskable-512.png",
+  "webManifestUrl": "https://tcf-mqi-app-761a8.web.app/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "appVersionName": "2.0.0",
+  "appVersionCode": 1,
+  "signingKey": { "path": "./android.keystore", "alias": "android" },
+  "minSdkVersion": 21
+}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/lib/auth/client";
+import { can } from "@mqi/shared";
 import { QueueTab } from "./QueueTab";
 import { useQueue } from "./useQueue";
 
@@ -87,12 +88,15 @@ export function HomeTabs() {
             TCF Repair &amp; Maintenance Programme — score a campus against the Maintenance Quality Index, on site, in
             one session.
           </p>
-          <Link
-            href="/survey/find-school"
-            className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-brand text-white"
-          >
-            Start new survey
-          </Link>
+          {/* v2: hidden for roles that cannot submit (permission matrix); the server refuses them anyway. */}
+          {!user || can(user.role, "survey") ? (
+            <Link
+              href="/survey/find-school"
+              className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-brand text-white"
+            >
+              Start new survey
+            </Link>
+          ) : null}
           <Link
             href="/dashboard"
             className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-transparent text-brand-deep border border-border mt-2.5"
