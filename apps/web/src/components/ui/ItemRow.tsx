@@ -43,7 +43,9 @@ export function ItemRow({
 
   return (
     <div className="py-2.5 border-b border-border">
-      <div className="flex items-center justify-between gap-2 mb-2">
+      {/* v2 (W18): name on its own line, weight and buttons below — on a 360–390 px phone the
+          four buttons beside the name pushed the last one off screen and squeezed long names. */}
+      <div className="mb-1">
         <span className="text-[13.5px] font-medium text-ink">
           {item.name}
           {pending ? (
@@ -59,10 +61,12 @@ export function ItemRow({
             </span>
           ) : null}
         </span>
+      </div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="text-[10.5px] text-ink-faint whitespace-nowrap">
+          {item.weight}%{worstCase ? " · worst-case" : ""}
+        </span>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10.5px] text-ink-faint whitespace-nowrap">
-            {item.weight}%{worstCase ? " · worst-case" : ""}
-          </span>
           <IconButton active={infoOpen} aria-label="Rating guidance" onClick={() => setInfoOpen((v) => !v)}>
             <Info size={16} />
           </IconButton>

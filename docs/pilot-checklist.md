@@ -6,7 +6,7 @@ Record for every check: phone model, Android/Chrome version, pass/fail, and a no
 
 ## 0. Setup (once per phone)
 
-- [ ] Install the app from Chrome (⋮ → **Add to Home screen** / **Install app**) at `tcfmqi-staging.web.app`. It opens in its own window. (The Android Play app, the TWA, is not built yet.)
+- [ ] Open `tcfmqi-staging.web.app` in Chrome: the sign-in page shows **Install app**; tapping it installs the app, which then opens from the home screen in its own window and no longer shows the button. (The Android Play app, the TWA, is not built yet.)
 - [ ] Sign up → the screen says the account awaits approval. An admin approves it in **Manage users** → sign in works.
 - [ ] Open **Start new survey** once while online, so the school list and every screen are on the phone. While the list loads the note says **Updating the campus list…**; it disappears once loaded. It must never say **Offline** while the phone is online.
 

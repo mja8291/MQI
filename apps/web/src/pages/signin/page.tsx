@@ -7,6 +7,7 @@ import { ScreenShell } from "@/components/ui/ScreenShell";
 import { Field, TextInput } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { useAuth } from "@/lib/auth/client";
+import { useInstallApp } from "@/lib/install";
 
 /** Only same-app paths — `next` comes from the URL, so it mustn't be able to send someone to another site after signing in. */
 function safeNext(): string {
@@ -83,7 +84,40 @@ export default function SignInPage() {
           Create an account
         </Link>
       </p>
+
+      <InstallApp />
       <div className="flex-1" />
     </ScreenShell>
+  );
+}
+
+/** v2 (W19): install the app to the home screen, so it opens full-screen and works offline. */
+function InstallApp() {
+  const { mode, install } = useInstallApp();
+  const [showSteps, setShowSteps] = useState(false);
+  if (mode === "none") return null;
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-card px-4 py-3">
+      <p className="text-[12.5px] text-ink-soft leading-snug mb-2.5">
+        Install the app on this phone: it opens from the home screen and works without a connection.
+      </p>
+      {mode === "prompt" ? (
+        <Button variant="ghost" onClick={() => void install()}>
+          Install app
+        </Button>
+      ) : (
+        <>
+          <Button variant="ghost" onClick={() => setShowSteps((v) => !v)}>
+            Install app
+          </Button>
+          {showSteps ? (
+            <p className="text-[12.5px] text-ink leading-snug mt-2.5">
+              In Safari, tap <span className="font-semibold">Share</span>, then{" "}
+              <span className="font-semibold">Add to Home Screen</span>.
+            </p>
+          ) : null}
+        </>
+      )}
+    </div>
   );
 }
