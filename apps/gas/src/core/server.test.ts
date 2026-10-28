@@ -338,7 +338,23 @@ describe('sync.push', () => {
   });
 });
 
+/** Test photo bytes that start like a real JPEG (W32: the server checks the signature). */
+function jpeg(n: number, mod: number): Uint8Array {
+  const b = new Uint8Array(n).map((_, i) => i % mod);
+  b.set([0xff, 0xd8, 0xff]);
+  return b;
+}
+
 describe('files.upload (chunked, idempotent)', () => {
+  test('W32: bytes that are not the recorded image type never reach Drive', () => {
+    const t = login('surveyor@tcf.test');
+    const item = makeSurvey();
+    ok(push(t, item));
+    const notJpeg = new Uint8Array(1000).map((_, i) => i % 251); // starts 00 01 02
+    expect(code(upload(t, item.attachments[0]!.id, notJpeg, 0))).toBe('VALIDATION');
+    expect(env.drive.createdFiles).toBe(0);
+  });
+
   function upload(t: string, attachmentId: string, bytes: Uint8Array, chunkIndex: number) {
     const count = Math.max(1, Math.ceil(bytes.length / UPLOAD_CHUNK_BYTES));
     const part = bytes.slice(chunkIndex * UPLOAD_CHUNK_BYTES, (chunkIndex + 1) * UPLOAD_CHUNK_BYTES);
@@ -355,7 +371,7 @@ describe('files.upload (chunked, idempotent)', () => {
     const item = makeSurvey();
     ok(push(t, item));
     const a = item.attachments[0]!;
-    const bytes = new Uint8Array(1000).map((_, i) => i % 251);
+    const bytes = jpeg(1000, 251);
     const r = ok(upload(t, a.id, bytes, 0));
     expect(r.done).toBe(true);
     expect(r.url).toMatch(/drive\.google\.com\/file\/d\//);
@@ -375,7 +391,7 @@ describe('files.upload (chunked, idempotent)', () => {
     const item = makeSurvey();
     ok(push(t, item));
     const a = item.attachments[0]!;
-    const bytes = new Uint8Array(1000).map((_, i) => i % 251);
+    const bytes = jpeg(1000, 251);
     const sent = { attachmentId: a.id, chunkIndex: 0, chunkCount: 1, totalSize: bytes.length, data: base64Encode(bytes) };
     const wrongSum = bytesToHex(sha256(new Uint8Array([1, 2, 3])));
     const bad = call<UploadResult>('files.upload', { ...sent, sha256: wrongSum }, t);
@@ -393,7 +409,7 @@ describe('files.upload (chunked, idempotent)', () => {
     item.attachments[0]!.size = size;
     ok(push(t, item));
     const id = item.attachments[0]!.id;
-    const bytes = new Uint8Array(size).map((_, i) => i % 7);
+    const bytes = jpeg(size, 7);
     expect(code(upload(t, id, bytes, 1))).toBe('CONFLICT');
     expect(ok(upload(t, id, bytes, 0)).received).toEqual([0]);
     expect(ok(upload(t, id, bytes, 0)).received).toEqual([0]);

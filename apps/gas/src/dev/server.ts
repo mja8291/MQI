@@ -42,6 +42,9 @@ export function seedDevEnv(env: MemoryEnv): void {
 }
 
 const isMain = process.argv[1]?.replace(/\\/g, '/').endsWith('dev/server.ts');
+/** Test-only network faults (see POST /__dev/faults). */
+const faults: { fail: number; dropAfterWrite: number; delayMs: number; actions: string[] | null } = { fail: 0, dropAfterWrite: 0, delayMs: 0, actions: null };
+
 if (isMain) {
   const env = createMemoryEnv({ now: Date.now() });
   env.now = () => Date.now();
@@ -67,13 +70,44 @@ if (isMain) {
         }),
       );
     }
+    // POST /__dev/faults {fail?, dropAfterWrite?, delayMs?, actions?}: the next `fail` API calls
+    // never reach the server (connection dropped); the next `dropAfterWrite` are processed and
+    // their answer is lost; every call waits delayMs. `actions` limits faults to those actions.
+    if (req.url === '/__dev/faults' && req.method === 'POST') {
+      let b = '';
+      req.on('data', (c: Buffer) => (b += c.toString('utf8')));
+      req.on('end', () => {
+        Object.assign(faults, { fail: 0, dropAfterWrite: 0, delayMs: 0, actions: null }, JSON.parse(b || '{}'));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(faults));
+      });
+      return;
+    }
     if (req.url !== '/api' || req.method !== 'POST') return void res.writeHead(404).end();
     let body = '';
     req.on('data', (c: Buffer) => (body += c.toString('utf8')));
     req.on('end', () => {
-      const out = handleRequest(env, body);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(out));
+      const action = (() => {
+        try {
+          return String((JSON.parse(body) as { action?: string }).action ?? '');
+        } catch {
+          return '';
+        }
+      })();
+      const targeted = !faults.actions || faults.actions.includes(action);
+      setTimeout(() => {
+        if (targeted && faults.fail > 0) {
+          faults.fail--;
+          return void res.destroy();
+        }
+        const out = handleRequest(env, body);
+        if (targeted && faults.dropAfterWrite > 0) {
+          faults.dropAfterWrite--;
+          return void res.destroy();
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(out));
+      }, faults.delayMs);
     });
   }).listen(PORT, () => {
     console.log(`MQI dev API on http://localhost:${PORT}/api`);

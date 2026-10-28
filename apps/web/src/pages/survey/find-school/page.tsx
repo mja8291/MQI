@@ -102,6 +102,13 @@ export default function FindSchoolPage() {
     <ScreenShell>
       <TopBar title="Find school" onBack={() => router.push("/")} />
 
+      {!usingCache && listState === "failed" && schools.length === 0 ? (
+        // v2 (W31): first use with no signal and no saved list — say what to do.
+        <p role="alert" className="text-[12.5px] text-band-poor bg-band-poor-tint rounded-lg px-3 py-2.5 mb-3 leading-snug">
+          No connection, and the campus list is not on this phone yet. Connect to the internet once (Wi-Fi or mobile
+          data) and open this page again; after that it works offline.
+        </p>
+      ) : null}
       {usingCache ? (
         <p className="text-[11px] text-ink-faint bg-surface rounded-lg px-2.5 py-2 mb-3">
           {listState === "failed"

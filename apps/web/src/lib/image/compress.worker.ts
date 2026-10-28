@@ -16,6 +16,9 @@ self.onmessage = async (e: MessageEvent<{ id: number; file: Blob }>) => {
         const canvas = new OffscreenCanvas(Math.round(bitmap.width * scale), Math.round(bitmap.height * scale));
         const ctx = canvas.getContext('2d');
         if (!ctx) throw new Error('No 2D context');
+        // White first: a transparent PNG would otherwise turn black as JPEG.
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         return canvas.convertToBlob({ type: 'image/jpeg', quality });
       });

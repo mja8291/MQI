@@ -147,42 +147,75 @@ async function uploadPhoto(attachmentId: string): Promise<UploadResult | null> {
   return last;
 }
 
+/** v2 (W33): photos go up three at a time (each photo's chunks stay in order). */
+const PHOTO_UPLOADS_AT_ONCE = 3;
+
+/**
+ * One push at a time, shared: the photo workers ask for "any survey answers waiting?" before
+ * every photo, and must not push the same survey twice.
+ */
+let pushing: Promise<boolean> | null = null;
+function pushSurveysOnce(force: boolean): Promise<boolean> {
+  pushing ??= pushSurveys(force).finally(() => {
+    pushing = null;
+  });
+  return pushing;
+}
+
 async function uploadPhotos(force: boolean): Promise<boolean> {
   const dueIds = new Set((await due('uploading', force)).map((s) => s.id));
   const entries = await db.outbox.orderBy('seq').filter((e) => e.kind === 'photo' && dueIds.has(e.surveyId)).toArray();
   const blocked = new Set<string>();
-  for (const entry of entries) {
-    if (blocked.has(entry.surveyId)) continue;
-    try {
-      const r = await uploadPhoto(entry.attachmentId!);
-      const now = new Date().toISOString();
-      await db.transaction('rw', db.photos, db.outbox, db.surveys, async () => {
-        if (r?.done) await db.photos.update(entry.attachmentId!, { uploaded: true, url: r.url });
-        await db.outbox.delete(entry.seq!);
-        const left = await db.outbox.where('surveyId').equals(entry.surveyId).count();
-        if (left === 0) await db.surveys.update(entry.surveyId, { status: 'synced', syncedAt: now, lastError: undefined, attempts: 0 });
-      });
-      setLastSync(now);
-      notifyChanged();
-    } catch (e) {
-      await noteTransient([entry.surveyId], e);
-      if (isAuthError(e)) notifyAuthRequired();
-      // No connection or signed out: nothing else can go either, so stop the run.
-      if (kindOf(e) === 'offline' || isAuthError(e)) return false;
-      // v2 (W15): any other photo trouble stays with its own survey — it waits out its backoff
-      // (transient) or shows Retry (permanent) — and every other survey's photos carry on.
-      blocked.add(entry.surveyId);
-      if (!isTransient(e)) {
-        const reason = e instanceof Error ? e.message : 'Photo rejected';
-        await db.surveys.update(entry.surveyId, {
-          status: 'failed',
-          lastError: { kind: 'server', message: `Survey data saved; a photo could not upload (${reason}). Tap Retry.` },
-        });
+  let next = 0;
+  let stopped = false;
+
+  async function worker(): Promise<void> {
+    while (!stopped) {
+      // W33: survey answers always go first — a survey submitted while photos are uploading
+      // does not wait for them to finish.
+      if (!(await pushSurveysOnce(force))) {
+        stopped = true;
+        return;
       }
-      notifyChanged();
+      const entry = entries[next++];
+      if (!entry) return;
+      if (blocked.has(entry.surveyId)) continue;
+      try {
+        const r = await uploadPhoto(entry.attachmentId!);
+        const now = new Date().toISOString();
+        await db.transaction('rw', db.photos, db.outbox, db.surveys, async () => {
+          if (r?.done) await db.photos.update(entry.attachmentId!, { uploaded: true, url: r.url });
+          await db.outbox.delete(entry.seq!);
+          const left = await db.outbox.where('surveyId').equals(entry.surveyId).count();
+          if (left === 0) await db.surveys.update(entry.surveyId, { status: 'synced', syncedAt: now, lastError: undefined, attempts: 0 });
+        });
+        setLastSync(now);
+        notifyChanged();
+      } catch (e) {
+        await noteTransient([entry.surveyId], e);
+        if (isAuthError(e)) notifyAuthRequired();
+        // No connection or signed out: nothing else can go either, so stop the run.
+        if (kindOf(e) === 'offline' || isAuthError(e)) {
+          stopped = true;
+          return;
+        }
+        // v2 (W15): any other photo trouble stays with its own survey — it waits out its backoff
+        // (transient) or shows Retry (permanent) — and every other survey's photos carry on.
+        blocked.add(entry.surveyId);
+        if (!isTransient(e)) {
+          const reason = e instanceof Error ? e.message : 'Photo rejected';
+          await db.surveys.update(entry.surveyId, {
+            status: 'failed',
+            lastError: { kind: 'server', message: `Survey data saved; a photo could not upload (${reason}). Tap Retry.` },
+          });
+        }
+        notifyChanged();
+      }
     }
   }
-  return true;
+
+  await Promise.all(Array.from({ length: PHOTO_UPLOADS_AT_ONCE }, worker));
+  return !stopped;
 }
 
 function setLastSync(iso: string) {
@@ -195,7 +228,7 @@ function setLastSync(iso: string) {
 
 async function run(force: boolean): Promise<void> {
   if (!(await getMeta<string>('session'))) return;
-  if ((await pushSurveys(force)) && (await uploadPhotos(force))) {
+  if ((await pushSurveysOnce(force)) && (await uploadPhotos(force))) {
     try {
       await saveOwnSurveys((await api<PullResult>('sync.pull')).surveys);
     } catch {
@@ -226,8 +259,26 @@ export async function flushPendingSubmissions(force = false): Promise<{ succeede
     flushing = false;
     notifyChanged();
   }
+  await scheduleNextRetry();
   const after = await db.surveys.where('status').equals('synced').count();
   return { succeeded: after - before, remaining: await openCount() };
+}
+
+let retryTimer: ReturnType<typeof setTimeout> | undefined;
+/**
+ * v2 (W34): after a failed attempt, try again the moment its backoff ends — not only at the next
+ * trigger (Sync now, reopening the app, the online event, the 5-minute timer). Known-offline phones
+ * wait for the online event instead.
+ */
+async function scheduleNextRetry(): Promise<void> {
+  clearTimeout(retryTimer);
+  if (typeof window === 'undefined' || navigator.onLine === false) return;
+  if (!(await getMeta<string>('session'))) return; // signed out: signing in sends them (FR-AUTH-9)
+  // Surveys waiting for a sign-in have no backoff to wait out; they go when the user signs in.
+  const waiting = (await db.surveys.where('status').anyOf('pending', 'uploading').toArray()).filter((s) => s.lastError?.kind !== 'auth');
+  if (!waiting.length) return;
+  const at = Math.min(...waiting.map((s) => s.nextAttemptAt || 0));
+  retryTimer = setTimeout(() => void flushPendingSubmissions(), Math.max(5_000, at - Date.now()));
 }
 
 async function openCount(): Promise<number> {

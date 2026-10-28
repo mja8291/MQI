@@ -100,6 +100,7 @@ async function makeQueued(opts: { photoBytes?: number; tamper?: boolean } = {}):
   const attachments: AttachmentMeta[] = [];
   if (withPhoto) {
     const bytes = new Uint8Array(opts.photoBytes!).map((_, i) => i % 251);
+    bytes.set([0xff, 0xd8, 0xff]); // a real JPEG signature (W32 server check)
     await putPhoto({ id: photoId, surveyId: id, blob: new Blob([bytes], { type: 'image/jpeg' }), mimeType: 'image/jpeg', size: bytes.length });
     attachments.push({ id: photoId, surveyId: id, itemName: 'Plaster', locationName: 'Roof 1', location: { floorLevel: 'Roof', type: 'Roof', name: 'Roof 1' }, mimeType: 'image/jpeg', size: bytes.length });
   }

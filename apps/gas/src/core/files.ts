@@ -83,6 +83,11 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
     withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').update(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
     fail('INTERNAL', `Photo chunk ${p.chunkIndex} ${damaged}; it will be sent again.`);
   }
+  // v2 (W32): the bytes must really be the image type on record — nothing else reaches Drive.
+  if (p.chunkIndex === 0 && !looksLike(bytes, claim.f.mimeType ?? 'image/jpeg')) {
+    withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').update(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
+    fail('VALIDATION', 'This photo is not a JPEG, PNG or WebP image.');
+  }
 
   const survey = Table.of(ctx.env, 'SURVEYS', 'surveyId').get(f.surveyId ?? '');
   const where = photoLocation({
@@ -136,4 +141,12 @@ export function get(ctx: Ctx, raw: unknown): FileGetResult {
   if (f.ownerId !== me.id && !can(me.role, 'surveyDownload')) fail('FORBIDDEN', 'You cannot open this photo.');
   const file = ctx.env.drive.read(f.driveFileId);
   return { mimeType: file.mime, data: base64Encode(file.bytes) };
+}
+
+/** File signatures of the photo types the app saves (JPEG, PNG, WebP). */
+function looksLike(b: Uint8Array, mime: string): boolean {
+  if (mime === 'image/jpeg') return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  if (mime === "image/png") return b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+  if (mime === "image/webp") return String.fromCharCode(...b.slice(0, 4)) === "RIFF" && String.fromCharCode(...b.slice(8, 12)) === "WEBP";
+  return false;
 }

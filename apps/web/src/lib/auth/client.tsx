@@ -4,6 +4,7 @@ import { usePathname, useRouter } from '@/shims/next-navigation';
 import { ApiCallError, SESSION_KEY, api, isAuthError, rawCall } from '@/lib/api';
 import { deleteMeta, setMeta } from '@/lib/offline/db';
 import { flushPendingSubmissions } from '@/lib/offline/sync';
+import { warmOfflineData } from '@/lib/offline/readiness';
 import { AUTH_REQUIRED_EVENT } from './events';
 
 export interface AuthUser {
@@ -77,6 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus(w.mustChangePassword ? 'mustChange' : 'signedIn');
     // Ask the browser not to evict our data under storage pressure (unsent surveys live here).
     void navigator.storage?.persist?.().catch(() => false);
+    // W31: put the campus list on the phone now, so the first survey can start with no signal.
+    void warmOfflineData();
   }, []);
 
   const forget = useCallback(async () => {

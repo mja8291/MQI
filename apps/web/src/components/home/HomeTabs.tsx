@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/lib/auth/client";
 import { can } from "@mqi/shared";
 import { QueueTab } from "./QueueTab";
+import { useOfflineReadiness } from "@/lib/offline/readiness";
 import { useQueue } from "./useQueue";
 
 type Tab = "start" | "incomplete" | "sync";
@@ -121,6 +122,7 @@ export function HomeTabs() {
               Manage users
             </Link>
           ) : null}
+          <OfflineReadyLine />
           {queue.pending.length > 0 ? (
             // v2 (W29): a standing reminder until every submitted survey has reached the server.
             <button
@@ -163,5 +165,22 @@ export function HomeTabs() {
         onCancel={() => setConfirmSignOut(false)}
       />
     </>
+  );
+}
+
+/** v2 (W31): whether this phone can do a survey with no signal yet. */
+function OfflineReadyLine() {
+  const r = useOfflineReadiness();
+  if (!r) return null;
+  const ready = r.app && r.schools > 0;
+  return (
+    <p
+      role="status"
+      className={`mt-3 text-center text-[12px] leading-snug ${ready ? "text-brand-deep" : "text-band-poor"}`}
+    >
+      {ready
+        ? `✓ Ready to work offline (${r.schools.toLocaleString()} campuses saved on this phone)`
+        : "Preparing offline use… stay connected for a moment before going to a site with no signal."}
+    </p>
   );
 }

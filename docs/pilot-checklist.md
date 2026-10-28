@@ -9,6 +9,7 @@ Record for every check: phone model, Android/Chrome version, pass/fail, and a no
 - [ ] Open `tcfmqi-staging.web.app` in Chrome: the sign-in page shows **Install app**; tapping it installs the app, which then opens from the home screen in its own window and no longer shows the button. (The Android Play app, the TWA, is not built yet.)
 - [ ] Sign up → the screen says the account awaits approval. An admin approves it in **Manage users** → sign in works.
 - [ ] Open **Start new survey** once while online, so the school list and every screen are on the phone. While the list loads the note says **Updating the campus list…**; it disappears once loaded. It must never say **Offline** while the phone is online.
+- [ ] After signing in (without opening Start new survey), Home shows **✓ Ready to work offline (N campuses saved)**.
 
 ## 1. Airplane mode, start to finish
 
@@ -19,6 +20,7 @@ Record for every check: phone model, Android/Chrome version, pass/fail, and a no
 - [ ] Attach photos with both **Take photo** and **Choose from gallery**. Each shows a name and a size between about 25 KB and 450 KB within a few seconds, and the screen never freezes.
 - [ ] After Survey details, the **Applicable levels** page: External locked on; Ground, First, Roof ticked. Untick Roof → the vertical-campus message. Only the chosen levels appear on Floor level; **Change levels** works.
 - [ ] Wall/Column: pick **Column Unsafe** and **Wall Unsafe** together → a photo is required; the sheet cell reads "Column Unsafe, Wall Unsafe".
+- [ ] Pick photos from the gallery in several formats: a normal photo, a screenshot (PNG), and — on an iPhone or a Samsung set to "High efficiency" — a HEIC photo. Each is saved as JPEG within 450 KB; a broken or non-photo file is refused with a message.
 - [ ] Tap a photo thumbnail → full-screen view → **Delete photo** asks first, then removes it.
 - [ ] Roof location: **Drilling & observation** is on this screen; the Roof location will not save until it is answered.
 - [ ] Leave a floor with fewer than 2 locations → "Remain on this floor / Proceed anyway". Review and submit with fewer than 15 → "Remain on Floor level page / Proceed anyway".

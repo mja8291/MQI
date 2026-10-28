@@ -37,10 +37,15 @@ export function usePhotoAttachHandler(onAddPhoto: (file: File) => void | Promise
       try {
         await onAddPhoto(await compressPhoto(file));
       } catch (err) {
+        // v2 (W31): a full phone is the one storage failure people can fix themselves — say so.
+        const name = (err as { name?: string; inner?: { name?: string } } | null)?.name;
+        const inner = (err as { inner?: { name?: string } } | null)?.inner?.name;
         setError(
           err instanceof UnprocessablePhotoError
             ? err.message
-            : "This photo couldn't be processed. Try again or pick a different photo."
+            : name === "QuotaExceededError" || inner === "QuotaExceededError"
+              ? "This phone is out of storage, so the photo could not be saved. Free some space (delete old photos or videos) and attach it again. Nothing else was lost."
+              : "This photo couldn't be processed. Try again or pick a different photo."
         );
       } finally {
         setCompressing(false);

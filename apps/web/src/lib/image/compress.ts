@@ -23,19 +23,15 @@
  *   1. createImageBitmap — fast, the normal path.
  *   2. <img> + canvas — older and more permissive; rescues some
  *      malformed/unusual files the first method rejects outright.
- * If both fail, the file is only usable as-is if it's small enough to
- * upload safely on its own (see RAW_UPLOAD_CEILING); otherwise
- * compressImage throws UnprocessablePhotoError, which the photo-attach
- * hook (PhotoAttach.tsx) turns into a message the user can act on, rather
- * than silently attempting an upload that would blow past Vercel's
- * request-body limit.
+ * If both fail, compressImage throws UnprocessablePhotoError, which the
+ * photo-attach hook (PhotoAttach.tsx) turns into a message the user can act
+ * on. v2 (W32): an undecodable file is never kept as-is — it could not be
+ * checked and would fail on upload.
  */
 
 import { MAX_BYTES, encodeWithinTarget } from "./targets";
 
-// v2 (W14): size rules live in targets.ts (aim ≤ 400 KB, never above 450 KB). A photo that
-// cannot be decoded is kept as-is only when it is already within MAX_BYTES.
-const RAW_UPLOAD_CEILING = MAX_BYTES;
+// v2 (W14): size rules live in targets.ts (aim ≤ 400 KB, never above 450 KB).
 
 export class UnprocessablePhotoError extends Error {}
 
@@ -86,10 +82,7 @@ export async function compressImage(file: File): Promise<File> {
   try {
     decoded = await decodeImage(file);
   } catch {
-    // Both decode methods failed — nothing to resize or re-encode. Still
-    // safe to upload as-is if it's comfortably under the request-body
-    // limit on its own; otherwise this photo genuinely can't go through.
-    if (file.size <= RAW_UPLOAD_CEILING) return file;
+    // Both decode methods failed: nothing to resize or re-encode, and nothing to check.
     throw new UnprocessablePhotoError(
       "This photo couldn't be processed. Try again or pick a different photo."
     );
@@ -106,11 +99,13 @@ export async function compressImage(file: File): Promise<File> {
       const scale = Math.min(1, longEdge / Math.max(decoded.width, decoded.height));
       canvas.width = Math.round(decoded.width * scale);
       canvas.height = Math.round(decoded.height * scale);
+      ctx.fillStyle = "#ffffff"; // transparent PNG → white, not black, as JPEG
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(decoded.source, 0, 0, canvas.width, canvas.height);
       return toJpegBlob(canvas, quality);
     });
-    // Keep the original only when it is already smaller and within the cap.
-    if (!blob || (blob.size >= file.size && file.size <= MAX_BYTES)) return file;
+    // W32: always the re-encoded JPEG (see compress-photo.ts).
+    if (!blob) throw new UnprocessablePhotoError("This photo couldn't be processed. Try again or pick a different photo.");
 
     const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
     return new File([blob], name, { type: "image/jpeg", lastModified: file.lastModified });
