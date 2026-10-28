@@ -9,7 +9,7 @@ export default defineConfig({
     projects: [
       { extends: true, test: { name: 'shared', root: './packages/shared', include: ['src/**/*.test.ts'], environment: 'node' } },
       { extends: true, test: { name: 'gas', root: './apps/gas', include: ['src/**/*.test.ts'], environment: 'node' } },
-      { extends: true, test: { name: 'fixtures', root: './tools/fixtures', include: ['src/**/*.test.ts'], environment: 'node' } },
+      './tools/fixtures/vitest.config.ts',
       './apps/web/vitest.config.ts',
     ],
   },

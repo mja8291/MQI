@@ -14,6 +14,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # v1, read-only, for the v1 ⇄ v2 parity suite (tools/fixtures/src/v1-parity.test.ts).
+      - run: git clone --quiet https://github.com/mja8291/tcf.git reference && git -C reference checkout --quiet 0a4a75c
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
