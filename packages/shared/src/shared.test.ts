@@ -2,59 +2,57 @@ import { describe, expect, test } from 'vitest';
 import {
   CATEGORIES,
   KNOWN_RUBRIC_VERSIONS,
-  METHOD2_GROUPS,
-  METHOD2_HEADER,
+  RUBRIC_GROUPS,
+  RESPONSES_HEADER,
   RUBRIC_VERSION,
   can,
   canWrite,
   layoutRows,
-  method1ItemsFor,
-  method2GroupsFor,
-  method2Rows,
+  rubricGroupsFor,
+  responseRows,
   missingColumns,
   noteRows,
-  scoreMethod2,
-  scoreMethod2For,
+  scoreSurvey,
+  scoreSurveyFor,
   submissionIssues,
   submittedSurveySchema,
   toCell,
   uuidv7,
 } from './index';
-import type { Method2Location, SubmittedSurvey } from './index';
+import type { SurveyLocation, SubmittedSurvey } from './index';
 
 const rnd = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 37 + 11) % 256);
 
-function loc(type: Method2Location['type'], name: string, scores: Method2Location['scores']): Method2Location {
+function loc(type: SurveyLocation['type'], name: string, scores: SurveyLocation['scores']): SurveyLocation {
   return { id: name, floorLevel: 'Ground', type, name, scores, photos: {}, notes: {} };
 }
 
 describe('rubric data', () => {
-  test.each(KNOWN_RUBRIC_VERSIONS.filter(Boolean).map((v) => [v]))('Method 2 %s: every division sums to 100', (v) => {
-    const groups = method2GroupsFor(v);
+  test.each(KNOWN_RUBRIC_VERSIONS.filter(Boolean).map((v) => [v]))('rubric %s: every division sums to 100', (v) => {
+    const groups = rubricGroupsFor(v);
     for (const c of CATEGORIES) {
       expect(groups.filter((g) => g.category === c).reduce((s, g) => s + g.weight, 0)).toBe(100);
     }
   });
 
-  test('current Method 2 list matches TRD Appendix A (31 groups: Safety 9, Functionality 15, Aesthetics 7)', () => {
-    expect(METHOD2_GROUPS).toHaveLength(31);
-    expect(METHOD2_GROUPS.filter((g) => g.category === 'Safety')).toHaveLength(9);
-    expect(METHOD2_GROUPS.filter((g) => g.category === 'Functionality')).toHaveLength(15);
-    expect(METHOD2_GROUPS.filter((g) => g.category === 'Aesthetics')).toHaveLength(7);
-    expect(METHOD2_GROUPS.every((g) => (g.category === 'Safety') === (g.aggregation === 'worst'))).toBe(true);
+  test('current list matches TRD Appendix A (31 groups: Safety 9, Functionality 15, Aesthetics 7)', () => {
+    expect(RUBRIC_GROUPS).toHaveLength(31);
+    expect(RUBRIC_GROUPS.filter((g) => g.category === 'Safety')).toHaveLength(9);
+    expect(RUBRIC_GROUPS.filter((g) => g.category === 'Functionality')).toHaveLength(15);
+    expect(RUBRIC_GROUPS.filter((g) => g.category === 'Aesthetics')).toHaveLength(7);
+    expect(RUBRIC_GROUPS.every((g) => (g.category === 'Safety') === (g.aggregation === 'worst'))).toBe(true);
   });
 
-  test('version lookup: blank reads the legacy lists, unknown reads current', () => {
-    expect(method2GroupsFor('')).not.toBe(METHOD2_GROUPS);
-    expect(method2GroupsFor(RUBRIC_VERSION)).toBe(METHOD2_GROUPS);
-    expect(method2GroupsFor('2099-01-01')).toBe(METHOD2_GROUPS);
-    expect(method1ItemsFor('')).not.toBe(method1ItemsFor(RUBRIC_VERSION));
+  test('version lookup: blank reads the legacy list, unknown reads current', () => {
+    expect(rubricGroupsFor('')).not.toBe(RUBRIC_GROUPS);
+    expect(rubricGroupsFor(RUBRIC_VERSION)).toBe(RUBRIC_GROUPS);
+    expect(rubricGroupsFor('2099-01-01')).toBe(RUBRIC_GROUPS);
   });
 });
 
 describe('scoring (unchanged v1 formulas)', () => {
   test('Safety takes the worst location, others the average', () => {
-    const r = scoreMethod2([
+    const r = scoreSurvey([
       loc('Toilet', 'Girls Toilet', { 'Concrete/Plaster Soundness': 'Good', Paint: 'Good' }),
       loc('Toilet', 'Boys Toilet', { 'Concrete/Plaster Soundness': 'Very Poor', Paint: 'Poor' }),
     ]);
@@ -63,23 +61,23 @@ describe('scoring (unchanged v1 formulas)', () => {
   });
 
   test('N/A drops out and the rest renormalise', () => {
-    const a = scoreMethod2([loc('Toilet', 'T', { Paint: 'Good', Plaster: 'N/A' })]);
+    const a = scoreSurvey([loc('Toilet', 'T', { Paint: 'Good', Plaster: 'N/A' })]);
     expect(a.categories.Aesthetics.score).toBe(100);
     expect(a.categories.Aesthetics.answeredWeight).toBe(35);
   });
 
   test('overall is the full-set weighted average, not a blend of division scores', () => {
-    const r = scoreMethod2([loc('Roof', 'Roof 1', { 'Access to roof area /tanks': 'Good', Plaster: 'Poor' })]);
+    const r = scoreSurvey([loc('Roof', 'Roof 1', { 'Access to roof area /tanks': 'Good', Plaster: 'Poor' })]);
     // (25×10×100 + 30×8×50) / (25×10 + 30×8)
     expect(r.overall).toBeCloseTo((25 * 10 * 100 + 30 * 8 * 50) / (25 * 10 + 30 * 8), 10);
   });
 
   test('nothing scored gives null, not 0', () => {
-    expect(scoreMethod2([]).overall).toBeNull();
+    expect(scoreSurvey([]).overall).toBeNull();
   });
 
-  test('the three Ceiling-filed watchlist entries share one value in Method 2', () => {
-    const r = scoreMethod2For([loc('Classroom', 'KG A', { 'Ceiling Condition i.e. cracks & seepage': 'Very Poor' })], RUBRIC_VERSION);
+  test('the three Ceiling-filed watchlist entries share one value', () => {
+    const r = scoreSurveyFor([loc('Classroom', 'KG A', { 'Ceiling Condition i.e. cracks & seepage': 'Very Poor' })], RUBRIC_VERSION);
     expect(r.criticalItems['Cracks visibility in roof']).toBe(25);
     expect(r.criticalItems['Roof leakage/seepage']).toBe(25);
     expect(r.criticalItems['Visibility of dampness']).toBe(25);
@@ -99,10 +97,9 @@ function survey(overrides: Partial<SubmittedSurvey> = {}): SubmittedSurvey {
       Masonry: 'Good',
     }),
   ];
-  const r = scoreMethod2For(locations, RUBRIC_VERSION);
+  const r = scoreSurveyFor(locations, RUBRIC_VERSION);
   return {
     id: uuidv7(rnd, Date.UTC(2026, 9, 28)),
-    method: 2,
     rubricVersion: RUBRIC_VERSION,
     school: { schoolId: '947', name: 'OGS Trust Campus', region: 'South West', area: 'Gadap West I' },
     asm: 'A',
@@ -140,7 +137,7 @@ function survey(overrides: Partial<SubmittedSurvey> = {}): SubmittedSurvey {
 
 describe('sheet rows (v1 responses.ts parity)', () => {
   const s = survey();
-  const rows = method2Rows(s, { name: 'Sam', email: 'sam@tcf.org.pk' }, '2026-10-28T05:00:01.000Z');
+  const rows = responseRows(s, { name: 'Sam', email: 'sam@tcf.org.pk' }, '2026-10-28T05:00:01.000Z');
 
   test('one row per location with v1 field names and rounded scores', () => {
     expect(rows).toHaveLength(1);
@@ -154,7 +151,7 @@ describe('sheet rows (v1 responses.ts parity)', () => {
   });
 
   test('every written field is in the desired header', () => {
-    for (const key of Object.keys(rows[0]!)) expect(METHOD2_HEADER).toContain(key);
+    for (const key of Object.keys(rows[0]!)) expect(RESPONSES_HEADER).toContain(key);
   });
 
   test('RAW typing: numeric columns become numbers, text (even formula-like) stays text', () => {

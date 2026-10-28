@@ -16,7 +16,7 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-semibold truncate">{school.name}</div>
         <div className="text-[11px] text-ink-faint">
-          {school.region} · {school.area} · Method {school.method} ·{" "}
+          {school.region} · {school.area} ·{" "}
           {school.date ? new Date(school.date).toLocaleDateString() : "—"}
         </div>
       </div>

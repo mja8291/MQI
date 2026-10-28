@@ -14,7 +14,6 @@ export function workbookInput(found: FoundSurvey): SingleSurveyExportInput {
   return {
     surveyId: found.surveyId,
     campusName: found.campusName,
-    method: found.method,
     submittedAt: found.submittedAt,
     startTime: found.startTime,
     endTime: found.endTime,
@@ -26,16 +25,14 @@ export function workbookInput(found: FoundSurvey): SingleSurveyExportInput {
 }
 
 export function pdfInput(found: FoundSurvey): SingleSurveyPdfInput {
-  const itemValues: Record<string, string> =
-    found.method === 1
-      ? found.conditions
-      : Object.fromEntries(Object.entries(found.aggregatedScores ?? {}).map(([name, score]) => [name, `Aggregated (${Math.round(score)}%)`]));
+  const itemValues: Record<string, string> = Object.fromEntries(
+    Object.entries(found.aggregatedScores ?? {}).map(([name, score]) => [name, `Aggregated (${Math.round(score)}%)`]),
+  );
   return {
     surveyId: found.surveyId,
     campusName: found.campusName,
     region: found.region,
     area: found.area,
-    method: found.method,
     submittedAt: found.submittedAt,
     startTime: found.startTime,
     endTime: found.endTime,
@@ -86,10 +83,10 @@ export async function downloadSurveyPdf(surveyId: string): Promise<void> {
   save(bytes as BlobPart, 'application/pdf', `mqi-survey-${surveyId}.pdf`);
 }
 
-async function allRows(tab: 'Method 1 Responses' | 'Method 2 Responses'): Promise<Pick<ExportRowsResult, 'header' | 'rows'>> {
+async function allRows(): Promise<Pick<ExportRowsResult, 'header' | 'rows'>> {
   const out: Pick<ExportRowsResult, 'header' | 'rows'> = { header: [], rows: [] };
   for (let offset = 0; ; ) {
-    const page = await api<ExportRowsResult>('export.rows', { tab, offset, limit: 1000 });
+    const page = await api<ExportRowsResult>('export.rows', { offset, limit: 1000 });
     if (offset === 0) out.header = page.header;
     out.rows.push(...page.rows);
     if (!page.hasMore || page.rows.length === 0) break;
@@ -98,9 +95,9 @@ async function allRows(tab: 'Method 1 Responses' | 'Method 2 Responses'): Promis
   return out;
 }
 
-/** FR-EXP-2: all responses, both tabs. */
+/** FR-EXP-2: all responses. */
 export async function downloadAllResponses(): Promise<void> {
-  const [m1, m2, { buildAllResponsesWorkbook }] = await Promise.all([allRows('Method 1 Responses'), allRows('Method 2 Responses'), import('./all-responses-workbook')]);
-  const buf = await buildAllResponsesWorkbook(m1, m2).xlsx.writeBuffer();
+  const [rows, { buildAllResponsesWorkbook }] = await Promise.all([allRows(), import('./all-responses-workbook')]);
+  const buf = await buildAllResponsesWorkbook(rows).xlsx.writeBuffer();
   save(buf, XLSX, `mqi-all-responses-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }

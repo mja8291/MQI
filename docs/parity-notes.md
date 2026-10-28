@@ -16,14 +16,15 @@ The v1 reference is `mja8291/tcf` at master `0a4a75c` (`reference/`). Each entry
 | D8 | Write mode | `USER_ENTERED` (formula injection possible) | RAW. Columns v1 stored as numbers are sent as numbers (`packages/shared/src/sheets.ts` `NUMERIC_COLUMNS`), so cells keep their type. | Brief |
 | D9 | Appending next to v1 | Sheets API `values.append` | Sheets Advanced Service `values.append` (RAW, INSERT_ROWS): the old app takes no script lock, so `getLastRow()+1` could overwrite its rows | Proposed |
 | D10 | Photo rows | Written at submit (link already known) | Note rows are written with the survey. Each photo's row is written when its upload completes, so photo rows can appear minutes after the location rows. | Proposed |
-| D11 | Method 1 | Can finish Method 1 drafts | v2 cannot see v1 drafts, so Method 1 is read-only history (exports and dashboard) | Proposed |
-| D12 | New column | (none) | `Source App` = `v2` on v2 rows, appended at the end of `Method 2 Responses` on the first write (kept after D14 so rows stay identifiable if the two spreadsheets are combined) | Brief |
+| D11 | Old scoring method | Can finish drafts of v1's older item-by-item method | Removed completely (superseded by D15) | Product owner |
+| D12 | New column | (none) | `Source App` = `v2` on v2 rows, appended at the end of the responses tab on the first write (kept after D14 so rows stay identifiable if the two spreadsheets are combined) | Brief |
 | D13 | Reviewer role | Not enforced | Reviewer cannot submit surveys; downloads and dashboard only | Proposed |
-| D14 | Responses spreadsheet | MQI Analysis `1Hv2lOEx…PCM4` | **MQI Spreadsheet** `1uLCnBNC…T42o`, with `Method 1 Responses`, `Method 2 Responses` and `MQI Survey Attachments` headers copied exactly from MQI Analysis (2026-10-28). v2's dashboard and "find survey" show v2 surveys only; v1's show v1 only. MQI Analysis stays the source of the golden fixtures. | Product owner |
+| D14 | Responses spreadsheet | MQI Analysis `1Hv2lOEx…PCM4` | **MQI Spreadsheet** `1uLCnBNC…T42o`, with response and attachment headers copied exactly from MQI Analysis (2026-10-28). v2's dashboard and "find survey" show v2 surveys only; v1's show v1 only. MQI Analysis stays the source of the golden fixtures. | Product owner |
+| D15 | Survey "methods" | Two methods; the location-by-location one labelled "Method 2" | One survey type, never called a method (2026-10-28). The old item-by-item method is removed everywhere (code, rubric, `Method 1 Responses` tab, dashboard, exports). The responses tab is **`MQI Survey Responses`** (v1: `Method 2 Responses`, same header). The Excel download drops v1's Method row (O3/P3; the rows below move up one); the PDF drops the "Method 2 · " prefix before the date; dashboard rows drop "Method 2"; URLs are `/survey/details` and `/survey/locations`. The parity suite checks everything else still matches v1. | Product owner |
 
 ## Golden parity
 
-- Production (`MQI Analysis`, `1Hv2lOEx…PCM4`) holds about 246 location rows in **18 Method 2 surveys**: 15 legacy (blank version), 1 at `2026-10-27` and 2 at `2026-10-28`. That is fewer than the brief's 50, so the suite uses all of them.
+- Production (`MQI Analysis`, `1Hv2lOEx…PCM4`) holds about 246 location rows in **18 surveys**: 15 legacy (blank version), 1 at `2026-10-27` and 2 at `2026-10-28`. That is fewer than the brief's 50, so the suite uses all of them.
 - Four real surveys are checked in so far (two legacy, two at `2026-10-28`, names removed). All reproduce overall, divisions, band, Major/Minor and all seven critical items exactly.
 - **To finish:** export the full workbook (see `tools/fixtures/src/export.ts`) and re-run `npm test`.
 - Precision is the stored integer. The sheet keeps `Math.round(score)`, so "to the decimal" is not checkable against stored values. The Excel export recomputes unrounded values from formulas, and Phase 5 compares those.
@@ -41,7 +42,7 @@ The v1 reference is `mja8291/tcf` at master `0a4a75c` (`reference/`). Each entry
 | --- | --- | --- | --- |
 | W1 | Photo attach | Uploaded to Drive on attach, with a per-photo Uploading/Retry state | Compressed in a Web Worker (1600 px, ≤ 300 KB, EXIF orientation), saved on the phone under a UUID v7 attachment id, then uploaded by the sync engine after the survey reaches the server, in resumable 2 MB chunks. The per-photo Retry control is gone, because nothing uploads at attach time. |
 | W2 | Submit | POST, then queued on failure | Always committed locally first (record + outbox entry + draft removal in one transaction), validated with the same shared rules the server uses, then sent. Done shows Sending → Survey submitted, or Saved offline. |
-| W3 | Method 1 screens | Kept to finish v1 drafts | Removed (unreachable in v2, D11) |
+| W3 | Old-method screens | Kept to finish v1 drafts | Removed (D11, D15) |
 | W4 | Unload flush (FR-OFF-7) | Async IndexedDB write on pagehide | Synchronous transaction on the open connection; an async write was shown (end-to-end test) to be lost on an immediate reload |
 | W5 | Reconnect | Flush on the online event | The online event sends at once, ignoring backoff; failures while the phone reports offline add no backoff |
 | W6 | Service worker | Self-updating; reload on activate | Updates are offered by a banner and applied when the user taps Update or the server answers UPGRADE_REQUIRED. A worker claiming the page on first install never reloads it mid-survey (also found by the end-to-end test). |

@@ -1,19 +1,21 @@
-import type { LocationType, Method2Group } from "../types";
+import type { LocationType, RubricGroup } from "../types";
 import { OK_UNSAFE, ROOF_ACCESS } from "./condition-overrides";
 
 /**
- * FROZEN snapshot of Method 2's item groups as released under rubric version
- * "2026-10-27" (30 groups, before Internal Flooring was added and six
- * weights changed — see method2-items.ts). Never edited again. Surveys
- * stamped with that version were scored against exactly these weights, so
- * exporting one has to read them back the same way (see find-survey.ts).
+ * FROZEN snapshot of the item groups as released under rubric version
+ * "2026-10-27.3" (33 groups: before Window Shades was added, Taps/Wash Basin
+ * and Electrical Fixtures/Switch-Dimmer were merged, W.Cs/Commodes and Plaque
+ * were dropped, Plaster/Masonry was split and most weights/locations moved —
+ * see items.ts). Never edited again. Surveys stamped with that
+ * version were scored against exactly these weights, so exporting one has to
+ * read them back the same way (see find-survey.ts).
  */
-function worst(item: Omit<Method2Group, "aggregation" | "category"> & { category: "Safety" }): Method2Group {
+function worst(item: Omit<RubricGroup, "aggregation" | "category"> & { category: "Safety" }): RubricGroup {
   return { ...item, aggregation: "worst" };
 }
 function average(
-  item: Omit<Method2Group, "aggregation" | "category"> & { category: "Functionality" | "Aesthetics" }
-): Method2Group {
+  item: Omit<RubricGroup, "aggregation" | "category"> & { category: "Functionality" | "Aesthetics" }
+): RubricGroup {
   return { ...item, aggregation: "average" };
 }
 
@@ -26,7 +28,7 @@ const ROOF: LocationType = "Roof";
 const OTHER_ROOM: LocationType = "Other Room (Staff, Principal, Admin, Store etc.)";
 const LAB: LocationType = "Lab (Wet/Dry/DLP)";
 
-export const METHOD2_GROUPS_20261027: Method2Group[] = [
+export const RUBRIC_GROUPS_20261027_3: RubricGroup[] = [
   // Safety — 25% of overall, 8 groups
   worst({ name: "Boundary wall", category: "Safety", weight: 10, locations: [EXT_DEV] }),
   worst({ name: "Main Gate", category: "Safety", weight: 7, locations: [EXT_DEV] }),
@@ -79,7 +81,7 @@ export const METHOD2_GROUPS_20261027: Method2Group[] = [
   average({
     name: "Water Storage (Overhead Tank)",
     category: "Functionality",
-    weight: 6,
+    weight: 5,
     principalMaintained: true,
     locations: [ROOF],
   }),
@@ -94,14 +96,14 @@ export const METHOD2_GROUPS_20261027: Method2Group[] = [
   average({
     name: "Wash Basin",
     category: "Functionality",
-    weight: 7,
+    weight: 6,
     principalMaintained: true,
     locations: [TOILET, LAB],
   }),
   average({
     name: "Flush Tanks",
     category: "Functionality",
-    weight: 8,
+    weight: 7,
     principalMaintained: true,
     locations: [TOILET],
   }),
@@ -109,23 +111,30 @@ export const METHOD2_GROUPS_20261027: Method2Group[] = [
   average({
     name: "Sewerage System",
     category: "Functionality",
-    weight: 8,
+    weight: 6,
     principalMaintained: true,
     locations: [TOILET, EXT_DEV, LAB],
   }),
   average({
     name: "Electrical Fixtures",
     category: "Functionality",
-    weight: 8,
+    weight: 5,
     principalMaintained: true,
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM],
   }),
   average({
     name: "Switch/Dimmer Sheet",
     category: "Functionality",
-    weight: 7,
+    weight: 6,
     principalMaintained: true,
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM],
+  }),
+  average({
+    name: "Drinking Water Cooler & Filter",
+    category: "Functionality",
+    weight: 3,
+    principalMaintained: true,
+    locations: [CORRIDOR, LAB],
   }),
   average({
     name: "Motor (Water pump)",
@@ -135,6 +144,12 @@ export const METHOD2_GROUPS_20261027: Method2Group[] = [
     locations: [EXT_DEV],
   }),
   average({
+    name: "Internal Flooring",
+    category: "Functionality",
+    weight: 6,
+    locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM, LAB],
+  }),
+  average({
     name: "Furniture Condition",
     category: "Functionality",
     weight: 5,
@@ -142,9 +157,16 @@ export const METHOD2_GROUPS_20261027: Method2Group[] = [
     locations: [CLASSROOM, OTHER_ROOM, LAB],
   }),
   average({
+    name: "Grill Gate",
+    category: "Functionality",
+    weight: 3,
+    principalMaintained: true,
+    locations: [CORRIDOR, LAB],
+  }),
+  average({
     name: "Door/Windows/Ventilators",
     category: "Functionality",
-    weight: 8,
+    weight: 7,
     principalMaintained: true,
     locations: [CLASSROOM, TOILET, CORRIDOR, FACADE, OTHER_ROOM, LAB],
   }),
@@ -158,7 +180,7 @@ export const METHOD2_GROUPS_20261027: Method2Group[] = [
   average({
     name: "Solar Panels/Inverter/Batteries",
     category: "Functionality",
-    weight: 7,
+    weight: 5,
     locations: [CORRIDOR, ROOF, OTHER_ROOM],
   }),
 

@@ -7,7 +7,7 @@ import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
-import { FLOOR_LEVELS, LOCATION_NAME_OPTIONS, LOCATION_TYPES } from "@/lib/data/method2-items";
+import { FLOOR_LEVELS, LOCATION_NAME_OPTIONS, LOCATION_TYPES } from "@/lib/data/items";
 import type { FloorLevel, LocationType } from "@/lib/types";
 
 function isFloorLevel(v: string | null): v is FloorLevel {
@@ -17,9 +17,9 @@ function isLocationType(v: string | null): v is LocationType {
   return v !== null && (LOCATION_TYPES as string[]).includes(v);
 }
 
-function Method2LocationNameContent() {
+function LocationNameContent() {
   const router = useRouter();
-  const { m2SetLocationType, m2SetLocationName } = useSurvey();
+  const { locSetLocationType, locSetLocationName } = useSurvey();
   const params = useSearchParams();
   const floorParam = params.get("floor");
   const typeParam = params.get("type");
@@ -28,7 +28,7 @@ function Method2LocationNameContent() {
   const [name, setName] = useState("");
 
   useEffect(() => {
-    if (!floor || !type) router.replace("/survey/m2");
+    if (!floor || !type) router.replace("/survey/locations");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floor, type]);
 
@@ -37,14 +37,14 @@ function Method2LocationNameContent() {
   const options = LOCATION_NAME_OPTIONS[type] ?? [];
 
   function start() {
-    m2SetLocationType(floor!, type!);
-    m2SetLocationName(name);
-    router.push("/survey/m2/category");
+    locSetLocationType(floor!, type!);
+    locSetLocationName(name);
+    router.push("/survey/locations/category");
   }
 
   return (
     <ScreenShell>
-      <TopBar title={type} onBack={() => router.push(`/survey/m2/location?floor=${encodeURIComponent(floor)}`)} />
+      <TopBar title={type} onBack={() => router.push(`/survey/locations/location?floor=${encodeURIComponent(floor)}`)} />
       <Field label="Location">
         <select
           value={name}
@@ -68,10 +68,10 @@ function Method2LocationNameContent() {
   );
 }
 
-export default function Method2LocationNamePage() {
+export default function LocationNamePage() {
   return (
     <Suspense fallback={null}>
-      <Method2LocationNameContent />
+      <LocationNameContent />
     </Suspense>
   );
 }

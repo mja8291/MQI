@@ -4,7 +4,7 @@
  * and by the Playwright suite. State lives in memory and resets on restart.
  */
 import { createServer } from 'node:http';
-import { API_VERSION, ATTACHMENTS_HEADER, METHOD1_TAB, METHOD2_HEADER, METHOD2_TAB } from '@mqi/shared';
+import { API_VERSION, ATTACHMENTS_HEADER, RESPONSES_HEADER, RESPONSES_TAB } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { ensureAdmin, hashPassword } from '../core/auth';
@@ -23,8 +23,7 @@ export const DEV_USERS = [
 
 export function seedDevEnv(env: MemoryEnv): void {
   // v1's tabs exist before v2 ever runs; Source App is added by v2 itself.
-  env.responses.createTab(METHOD2_TAB, METHOD2_HEADER.filter((h) => h !== 'Source App'));
-  env.responses.createTab(METHOD1_TAB, ['Survey ID', 'Timestamp', 'Campus Name', 'School ID', 'Region', 'Overall Score', 'Rating Band']);
+  env.responses.createTab(RESPONSES_TAB, RESPONSES_HEADER.filter((h) => h !== 'Source App'));
   env.responses.createTab('MQI Survey Attachments', [...ATTACHMENTS_HEADER]);
   env.props.set('PBKDF2_ITERATIONS', '1000');
   setupCore(env);
@@ -61,7 +60,7 @@ if (isMain) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return void res.end(
         JSON.stringify({
-          method2: env.responses.objects(METHOD2_TAB),
+          responses: env.responses.objects(RESPONSES_TAB),
           attachments: env.responses.objects('MQI Survey Attachments'),
           files: env.drive.files.size,
           appendCalls: env.responses.appendCalls,

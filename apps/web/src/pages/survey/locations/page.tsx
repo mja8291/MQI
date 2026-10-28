@@ -9,40 +9,40 @@ import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useSurvey } from "@/lib/survey-context";
-import { FLOOR_LEVELS, isMethod2LocationComplete } from "@/lib/data/method2-items";
-import { scoreMethod2 } from "@/lib/scoring";
+import { FLOOR_LEVELS, isLocationComplete } from "@/lib/data/items";
+import { scoreSurvey } from "@/lib/scoring";
 import type { FloorLevel } from "@/lib/types";
 
-export default function Method2FloorPage() {
+export default function FloorPage() {
   const router = useRouter();
-  const { state, hydrated, m2SetFloor, m2ResumeLocation, discardMethodProgress } = useSurvey();
+  const { state, hydrated, locSetFloor, locResumeLocation, discardProgress } = useSurvey();
   const [confirmBack, setConfirmBack] = useState(false);
 
   useEffect(() => {
-    // See survey/m1/campus-visit/page.tsx's matching effect for why this waits.
+    // See survey/locations/page.tsx's matching effect for why this waits.
     if (!hydrated) return;
-    if (!state.school || state.method !== 2) router.replace("/survey/find-school");
-  }, [hydrated, state.school, state.method, router]);
+    if (!state.school || !state.started) router.replace("/survey/find-school");
+  }, [hydrated, state.school, state.started, router]);
 
   if (!state.school) return null;
 
-  const result = scoreMethod2(state.m2.locations);
-  const totalLocations = state.m2.locations.length;
-  const incompleteLocations = state.m2.locations.filter((l) => !isMethod2LocationComplete(l));
+  const result = scoreSurvey(state.scoring.locations);
+  const totalLocations = state.scoring.locations.length;
+  const incompleteLocations = state.scoring.locations.filter((l) => !isLocationComplete(l));
   const canSubmit = totalLocations > 0 && incompleteLocations.length === 0;
 
   function confirmDiscardAndGoBack() {
-    discardMethodProgress();
-    router.push("/survey/method");
+    discardProgress();
+    router.push("/survey/details");
   }
 
   function chooseFloor(floor: FloorLevel) {
     if (floor === "Roof") {
-      const count = state.m2.locations.filter((l) => l.type === "Roof").length;
-      m2SetFloor(floor, `Roof ${count + 1}`);
-      router.push("/survey/m2/category");
+      const count = state.scoring.locations.filter((l) => l.type === "Roof").length;
+      locSetFloor(floor, `Roof ${count + 1}`);
+      router.push("/survey/locations/category");
     } else {
-      router.push(`/survey/m2/location?floor=${encodeURIComponent(floor)}`);
+      router.push(`/survey/locations/location?floor=${encodeURIComponent(floor)}`);
     }
   }
 
@@ -78,15 +78,15 @@ export default function Method2FloorPage() {
           <div className="text-xs font-semibold text-brand-deep uppercase tracking-wide mb-2">
             Locations recorded ({totalLocations})
           </div>
-          {state.m2.locations.map((loc) => {
-            const complete = isMethod2LocationComplete(loc);
+          {state.scoring.locations.map((loc) => {
+            const complete = isLocationComplete(loc);
             return (
               <button
                 key={loc.id}
                 type="button"
                 onClick={() => {
-                  m2ResumeLocation(loc.id);
-                  router.push("/survey/m2/category");
+                  locResumeLocation(loc.id);
+                  router.push("/survey/locations/category");
                 }}
                 className="w-full flex items-center gap-2 py-2 border-b border-border text-[13px] text-left"
               >

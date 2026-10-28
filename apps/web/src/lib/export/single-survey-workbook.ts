@@ -6,7 +6,6 @@ import type { Category, RubricItem } from "@/lib/types";
 export interface SingleSurveyExportInput {
   surveyId: string;
   campusName: string;
-  method: 1 | 2;
   submittedAt: string;
   /** "" if this survey predates the Start/End Time columns. */
   startTime: string;
@@ -15,7 +14,7 @@ export interface SingleSurveyExportInput {
   /** Item name -> condition text ("Good"/"Ok"/"Poor"/"Very Poor"), omitted/blank means N/A / unscored. */
   conditions: Record<string, string>;
   /**
-   * Optional pre-aggregated numeric score (0-100) per item, used for Method 2
+   * Optional pre-aggregated numeric score (0-100) per item, used for item
    * groups where the value is already an average/worst-case across several
    * locations rather than a single pick — written as a literal instead of
    * going through the Good/Ok/Poor/Very Poor lookup formula.
@@ -74,16 +73,14 @@ export function buildSingleSurveyWorkbook(input: SingleSurveyExportInput): Excel
   sheet.getCell("P1").value = input.surveyId;
   sheet.getCell("O2").value = "Campus";
   sheet.getCell("P2").value = input.campusName;
-  sheet.getCell("O3").value = "Method";
-  sheet.getCell("P3").value = input.method;
-  sheet.getCell("O4").value = "Submitted";
-  sheet.getCell("P4").value = input.submittedAt;
-  sheet.getCell("O5").value = "Start Time";
-  sheet.getCell("P5").value = input.startTime ? new Date(input.startTime).toLocaleString() : "—";
-  sheet.getCell("O6").value = "Finish Time";
-  sheet.getCell("P6").value = input.endTime ? new Date(input.endTime).toLocaleString() : "—";
-  sheet.getCell("O7").value = "Time Taken";
-  sheet.getCell("P7").value =
+  sheet.getCell("O3").value = "Submitted";
+  sheet.getCell("P3").value = input.submittedAt;
+  sheet.getCell("O4").value = "Start Time";
+  sheet.getCell("P4").value = input.startTime ? new Date(input.startTime).toLocaleString() : "—";
+  sheet.getCell("O5").value = "Finish Time";
+  sheet.getCell("P5").value = input.endTime ? new Date(input.endTime).toLocaleString() : "—";
+  sheet.getCell("O6").value = "Time Taken";
+  sheet.getCell("P6").value =
     input.timeTakenSeconds === null ? "—" : formatDurationFriendly(input.timeTakenSeconds);
 
   const firstDataRow = 2;

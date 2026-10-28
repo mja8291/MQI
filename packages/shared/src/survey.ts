@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { RISK_FACTOR_OPTIONS } from './rubric/content';
-import { FLOOR_LEVELS, LOCATION_TYPES, isMethod2LocationComplete } from './rubric/method2-items';
-import { method2GroupsFor } from './rubric/versions';
+import { FLOOR_LEVELS, LOCATION_TYPES, isLocationComplete } from './rubric/items';
+import { rubricGroupsFor } from './rubric/versions';
 import {
   SITE_PHOTO_DRILLING_POINT,
   SITE_PHOTO_RAIN_SPOUTS,
@@ -13,7 +13,7 @@ import {
 import type { Condition, DrillingCheck, FloorLevel, LocationType, SiteChecks } from './types';
 
 /**
- * The one MQI v2 entity the phone writes: a Method 2 survey, plus its attachments (photo
+ * The one MQI v2 entity the phone writes: a survey, plus its attachments (photo
  * metadata; the bytes travel separately through files.upload). Field names follow v1's
  * SubmitPayload / survey state so the sheet mapping (sheets.ts) reads like v1's responses.ts.
  */
@@ -77,7 +77,6 @@ export type SurveyScores = z.infer<typeof scoreResultSchema>;
 /** A submitted survey as pushed to the server (sync.push). Drafts never leave the phone. */
 export const submittedSurveySchema = z.object({
   id: ID,
-  method: z.literal(2),
   rubricVersion: text(20),
   school: schoolSchema,
   asm: text(120),
@@ -152,13 +151,13 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
   }
   need(s.declaration === true, 'declaration', 'Tick the declaration.');
 
-  const groups = method2GroupsFor(s.rubricVersion);
+  const groups = rubricGroupsFor(s.rubricVersion);
   const groupNames = new Set(groups.map((g) => g.name));
   const names = new Set<string>();
   s.locations.forEach((loc, i) => {
     need(!names.has(loc.name), `locations.${i}.name`, `Two locations are both named "${loc.name}".`);
     names.add(loc.name);
-    need(isMethod2LocationComplete(loc), `locations.${i}`, `Score every item at ${loc.name}.`);
+    need(isLocationComplete(loc), `locations.${i}`, `Score every item at ${loc.name}.`);
     for (const item of Object.keys(loc.scores)) need(groupNames.has(item), `locations.${i}.scores`, `Unknown item "${item}" at ${loc.name}.`);
     if (attachmentIds) {
       for (const ids of Object.values(loc.photos)) for (const id of ids) need(attachmentIds.has(id), `locations.${i}.photos`, 'A photo is missing its attachment record.');

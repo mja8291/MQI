@@ -33,7 +33,7 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
   };
 
   const locations: SubmittedSurvey['locations'] = [];
-  for (const loc of state.m2.locations) {
+  for (const loc of state.scoring.locations) {
     const photos: Record<string, string[]> = {};
     for (const [itemName, list] of Object.entries(loc.photos)) {
       const ids: string[] = [];
@@ -61,7 +61,6 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
 
   const survey: SubmittedSurvey = {
     id: state.surveyId,
-    method: 2,
     rubricVersion: RUBRIC_VERSION,
     school: state.school,
     asm: state.asm,

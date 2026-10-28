@@ -5,7 +5,7 @@ All code for Phases 1–8 is written and tested locally against an in-memory She
 ## Already done (no action)
 
 - v2 Drive root folder `1wCWvRxaik6h2dsm2ExX9cSqJ84vDs9Cm`: `setup()` builds `01 Production`, `02 Staging`, `03 Backups`, `04 Exports` and the System spreadsheets inside it.
-- v2 responses spreadsheet: **MQI Spreadsheet** `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o`. Its `Method 2 Responses`, `Method 1 Responses` and `MQI Survey Attachments` tabs have headers copied exactly from MQI Analysis (130, 90 and 5 columns), with no data rows.
+- v2 responses spreadsheet: **MQI Spreadsheet** `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o`. Its `MQI Survey Responses` and `MQI Survey Attachments` tabs have headers copied exactly from MQI Analysis (130 and 5 columns), with no data rows.
 - v1's responses spreadsheet **MQI Analysis** `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4` is read only; it is used only as the source of the golden scoring fixtures.
 - Firebase project `tcf-mqi-app-761a8` is connected on this PC.
 
@@ -21,7 +21,7 @@ All code for Phases 1–8 is written and tested locally against an in-memory She
 
 ## 3. Full golden fixtures (about 2 minutes)
 
-Production holds 18 Method 2 surveys; 4 are in the tests now.
+Production holds 18 surveys; 4 are in the tests now.
 
 1. Open **MQI Analysis** → File → Download → Microsoft Excel (.xlsx).
 2. Save it as `tools/fixtures/raw/MQI-Analysis.xlsx` in this project (the folder is gitignored, so it never leaves this PC).

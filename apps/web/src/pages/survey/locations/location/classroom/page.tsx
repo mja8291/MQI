@@ -12,16 +12,16 @@ import {
   CLASSROOM_GRADES_WITH_OPTIONAL_SECTION,
   CLASSROOM_SECTIONS,
   FLOOR_LEVELS,
-} from "@/lib/data/method2-items";
+} from "@/lib/data/items";
 import type { FloorLevel } from "@/lib/types";
 
 function isFloorLevel(v: string | null): v is FloorLevel {
   return v !== null && (FLOOR_LEVELS as string[]).includes(v);
 }
 
-function Method2ClassroomContent() {
+function ClassroomContent() {
   const router = useRouter();
-  const { m2SetClassroom } = useSurvey();
+  const { locSetClassroom } = useSurvey();
   const floorParam = useSearchParams().get("floor");
   const floor = isFloorLevel(floorParam) ? floorParam : null;
   const [grade, setGrade] = useState("");
@@ -33,20 +33,20 @@ function Method2ClassroomContent() {
   const sectionRequired = !CLASSROOM_GRADES_WITH_OPTIONAL_SECTION.includes(grade);
 
   useEffect(() => {
-    if (!floor) router.replace("/survey/m2");
+    if (!floor) router.replace("/survey/locations");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [floor]);
 
   if (!floor) return null;
 
   function start() {
-    m2SetClassroom(floor!, grade, section);
-    router.push("/survey/m2/category");
+    locSetClassroom(floor!, grade, section);
+    router.push("/survey/locations/category");
   }
 
   return (
     <ScreenShell>
-      <TopBar title="Classroom" onBack={() => router.push(`/survey/m2/location?floor=${encodeURIComponent(floor)}`)} />
+      <TopBar title="Classroom" onBack={() => router.push(`/survey/locations/location?floor=${encodeURIComponent(floor)}`)} />
 
       <Field label="Grade">
         <select
@@ -87,10 +87,10 @@ function Method2ClassroomContent() {
   );
 }
 
-export default function Method2ClassroomPage() {
+export default function ClassroomPage() {
   return (
     <Suspense fallback={null}>
-      <Method2ClassroomContent />
+      <ClassroomContent />
     </Suspense>
   );
 }

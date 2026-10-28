@@ -147,7 +147,6 @@ export const surveyGetPayload = z.object({ surveyId: z.string().min(1).max(80) }
 /** v1 FoundSurvey (src/lib/export/find-survey.ts): what the Excel/PDF builders read. */
 export interface FoundSurvey {
   surveyId: string;
-  method: 1 | 2;
   rubricVersion: string;
   campusName: string;
   region: string;
@@ -175,12 +174,11 @@ export interface FoundSurvey {
   conditions: Record<string, string>;
   aggregatedScores?: Record<string, number>;
   items: RubricItem[];
-  /** Method 2 only: location rows as written (floor, type, name, conditions). */
+  /** Location rows as written (floor, type, name, conditions). */
   locations?: { floorLevel: string; type: string; name: string; scores: Record<string, string> }[];
 }
 
 export const exportRowsPayload = z.object({
-  tab: z.enum(['Method 1 Responses', 'Method 2 Responses']),
   offset: z.number().int().min(0),
   limit: z.number().int().min(1).max(2000),
 });
@@ -196,7 +194,6 @@ export interface CapturedSchool {
   name: string;
   region: string;
   area: string;
-  method: 1 | 2;
   date: string;
   overall: number;
   band: RatingBand;

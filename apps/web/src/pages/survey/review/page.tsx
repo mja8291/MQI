@@ -9,8 +9,8 @@ import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
-import { CATEGORIES, CRITICAL_ITEMS, ratingBand, scoreMethod1, scoreMethod2 } from "@/lib/scoring";
-import { isMethod2LocationComplete } from "@/lib/data/method2-items";
+import { CATEGORIES, CRITICAL_ITEMS, ratingBand, scoreSurvey } from "@/lib/scoring";
+import { isLocationComplete } from "@/lib/data/items";
 import {
   BUILDING_STRUCTURE_OPTIONS,
   BUILDING_STRUCTURE_QUESTION,
@@ -97,24 +97,22 @@ export default function ReviewPage() {
   const [exporting, setExporting] = useState<"excel" | "pdf" | null>(null);
 
   useEffect(() => {
-    // See survey/m1/campus-visit/page.tsx's matching effect for why this waits.
+    // See survey/locations/page.tsx's matching effect for why this waits.
     if (!hydrated) return;
-    if (!state.school || !state.method) {
+    if (!state.school || !state.started) {
       router.replace("/survey/find-school");
       return;
     }
     // Defense in depth — the Floor Level page already blocks navigating here
     // with an incomplete location, but don't trust only client-side button
     // state to guarantee that (e.g. a direct URL visit).
-    if (state.method === 2) {
-      const incomplete = state.m2.locations.length === 0 || state.m2.locations.some((l) => !isMethod2LocationComplete(l));
-      if (incomplete) router.replace("/survey/m2");
-    }
-  }, [hydrated, state.school, state.method, state.m2.locations, router]);
+    const incomplete = state.scoring.locations.length === 0 || state.scoring.locations.some((l) => !isLocationComplete(l));
+    if (incomplete) router.replace("/survey/locations");
+  }, [hydrated, state.school, state.started, state.scoring.locations, router]);
 
   const result = useMemo(
-    () => (state.method === 1 ? scoreMethod1(state.m1.scores) : scoreMethod2(state.m2.locations)),
-    [state.method, state.m1.scores, state.m2.locations]
+    () => scoreSurvey(state.scoring.locations),
+    [state.scoring.locations]
   );
 
   // A snapshot, not a live tick — Date.now() can't be called during render
@@ -137,7 +135,7 @@ export default function ReviewPage() {
     });
   }, [state.startTime, state.pausedAt, state.pausedSeconds]);
 
-  if (!state.school || !state.method) return null;
+  if (!state.school || !state.started) return null;
 
   const band = ratingBand(result.overall);
   // Round 3 Task 8: photos upload individually as soon as they're attached
@@ -165,7 +163,7 @@ export default function ReviewPage() {
   keepPhotos(SITE_PHOTO_SLAB_THICKNESS, drilling.done === "YES");
 
   const { uploading: photosUploading } = countUnresolvedPhotos([
-    ...(state.method === 1 ? [state.m1.photos] : state.m2.locations.map((l) => l.photos)),
+    ...state.scoring.locations.map((l) => l.photos),
     reviewPhotos,
   ]);
   const canSubmit =
@@ -203,7 +201,7 @@ export default function ReviewPage() {
       !typeOfStructure ||
       !centerBeam ||
       !state.school ||
-      !state.method
+      !state.started
     )
       return;
     setSubmitting(true);
@@ -234,7 +232,6 @@ export default function ReviewPage() {
       {
         ...state,
         school: state.school,
-        method: state.method,
         powerSupply,
         structuralConcern,
         buildingStructure,
@@ -270,7 +267,7 @@ export default function ReviewPage() {
   // far, so the surveyor's work isn't trapped in the app. Available
   // whenever, not gated on the oath/power-supply Submit requires.
   async function exportAs(kind: "excel" | "pdf") {
-    if (!state.school || !state.method || exporting) return;
+    if (!state.school || !state.started || exporting) return;
     setExporting(kind);
     try {
       const filename = `${draftExportFilenameBase(state)}.${kind === "excel" ? "xlsx" : "pdf"}`;
@@ -297,7 +294,7 @@ export default function ReviewPage() {
     <ScreenShell>
       <TopBar
         title="Review and submit"
-        onBack={() => router.push(state.method === 1 ? "/survey/m1" : "/survey/m2")}
+        onBack={() => router.push("/survey/locations")}
       />
 
       <div className="space-y-0.5 mb-4">
@@ -305,7 +302,7 @@ export default function ReviewPage() {
         <RecapRow k="Accompanying APM" v={state.apm || "—"} />
         <RecapRow k="Responding ASM" v={state.asm || "—"} />
         <RecapRow k="School Principal" v={state.principal || "—"} />
-        {state.method === 2 ? <RecapRow k="Locations recorded" v={String(state.m2.locations.length)} /> : null}
+        <RecapRow k="Locations recorded" v={String(state.scoring.locations.length)} />
         {elapsedSeconds !== null ? <RecapRow k="Time on assessment" v={formatDuration(elapsedSeconds)} /> : null}
       </div>
 

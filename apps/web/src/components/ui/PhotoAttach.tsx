@@ -7,8 +7,8 @@ import type { PhotoAsset } from "@/lib/types";
 import { IconButton } from "./IconButton";
 
 /**
- * The photo-attach mechanism shared between the item-scoring page (ItemRow)
- * and the Method 1 Campus Visit page — one implementation, one underlying
+ * The photo-attach mechanism shared by the item-scoring page (ItemRow)
+ * and the review page — one implementation, one underlying
  * state (whatever Record<string, PhotoAsset[]> the caller passes in via
  * onAddPhoto/onRemovePhoto), so a photo attached on either page shows up on
  * the other. Split into a hook + two small pieces rather than one combined

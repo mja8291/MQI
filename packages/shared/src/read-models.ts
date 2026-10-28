@@ -1,8 +1,8 @@
 import type { CapturedSchool, DashboardData, FoundSurvey } from './api';
-import { CRITICAL_ITEMS, aggregateMethod2, ratingBand } from './scoring';
+import { CRITICAL_ITEMS, aggregateLocations, ratingBand } from './scoring';
 import { criticalColumn } from './sheets';
-import { method1ItemsFor, method2GroupsFor } from './rubric/versions';
-import type { Condition, DrillingCheck, Method2Location, RatingBand, School, SiteChecks } from './types';
+import { rubricGroupsFor } from './rubric/versions';
+import type { Condition, DrillingCheck, SurveyLocation, RatingBand, School, SiteChecks } from './types';
 
 /**
  * Pure read-side logic ported from v1 (src/lib/sheets/{schools,dashboard}.ts,
@@ -53,7 +53,7 @@ function num(v: string | undefined): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-function rowToCaptured(r: SheetRow, method: 1 | 2): CapturedSchool | null {
+function rowToCaptured(r: SheetRow): CapturedSchool | null {
   const overallRaw = r['Overall Score'];
   const overall = overallRaw ? Number(overallRaw) : NaN;
   if (!r['School ID'] || Number.isNaN(overall)) return null;
@@ -65,7 +65,6 @@ function rowToCaptured(r: SheetRow, method: 1 | 2): CapturedSchool | null {
     name: r['Campus Name'] || r['School ID'],
     region: r['Region'] || '',
     area: r['Area'] || '',
-    method,
     date: r['Timestamp'] || '',
     overall,
     band: (r['Rating Band'] as RatingBand) || ratingBand(overall) || 'Poor',
@@ -80,24 +79,22 @@ function averageOf(values: (number | null)[]): number | null {
   return present.length ? present.reduce((a, b) => a + b, 0) / present.length : null;
 }
 
-export function buildDashboard(totalSchools: number, m1Rows: readonly SheetRow[], m2Rows: readonly SheetRow[]): DashboardData {
-  const fromM1 = m1Rows.map((r) => rowToCaptured(r, 1)).filter((s): s is CapturedSchool => s !== null);
-  // Method 2 repeats the campus scores on every location row: one row per Survey ID is the rollup.
+export function buildDashboard(totalSchools: number, rows: readonly SheetRow[]): DashboardData {
+  // Every location row repeats the campus scores: one row per Survey ID is the rollup.
   const seenSurveyIds = new Set<string>();
-  const fromM2: CapturedSchool[] = [];
-  for (const r of m2Rows) {
+  const surveys: CapturedSchool[] = [];
+  for (const r of rows) {
     const surveyId = r['Survey ID'];
     if (surveyId && seenSurveyIds.has(surveyId)) continue;
     if (surveyId) seenSurveyIds.add(surveyId);
-    const s = rowToCaptured(r, 2);
-    if (s) fromM2.push(s);
+    const s = rowToCaptured(r);
+    if (s) surveys.push(s);
   }
-  // Latest submission per (school, method); a school surveyed by both methods appears twice (FR-DASH-2).
+  // Latest submission per school (FR-DASH-2).
   const byKey = new Map<string, CapturedSchool>();
-  for (const s of [...fromM1, ...fromM2]) {
-    const key = `${s.schoolId}::${s.method}`;
-    const existing = byKey.get(key);
-    if (!existing || s.date > existing.date) byKey.set(key, s);
+  for (const s of surveys) {
+    const existing = byKey.get(s.schoolId);
+    if (!existing || s.date > existing.date) byKey.set(s.schoolId, s);
   }
   const captured = [...byKey.values()];
 
@@ -158,7 +155,7 @@ function siteChecksFromRow(row: SheetRow): SiteChecks {
   };
 }
 
-function common(surveyId: string, first: SheetRow): Omit<FoundSurvey, 'method' | 'rubricVersion' | 'conditions' | 'items'> {
+function common(surveyId: string, first: SheetRow): Omit<FoundSurvey, 'rubricVersion' | 'conditions' | 'items'> {
   const overall = num(first['Overall Score']);
   return {
     surveyId,
@@ -188,20 +185,13 @@ function common(surveyId: string, first: SheetRow): Omit<FoundSurvey, 'method' |
   };
 }
 
-/** Rows are those of one Survey ID (a Method 1 row, or the Method 2 location rows). */
-export function foundSurveyFromRows(surveyId: string, m1Row: SheetRow | undefined, m2Rows: readonly SheetRow[]): FoundSurvey | null {
-  if (m1Row) {
-    const version = m1Row['Rubric Version'] ?? '';
-    const items = method1ItemsFor(version);
-    const conditions: Record<string, string> = {};
-    for (const item of items) conditions[item.name] = m1Row[item.name] ?? '';
-    return { ...common(surveyId, m1Row), method: 1, rubricVersion: version, conditions, items };
-  }
-  const first = m2Rows[0];
+/** Rows are the location rows of one Survey ID. */
+export function foundSurveyFromRows(surveyId: string, rows: readonly SheetRow[]): FoundSurvey | null {
+  const first = rows[0];
   if (!first) return null;
   const version = first['Rubric Version'] ?? '';
-  const groups = method2GroupsFor(version);
-  const locations: Method2Location[] = m2Rows.map((row, i) => {
+  const groups = rubricGroupsFor(version);
+  const locations: SurveyLocation[] = rows.map((row, i) => {
     const scores: Record<string, Condition> = {};
     for (const group of groups) {
       const value = row[group.name];
@@ -209,8 +199,8 @@ export function foundSurveyFromRows(surveyId: string, m1Row: SheetRow | undefine
     }
     return {
       id: String(i),
-      floorLevel: (row['Floor Level'] || 'Ground') as Method2Location['floorLevel'],
-      type: (row['Location Type'] || 'Classroom') as Method2Location['type'],
+      floorLevel: (row['Floor Level'] || 'Ground') as SurveyLocation['floorLevel'],
+      type: (row['Location Type'] || 'Classroom') as SurveyLocation['type'],
       name: row['Location Name'] ?? '',
       scores,
       photos: {},
@@ -219,10 +209,9 @@ export function foundSurveyFromRows(surveyId: string, m1Row: SheetRow | undefine
   });
   return {
     ...common(surveyId, first),
-    method: 2,
     rubricVersion: version,
     conditions: {},
-    aggregatedScores: aggregateMethod2(locations, groups),
+    aggregatedScores: aggregateLocations(locations, groups),
     items: groups,
     locations: locations.map((l) => ({ floorLevel: l.floorLevel, type: l.type, name: l.name, scores: l.scores })),
   };

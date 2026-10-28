@@ -25,16 +25,16 @@ export function AutoResumeRedirect() {
   const { state, hydrated } = useSurvey();
 
   useEffect(() => {
-    if (!hydrated || !state.surveyId || !state.school || !state.method) return;
+    if (!hydrated || !state.surveyId || !state.school || !state.started) return;
     router.replace(resumeTargetRoute(state));
-    // resumeTargetRoute also reads state.m2.current, deliberately not
-    // listed below — this only needs to run once the survey/method
-    // decision settles, using whatever m2 shape happens to be current at
-    // that moment; re-evaluating every time an m2 field changes would be
+    // resumeTargetRoute also reads state.scoring.current, deliberately not
+    // listed below — this only needs to run once the survey
+    // decision settles, using whatever scoring shape happens to be current at
+    // that moment; re-evaluating every time an scoring field changes would be
     // pointless (we've already navigated away by then) and wrong (we
     // shouldn't redirect again later just because scoring continued).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, state.surveyId, state.school, state.method, router]);
+  }, [hydrated, state.surveyId, state.school, state.started, router]);
 
   return null;
 }

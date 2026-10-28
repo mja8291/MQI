@@ -15,7 +15,7 @@ import { resumeTargetRoute } from "@/lib/resume-target";
  * simpler than wiring every Queue tab row through context. Loads the
  * draft, drops it from the drafts store (it's live app state again now,
  * not a saved-and-closed snapshot), and continues straight into scoring —
- * no reason to replay the Method 1 Campus Visit intro or method selection
+ * no reason to replay the survey details screen
  * for progress that's already underway.
  */
 function ResumeContent() {

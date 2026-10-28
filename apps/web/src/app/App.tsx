@@ -17,13 +17,13 @@ const Terms = lazy(() => import('@/pages/terms/page'));
 const Dashboard = lazy(() => import('@/pages/dashboard/page'));
 const Admin = lazy(() => import('@/pages/admin/page'));
 const FindSchool = lazy(() => import('@/pages/survey/find-school/page'));
-const Method = lazy(() => import('@/pages/survey/method/page'));
+const Details = lazy(() => import('@/pages/survey/details/page'));
 const Resume = lazy(() => import('@/pages/survey/resume/page'));
-const M2 = lazy(() => import('@/pages/survey/m2/page'));
-const M2Location = lazy(() => import('@/pages/survey/m2/location/page'));
-const M2LocationName = lazy(() => import('@/pages/survey/m2/location/name/page'));
-const M2Classroom = lazy(() => import('@/pages/survey/m2/location/classroom/page'));
-const M2Category = lazy(() => import('@/pages/survey/m2/category/page'));
+const Locations = lazy(() => import('@/pages/survey/locations/page'));
+const Location = lazy(() => import('@/pages/survey/locations/location/page'));
+const LocationName = lazy(() => import('@/pages/survey/locations/location/name/page'));
+const Classroom = lazy(() => import('@/pages/survey/locations/location/classroom/page'));
+const Category = lazy(() => import('@/pages/survey/locations/category/page'));
 const Review = lazy(() => import('@/pages/survey/review/page'));
 const Done = lazy(() => import('@/pages/survey/done/page'));
 
@@ -58,13 +58,13 @@ export function App() {
                     }
                   >
                     <Route path="find-school" element={<FindSchool />} />
-                    <Route path="method" element={<Method />} />
+                    <Route path="details" element={<Details />} />
                     <Route path="resume" element={<Resume />} />
-                    <Route path="m2" element={<M2 />} />
-                    <Route path="m2/location" element={<M2Location />} />
-                    <Route path="m2/location/name" element={<M2LocationName />} />
-                    <Route path="m2/location/classroom" element={<M2Classroom />} />
-                    <Route path="m2/category" element={<M2Category />} />
+                    <Route path="locations" element={<Locations />} />
+                    <Route path="locations/location" element={<Location />} />
+                    <Route path="locations/location/name" element={<LocationName />} />
+                    <Route path="locations/location/classroom" element={<Classroom />} />
+                    <Route path="locations/category" element={<Category />} />
                     <Route path="review" element={<Review />} />
                     <Route path="done" element={<Done />} />
                   </Route>

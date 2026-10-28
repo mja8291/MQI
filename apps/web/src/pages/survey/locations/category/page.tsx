@@ -11,38 +11,38 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useSurvey } from "@/lib/survey-context";
 import { usePhotoUploadHandlers } from "@/lib/use-photo-upload-handlers";
 import {
-  METHOD2_SECTIONS,
-  method2GroupsForLocationAndSection,
+  RUBRIC_SECTIONS,
+  rubricGroupsForLocationAndSection,
   sectionCountsForLocation,
-} from "@/lib/data/method2-items";
+} from "@/lib/data/items";
 import type { Category } from "@/lib/types";
 
 /**
- * Method 2's section picker and per-section item-group scoring page, merged
- * into one accordion (Round 3 Task 11) — the old m2/score route is gone;
+ * The section picker and per-section item-group scoring page, merged
+ * into one accordion (Round 3 Task 11) — the old score route is gone;
  * this is now the only screen for scoring a location. Sections (Safety /
  * Functionality / Aesthetics — the revised rubric has no Work Category
  * column) collapsed by default, one open at a time.
  *
- * Satisfies Task 13 together with this: m2/page.tsx's "Locations recorded"
- * list already links a finalized location back here via m2ResumeLocation
+ * Satisfies Task 13 together with this: locations/page.tsx's "Locations recorded"
+ * list already links a finalized location back here via locResumeLocation
  * (unchanged) — that now lands on this single accordion with everything
  * pre-filled and editable, instead of a separate work-category picker, so
  * editing an earlier location's category is just tapping its header.
  */
-export default function Method2CategoryPage() {
+export default function CategoryPage() {
   const router = useRouter();
   const {
     state,
     hydrated,
-    m2CurrentSetScore,
-    m2CurrentAddPhoto,
-    m2CurrentRemovePhoto,
-    m2CurrentSetNote,
-    m2FinalizeCurrent,
-    m2DiscardCurrent,
+    locCurrentSetScore,
+    locCurrentAddPhoto,
+    locCurrentRemovePhoto,
+    locCurrentSetNote,
+    locFinalizeCurrent,
+    locDiscardCurrent,
   } = useSurvey();
-  const current = state.m2.current;
+  const current = state.scoring.current;
   const { handleAddPhoto, handleRemovePhoto } = usePhotoUploadHandlers({
     surveyId: state.surveyId,
     region: state.school?.region ?? "",
@@ -50,8 +50,8 @@ export default function Method2CategoryPage() {
     floorLevel: current?.floorLevel,
     locationType: current?.type ?? undefined,
     locationName: current?.name,
-    addPhoto: m2CurrentAddPhoto,
-    removePhoto: m2CurrentRemovePhoto,
+    addPhoto: locCurrentAddPhoto,
+    removePhoto: locCurrentRemovePhoto,
   });
   const [openCategory, setOpenCategory] = useState<Category | null>(null);
   const [attemptedSave, setAttemptedSave] = useState(false);
@@ -61,12 +61,12 @@ export default function Method2CategoryPage() {
   // clears `current` as part of navigating away, and depending on it here
   // would re-fire this exact check mid-navigation and race the explicit
   // router.push. It still needs to wait on `hydrated` (see
-  // survey/m1/campus-visit/page.tsx's matching effect) so this doesn't
+  // survey/locations/page.tsx's matching effect) so this doesn't
   // bounce away before a possible auto-resume — reached directly by resume,
   // not just via the floor picker — has loaded `current`.
   useEffect(() => {
     if (!hydrated) return;
-    if (!current || !current.type) router.replace("/survey/m2");
+    if (!current || !current.type) router.replace("/survey/locations");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrated]);
 
@@ -74,9 +74,9 @@ export default function Method2CategoryPage() {
   const type = current.type;
 
   const counts = sectionCountsForLocation(type);
-  const applicableCategories = METHOD2_SECTIONS.filter((wc) => counts[wc] > 0);
+  const applicableCategories = RUBRIC_SECTIONS.filter((wc) => counts[wc] > 0);
   const categoryStatus = applicableCategories.map((wc) => {
-    const items = method2GroupsForLocationAndSection(type, wc);
+    const items = rubricGroupsForLocationAndSection(type, wc);
     const answered = items.filter((i) => current!.scores[i.name]).length;
     return { wc, items, answered, total: items.length, complete: answered === items.length };
   });
@@ -85,7 +85,7 @@ export default function Method2CategoryPage() {
 
   function targetRoute() {
     const floorLevel = current!.floorLevel;
-    return floorLevel === "Roof" ? "/survey/m2" : `/survey/m2/location?floor=${encodeURIComponent(floorLevel)}`;
+    return floorLevel === "Roof" ? "/survey/locations" : `/survey/locations/location?floor=${encodeURIComponent(floorLevel)}`;
   }
 
   // Leaving with everything scored just finalizes and goes — nothing to
@@ -99,7 +99,7 @@ export default function Method2CategoryPage() {
   // discard below, not a silent partial save.
   function goBack() {
     if (allComplete) {
-      m2FinalizeCurrent();
+      locFinalizeCurrent();
       router.push(targetRoute());
       return;
     }
@@ -107,7 +107,7 @@ export default function Method2CategoryPage() {
       // Nothing's been entered on this location at all yet (just landed
       // here, or backed out of every category without picking a
       // condition) — nothing to warn about discarding, so don't.
-      m2DiscardCurrent();
+      locDiscardCurrent();
       router.push(targetRoute());
       return;
     }
@@ -115,19 +115,19 @@ export default function Method2CategoryPage() {
   }
 
   function confirmDiscardAndGoBack() {
-    m2DiscardCurrent();
+    locDiscardCurrent();
     router.push(targetRoute());
   }
 
   function saveSelectionAndReturn() {
     if (allComplete) {
-      m2FinalizeCurrent();
+      locFinalizeCurrent();
       router.push(targetRoute());
       return;
     }
     // Incomplete: stay put, mark every unscored item pending, and jump to
     // the first work category that still has one, same reasoning as
-    // Method 1's equivalent — a pending marker inside a collapsed section
+    // The old equivalent — a pending marker inside a collapsed section
     // is invisible otherwise.
     setAttemptedSave(true);
     const firstIncomplete = categoryStatus.find((c) => !c.complete);
@@ -172,10 +172,10 @@ export default function Method2CategoryPage() {
               value={current!.scores[item.name]}
               photos={current!.photos[item.name] ?? []}
               note={current!.notes[item.name]}
-              onScoreChange={(v) => m2CurrentSetScore(item.name, v)}
+              onScoreChange={(v) => locCurrentSetScore(item.name, v)}
               onAddPhoto={(f) => handleAddPhoto(item.name, f)}
               onRemovePhoto={(id) => handleRemovePhoto(item.name, id)}
-              onNoteChange={(v) => m2CurrentSetNote(item.name, v)}
+              onNoteChange={(v) => locCurrentSetNote(item.name, v)}
               pending={attemptedSave && !current!.scores[item.name]}
             />
           ))}

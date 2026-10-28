@@ -2,14 +2,14 @@ import {
   ATTACHMENTS_HEADER,
   ATTACHMENTS_TAB,
   KNOWN_RUBRIC_VERSIONS,
-  METHOD2_HEADER,
-  METHOD2_TAB,
+  RESPONSES_HEADER,
+  RESPONSES_TAB,
   canWrite,
-  method2Rows,
+  responseRows,
   noteRows,
   pushPayload,
   ratingBand,
-  scoreMethod2For,
+  scoreSurveyFor,
   submissionIssues,
 } from '@mqi/shared';
 import type { ApiError, PullResult, PushItem, PushResult, SubmittedSurvey, SurveyScores } from '@mqi/shared';
@@ -38,7 +38,7 @@ function sameScore(a: number | null | undefined, b: number | null | undefined): 
 
 /** The phone's scores must equal the server's recomputation with the same rubric version. */
 function checkScores(s: SubmittedSurvey): void {
-  const r = scoreMethod2For(s.locations, s.rubricVersion);
+  const r = scoreSurveyFor(s.locations, s.rubricVersion);
   const server: SurveyScores = {
     overall: r.overall,
     functionality: r.categories.Functionality.score,
@@ -136,8 +136,8 @@ function pushOne(ctx: Ctx, item: PushItem): PushResult {
     const idSet = new Set([s.id]);
     if (row.rowsWritten !== 'TRUE') {
       // After a crash the append may have landed even though the ledger never heard back.
-      const already = recovering && findRows(ctx.env, METHOD2_TAB, 'Survey ID', idSet).length > 0;
-      if (!already) appendByHeader(ctx.env, METHOD2_TAB, METHOD2_HEADER, method2Rows(s, { name: me.name, email: me.email }, ctx.nowIso));
+      const already = recovering && findRows(ctx.env, RESPONSES_TAB, 'Survey ID', idSet).length > 0;
+      if (!already) appendByHeader(ctx.env, RESPONSES_TAB, RESPONSES_HEADER, responseRows(s, { name: me.name, email: me.email }, ctx.nowIso));
       row = ledger.update(s.id, { rowsWritten: 'TRUE', updatedAt: ctx.nowIso });
     }
     if (row.notesWritten !== 'TRUE') {

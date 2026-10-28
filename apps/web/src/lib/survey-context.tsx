@@ -9,16 +9,16 @@ import type {
   BuildingStructure,
   CenterBeam,
   TypeOfStructure,
-  Method2Location,
+  SurveyLocation,
   PhotoAsset,
   PowerSupply,
   School,
   StructuralConcern,
 } from "@/lib/types";
-import { UNNAMED_LOCATION_TYPES } from "@/lib/data/method2-items";
+import { UNNAMED_LOCATION_TYPES } from "@/lib/data/items";
 import { uuidv7 } from "@mqi/shared";
 
-interface M2Current {
+interface CurrentLocation {
   floorLevel: FloorLevel;
   type: LocationType | null;
   name: string;
@@ -32,7 +32,8 @@ interface M2Current {
 
 export interface SurveyState {
   school: School | null;
-  method: 1 | 2 | null;
+  /** True from the moment the survey starts (respondent details confirmed). */
+  started: boolean;
   asm: string;
   apm: string;
   principal: string;
@@ -46,27 +47,21 @@ export interface SurveyState {
   /** Photos attached to last-page questions (see SITE_PHOTO_* in types.ts), keyed by question text. Same lifecycle as every other photo — each uploads to Drive individually on attach. */
   reviewPhotos: Record<string, PhotoAsset[]>;
   complaints: string;
-  m1: {
-    scores: Record<string, Condition>;
-    /** Multiple photos per item are allowed. Each uploads to Drive individually on attach — see PhotoAsset. */
-    photos: Record<string, PhotoAsset[]>;
-    notes: Record<string, string>;
-  };
-  m2: {
-    locations: Method2Location[];
-    current: M2Current | null;
+  scoring: {
+    locations: SurveyLocation[];
+    current: CurrentLocation | null;
   };
   /**
-   * Set the moment a method is chosen, alongside startTime — every photo
+   * Set the moment the survey starts, alongside startTime — every photo
    * uploaded during this attempt (Round 3 Task 8) carries this same id in
    * its Drive folder path, and the final submit's response/attachment rows
    * must reuse the exact same id so photos correlate back to their survey
-   * row. Regenerated fresh on every SET_METHOD, same lifecycle as startTime.
+   * row. Regenerated fresh on every START_SURVEY, same lifecycle as startTime.
    */
   surveyId: string | null;
   /** Set right after a successful (non-queued) submit, so the Done screen can offer downloads. */
   lastSurveyId: string | null;
-  /** ISO timestamp set the moment a method is chosen (not on page load, not on first item answered). Cleared if the user discards progress and goes back to method selection. */
+  /** ISO timestamp set the moment the survey starts (not on page load, not on first item answered). Cleared if the user discards progress and goes back to survey details. */
   startTime: string | null;
   /** ISO timestamp of the most recent pause, while paused; null once resumed (or if never paused). */
   pausedAt: string | null;
@@ -89,7 +84,7 @@ function newSurveyId(): string {
  * browser navigation" — makes Next fall back to a real, fresh page load.
  * Precaching (see public/sw.js) makes that fresh load itself succeed
  * offline, but a fresh load still means a brand new SurveyProvider with
- * nothing in memory — every guarded page's own "no school/method, bounce to
+ * nothing in memory — every guarded page's own "no school/not started, bounce to
  * find-school" check would otherwise fire immediately and look exactly like
  * the survey was lost, even though autosave had it safely in IndexedDB the
  * whole time. localStorage (not IndexedDB) specifically because it's read
@@ -101,16 +96,16 @@ const ACTIVE_SURVEY_STORAGE_KEY = "mqi-active-survey-id";
 /**
  * Same forced-fresh-reload failure mode as ACTIVE_SURVEY_STORAGE_KEY above,
  * but for the one gap that pointer doesn't cover: picking a school happens
- * on find-school, *before* a method is chosen, and surveyId (what
- * ACTIVE_SURVEY_STORAGE_KEY keys off) isn't minted until SET_METHOD. A
- * failed router.push("/survey/method") right after selecting a school —
+ * on find-school, *before* the survey starts, and surveyId (what
+ * ACTIVE_SURVEY_STORAGE_KEY keys off) isn't minted until START_SURVEY. A
+ * failed router.push("/survey/details") right after selecting a school —
  * confirmed live, offline, exactly this transition — falls back to a fresh
  * page load same as any other client navigation here, which mints a brand
- * new SurveyProvider with school back to null, and /survey/method's own
+ * new SurveyProvider with school back to null, and /survey/details's own
  * guard bounces straight back to find-school looking exactly like the
  * selection was silently lost. Kept in sync with state.school the same way
  * (write on select, clear on RESET) and restored on mount specifically in
- * the "nothing to resume" branch below — once a method's chosen and a real
+ * the "nothing to resume" branch below — once the survey's started and a real
  * surveyId/draft exists, LOAD_DRAFT already carries school along with
  * everything else and is the more authoritative source.
  */
@@ -136,7 +131,7 @@ export function clearActiveSurveyPointers(): void {
 function initialState(): SurveyState {
   return {
     school: null,
-    method: null,
+    started: false,
     asm: "",
     apm: "",
     principal: "",
@@ -149,8 +144,7 @@ function initialState(): SurveyState {
     siteChecks: emptySiteChecks(),
     reviewPhotos: {},
     complaints: "",
-    m1: { scores: {}, photos: {}, notes: {} },
-    m2: { locations: [], current: null },
+    scoring: { locations: [], current: null },
     surveyId: null,
     lastSurveyId: null,
     startTime: null,
@@ -159,9 +153,9 @@ function initialState(): SurveyState {
   };
 }
 
-// Small pure helpers so the M1/add-status-remove trio doesn't repeat the
-// same Record<string, PhotoAsset[]> plumbing four times over (M1 + M2
-// current each need add/status-update/remove).
+// Small pure helpers so the add/remove pair doesn't repeat the
+// same Record<string, PhotoAsset[]> plumbing over (every
+// photo field needs add/remove).
 function addPhoto(photos: Record<string, PhotoAsset[]>, name: string, asset: PhotoAsset): Record<string, PhotoAsset[]> {
   return { ...photos, [name]: [...(photos[name] ?? []), asset] };
 }
@@ -169,13 +163,13 @@ function removePhoto(photos: Record<string, PhotoAsset[]>, name: string, id: str
   return { ...photos, [name]: (photos[name] ?? []).filter((p) => p.id !== id) };
 }
 
-function emptyM2Current(floorLevel: FloorLevel): M2Current {
+function emptyCurrentLocation(floorLevel: FloorLevel): CurrentLocation {
   return { floorLevel, type: null, name: "", scores: {}, photos: {}, notes: {} };
 }
 
 type Action =
   | { type: "SET_SCHOOL"; school: School }
-  | { type: "SET_METHOD"; method: 1 | 2 }
+  | { type: "START_SURVEY" }
   | { type: "SET_RESPONDENT"; asm: string; apm: string; principal: string }
   | { type: "SET_POWER_SUPPLY"; value: PowerSupply }
   | { type: "SET_STRUCTURAL_CONCERN"; value: StructuralConcern }
@@ -188,23 +182,19 @@ type Action =
   | { type: "REVIEW_REMOVE_PHOTO"; name: string; id: string }
   | { type: "SET_COMPLAINTS"; value: string }
   | { type: "SET_LAST_SURVEY_ID"; surveyId: string | null }
-  | { type: "M1_SET_SCORE"; name: string; value: Condition }
-  | { type: "M1_ADD_PHOTO"; name: string; asset: PhotoAsset }
-  | { type: "M1_REMOVE_PHOTO"; name: string; id: string }
-  | { type: "M1_SET_NOTE"; name: string; value: string }
-  | { type: "M2_SET_FLOOR"; floorLevel: FloorLevel; autoName?: string }
-  | { type: "M2_SET_LOCATION_TYPE"; floorLevel: FloorLevel; locationType: LocationType; autoName?: string }
-  | { type: "M2_SET_LOCATION_NAME"; name: string }
-  | { type: "M2_SET_CLASSROOM"; floorLevel: FloorLevel; grade: string; section: string }
-  | { type: "M2_CURRENT_SET_SCORE"; name: string; value: Condition }
-  | { type: "M2_CURRENT_ADD_PHOTO"; name: string; asset: PhotoAsset }
-  | { type: "M2_CURRENT_REMOVE_PHOTO"; name: string; id: string }
-  | { type: "M2_CURRENT_SET_NOTE"; name: string; value: string }
-  | { type: "M2_FINALIZE_CURRENT" }
-  | { type: "M2_DISCARD_CURRENT" }
-  | { type: "M2_RESUME_LOCATION"; id: string }
+  | { type: "LOC_SET_FLOOR"; floorLevel: FloorLevel; autoName?: string }
+  | { type: "LOC_SET_LOCATION_TYPE"; floorLevel: FloorLevel; locationType: LocationType; autoName?: string }
+  | { type: "LOC_SET_LOCATION_NAME"; name: string }
+  | { type: "LOC_SET_CLASSROOM"; floorLevel: FloorLevel; grade: string; section: string }
+  | { type: "LOC_CURRENT_SET_SCORE"; name: string; value: Condition }
+  | { type: "LOC_CURRENT_ADD_PHOTO"; name: string; asset: PhotoAsset }
+  | { type: "LOC_CURRENT_REMOVE_PHOTO"; name: string; id: string }
+  | { type: "LOC_CURRENT_SET_NOTE"; name: string; value: string }
+  | { type: "LOC_FINALIZE_CURRENT" }
+  | { type: "LOC_DISCARD_CURRENT" }
+  | { type: "LOC_RESUME_LOCATION"; id: string }
   | { type: "LOAD_DRAFT"; state: SurveyState }
-  | { type: "DISCARD_METHOD_PROGRESS" }
+  | { type: "DISCARD_PROGRESS" }
   | { type: "PAUSE_TIMER" }
   | { type: "RESUME_TIMER" }
   | { type: "RESET" };
@@ -216,15 +206,15 @@ function resumeNow(state: SurveyState): SurveyState {
 }
 
 // Actions that don't count as "doing the assessment" — picking a school or
-// method, discarding/resetting everything, and the pause/resume actions
+// starting, discarding/resetting everything, and the pause/resume actions
 // themselves (which manage pausedAt directly and would otherwise conflict
 // with the auto-resume below).
 const TIMER_EXEMPT_ACTIONS = new Set<Action["type"]>([
   "SET_SCHOOL",
-  "SET_METHOD",
+  "START_SURVEY",
   "SET_LAST_SURVEY_ID",
   "LOAD_DRAFT",
-  "DISCARD_METHOD_PROGRESS",
+  "DISCARD_PROGRESS",
   "PAUSE_TIMER",
   "RESUME_TIMER",
   "RESET",
@@ -244,15 +234,15 @@ function reducer(state: SurveyState, action: Action): SurveyState {
   switch (action.type) {
     case "SET_SCHOOL":
       return { ...state, school: action.school };
-    case "SET_METHOD":
+    case "START_SURVEY":
       // startTime is set here, not on page load or first item answered — the
-      // moment a method is actually chosen is what "starting the assessment"
+      // moment the survey is actually started is what "starting the assessment"
       // means. surveyId is minted here too (Round 3 Task 8) — every photo
       // uploaded from here on carries this id in its Drive path, and submit
       // must reuse the exact same id so photos correlate back to their row.
       return {
         ...state,
-        method: action.method,
+        started: true,
         surveyId: newSurveyId(),
         startTime: new Date().toISOString(),
         pausedAt: null,
@@ -285,44 +275,32 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       return { ...state, complaints: action.value };
     case "SET_LAST_SURVEY_ID":
       return { ...state, lastSurveyId: action.surveyId };
-    case "M1_SET_SCORE":
-      return { ...state, m1: { ...state.m1, scores: { ...state.m1.scores, [action.name]: action.value } } };
-    case "M1_ADD_PHOTO": {
-      const photos = addPhoto(state.m1.photos, action.name, action.asset);
-      return { ...state, m1: { ...state.m1, photos } };
-    }
-    case "M1_REMOVE_PHOTO": {
-      const photos = removePhoto(state.m1.photos, action.name, action.id);
-      return { ...state, m1: { ...state.m1, photos } };
-    }
-    case "M1_SET_NOTE":
-      return { ...state, m1: { ...state.m1, notes: { ...state.m1.notes, [action.name]: action.value } } };
 
-    case "M2_SET_FLOOR": {
-      const current = emptyM2Current(action.floorLevel);
+    case "LOC_SET_FLOOR": {
+      const current = emptyCurrentLocation(action.floorLevel);
       // Roof floor has no Location page — it *is* the location type, auto-named.
       if (action.floorLevel === "Roof") {
         current.type = "Roof";
         current.name = action.autoName ?? "Roof";
       }
-      return { ...state, m2: { ...state.m2, current } };
+      return { ...state, scoring: { ...state.scoring, current } };
     }
-    case "M2_SET_LOCATION_TYPE": {
+    case "LOC_SET_LOCATION_TYPE": {
       // Always builds a fresh current from the explicit floorLevel — doesn't
       // depend on a pre-existing current, so there's no ordering/timing
       // dependency on whatever the previous screen last set.
       const named = UNNAMED_LOCATION_TYPES.includes(action.locationType);
-      const current = emptyM2Current(action.floorLevel);
+      const current = emptyCurrentLocation(action.floorLevel);
       current.type = action.locationType;
       current.name = named ? (action.autoName ?? action.locationType) : "";
-      return { ...state, m2: { ...state.m2, current } };
+      return { ...state, scoring: { ...state.scoring, current } };
     }
-    case "M2_SET_LOCATION_NAME":
-      return state.m2.current
-        ? { ...state, m2: { ...state.m2, current: { ...state.m2.current, name: action.name } } }
+    case "LOC_SET_LOCATION_NAME":
+      return state.scoring.current
+        ? { ...state, scoring: { ...state.scoring, current: { ...state.scoring.current, name: action.name } } }
         : state;
-    case "M2_SET_CLASSROOM": {
-      const current = emptyM2Current(action.floorLevel);
+    case "LOC_SET_CLASSROOM": {
+      const current = emptyCurrentLocation(action.floorLevel);
       current.type = "Classroom";
       current.classroomGrade = action.grade;
       current.classroomSection = action.section;
@@ -331,45 +309,45 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       // than a real value there, so skip the separator instead of leaving a
       // trailing space in the location name.
       current.name = action.section ? `${action.grade} ${action.section}` : action.grade;
-      return { ...state, m2: { ...state.m2, current } };
+      return { ...state, scoring: { ...state.scoring, current } };
     }
-    case "M2_CURRENT_SET_SCORE":
-      return state.m2.current
+    case "LOC_CURRENT_SET_SCORE":
+      return state.scoring.current
         ? {
             ...state,
-            m2: {
-              ...state.m2,
-              current: { ...state.m2.current, scores: { ...state.m2.current.scores, [action.name]: action.value } },
+            scoring: {
+              ...state.scoring,
+              current: { ...state.scoring.current, scores: { ...state.scoring.current.scores, [action.name]: action.value } },
             },
           }
         : state;
-    case "M2_CURRENT_ADD_PHOTO": {
-      if (!state.m2.current) return state;
-      const photos = addPhoto(state.m2.current.photos, action.name, action.asset);
-      return { ...state, m2: { ...state.m2, current: { ...state.m2.current, photos } } };
+    case "LOC_CURRENT_ADD_PHOTO": {
+      if (!state.scoring.current) return state;
+      const photos = addPhoto(state.scoring.current.photos, action.name, action.asset);
+      return { ...state, scoring: { ...state.scoring, current: { ...state.scoring.current, photos } } };
     }
-    case "M2_CURRENT_REMOVE_PHOTO": {
-      if (!state.m2.current) return state;
-      const photos = removePhoto(state.m2.current.photos, action.name, action.id);
-      return { ...state, m2: { ...state.m2, current: { ...state.m2.current, photos } } };
+    case "LOC_CURRENT_REMOVE_PHOTO": {
+      if (!state.scoring.current) return state;
+      const photos = removePhoto(state.scoring.current.photos, action.name, action.id);
+      return { ...state, scoring: { ...state.scoring, current: { ...state.scoring.current, photos } } };
     }
-    case "M2_CURRENT_SET_NOTE":
-      return state.m2.current
+    case "LOC_CURRENT_SET_NOTE":
+      return state.scoring.current
         ? {
             ...state,
-            m2: {
-              ...state.m2,
-              current: { ...state.m2.current, notes: { ...state.m2.current.notes, [action.name]: action.value } },
+            scoring: {
+              ...state.scoring,
+              current: { ...state.scoring.current, notes: { ...state.scoring.current.notes, [action.name]: action.value } },
             },
           }
         : state;
-    case "M2_FINALIZE_CURRENT": {
-      const current = state.m2.current;
+    case "LOC_FINALIZE_CURRENT": {
+      const current = state.scoring.current;
       if (!current || !current.type || Object.keys(current.scores).length === 0) {
         // Nothing scored yet at this location — nothing to keep.
-        return { ...state, m2: { ...state.m2, current: null } };
+        return { ...state, scoring: { ...state.scoring, current: null } };
       }
-      const location: Method2Location = {
+      const location: SurveyLocation = {
         id: `${current.type}-${Date.now()}`,
         floorLevel: current.floorLevel,
         type: current.type,
@@ -380,23 +358,23 @@ function reducer(state: SurveyState, action: Action): SurveyState {
         photos: current.photos,
         notes: current.notes,
       };
-      return { ...state, m2: { ...state.m2, locations: [...state.m2.locations, location], current: null } };
+      return { ...state, scoring: { ...state.scoring, locations: [...state.scoring.locations, location], current: null } };
     }
-    case "M2_DISCARD_CURRENT":
+    case "LOC_DISCARD_CURRENT":
       // The explicit "discard" side of the category page's incomplete-work
-      // confirmation — unlike M2_FINALIZE_CURRENT, this never adds a
+      // confirmation — unlike LOC_FINALIZE_CURRENT, this never adds a
       // location: whatever's scored on this unfinished location is dropped
       // entirely, not saved as an "Incomplete" entry to come back to later.
-      return { ...state, m2: { ...state.m2, current: null } };
-    case "M2_RESUME_LOCATION": {
+      return { ...state, scoring: { ...state.scoring, current: null } };
+    case "LOC_RESUME_LOCATION": {
       // Pulls a previously-finalized location back into `current` for
       // editing — the only way to fix an incomplete location (added
       // alongside Task 3's submit-blocking validation: without this, an
       // incomplete location had no path back to completion and would
       // permanently block submission).
-      const location = state.m2.locations.find((l) => l.id === action.id);
+      const location = state.scoring.locations.find((l) => l.id === action.id);
       if (!location) return state;
-      const current: M2Current = {
+      const current: CurrentLocation = {
         floorLevel: location.floorLevel,
         type: location.type,
         name: location.name,
@@ -408,7 +386,7 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       };
       return {
         ...state,
-        m2: { locations: state.m2.locations.filter((l) => l.id !== action.id), current },
+        scoring: { locations: state.scoring.locations.filter((l) => l.id !== action.id), current },
       };
     }
     case "LOAD_DRAFT":
@@ -428,16 +406,16 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       return { ...state, pausedAt: new Date().toISOString() };
     case "RESUME_TIMER":
       return resumeNow(state);
-    case "DISCARD_METHOD_PROGRESS":
-      // Confirmed navigation back to method selection: clear every response
+    case "DISCARD_PROGRESS":
+      // Confirmed navigation back to survey details: clear every response
       // entered in this session and the timer — but not school/respondent
       // details (re-typing names would be bad UX for the same screen
-      // they're landing back on), and deliberately *not* `method` either:
-      // nulling it here races the m1/m2 pages' own "state.method !== N"
+      // they're landing back on), and deliberately *not* `started` either:
+      // clearing it here races the locations page's own "!state.started"
       // guard effect, which fires on the same still-mounted page before our
-      // router.push("/survey/method") completes and redirects to
-      // find-school instead. Leaving it as-is is harmless — setMethod
-      // overwrites it the moment they pick again on that screen.
+      // router.push("/survey/details") completes and redirects to
+      // find-school instead. Leaving it as-is is harmless — startSurvey
+      // sets it again the moment they start on that screen.
       //
       // `surveyId` *is* nulled, though (no guard reads it, so no equivalent
       // race) — it's what ACTIVE_SURVEY_STORAGE_KEY's sync effect keys off
@@ -445,11 +423,10 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       // could silently reappear on the next cold start (see
       // survey-context.tsx's ACTIVE_SURVEY_STORAGE_KEY) even though the
       // user explicitly walked away from it. A fresh one is minted the
-      // moment they pick a method again (SET_METHOD), same as always.
+      // moment they start again (START_SURVEY), same as always.
       return {
         ...state,
-        m1: { scores: {}, photos: {}, notes: {} },
-        m2: { locations: [], current: null },
+        scoring: { locations: [], current: null },
         surveyId: null,
         startTime: null,
         pausedAt: null,
@@ -465,7 +442,7 @@ function reducer(state: SurveyState, action: Action): SurveyState {
 interface SurveyContextValue {
   state: SurveyState;
   setSchool: (school: School) => void;
-  setMethod: (method: 1 | 2) => void;
+  startSurvey: () => void;
   setRespondent: (asm: string, apm: string, principal: string) => void;
   setPowerSupply: (value: PowerSupply) => void;
   setStructuralConcern: (value: StructuralConcern) => void;
@@ -478,23 +455,19 @@ interface SurveyContextValue {
   reviewRemovePhoto: (name: string, id: string) => void;
   setComplaints: (value: string) => void;
   setLastSurveyId: (surveyId: string | null) => void;
-  m1SetScore: (name: string, value: Condition) => void;
-  m1AddPhoto: (name: string, asset: PhotoAsset) => void;
-  m1RemovePhoto: (name: string, id: string) => void;
-  m1SetNote: (name: string, value: string) => void;
-  m2SetFloor: (floorLevel: FloorLevel, autoName?: string) => void;
-  m2SetLocationType: (floorLevel: FloorLevel, locationType: LocationType, autoName?: string) => void;
-  m2SetLocationName: (name: string) => void;
-  m2SetClassroom: (floorLevel: FloorLevel, grade: string, section: string) => void;
-  m2CurrentSetScore: (name: string, value: Condition) => void;
-  m2CurrentAddPhoto: (name: string, asset: PhotoAsset) => void;
-  m2CurrentRemovePhoto: (name: string, id: string) => void;
-  m2CurrentSetNote: (name: string, value: string) => void;
-  m2FinalizeCurrent: () => void;
-  m2DiscardCurrent: () => void;
-  m2ResumeLocation: (id: string) => void;
+  locSetFloor: (floorLevel: FloorLevel, autoName?: string) => void;
+  locSetLocationType: (floorLevel: FloorLevel, locationType: LocationType, autoName?: string) => void;
+  locSetLocationName: (name: string) => void;
+  locSetClassroom: (floorLevel: FloorLevel, grade: string, section: string) => void;
+  locCurrentSetScore: (name: string, value: Condition) => void;
+  locCurrentAddPhoto: (name: string, asset: PhotoAsset) => void;
+  locCurrentRemovePhoto: (name: string, id: string) => void;
+  locCurrentSetNote: (name: string, value: string) => void;
+  locFinalizeCurrent: () => void;
+  locDiscardCurrent: () => void;
+  locResumeLocation: (id: string) => void;
   loadDraft: (state: SurveyState) => void;
-  discardMethodProgress: () => void;
+  discardProgress: () => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
   reset: () => void;
@@ -502,7 +475,7 @@ interface SurveyContextValue {
    * False only for the brief window (one async IndexedDB read, at most)
    * right after mount while a possible auto-resume is being attempted — see
    * ACTIVE_SURVEY_STORAGE_KEY. Every page whose own guard effect would
-   * otherwise redirect away for "no school/method" (or, on the Method 2
+   * otherwise redirect away for "no school/not started" (or, on the locations
    * category page, "no current location") must wait for this to become
    * true first, or it'll win the race and redirect before the resume had a
    * chance to load anything.
@@ -520,7 +493,7 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
   // on mount. Runs even when there's no pointer (nothing to resume) — the
   // point isn't just the resume itself, it's that every guarded page needs
   // to know this attempt has *finished* (see `hydrated`) before trusting
-  // "no school/method" to mean "no survey," rather than "haven't checked
+  // "no school/not started" to mean "no survey," rather than "haven't checked
   // yet."
   useEffect(() => {
     let cancelled = false;
@@ -528,7 +501,7 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
     if (!id) {
       // No survey has started yet (no surveyId minted) — the only thing
       // that could still be sitting in memory from before a forced reload
-      // is a school picked on find-school but not yet followed by a method
+      // is a school picked on find-school but not yet followed by a start
       // choice. See PENDING_SCHOOL_STORAGE_KEY for why this needs its own
       // recovery path separate from the draft/surveyId one below.
       const pending = typeof window !== "undefined" ? localStorage.getItem(PENDING_SCHOOL_STORAGE_KEY) : null;
@@ -563,7 +536,7 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Keeps the pointer current with whichever survey is actually live in
-  // memory right now — set the moment one starts (SET_METHOD) or resumes
+  // memory right now — set the moment one starts (START_SURVEY) or resumes
   // (LOAD_DRAFT), cleared the moment one ends (submitted — see
   // review.tsx's clearDraft/reset chain — or discarded/reset).
   useEffect(() => {
@@ -586,7 +559,7 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
       state,
       hydrated,
       setSchool: (school) => dispatch({ type: "SET_SCHOOL", school }),
-      setMethod: (method) => dispatch({ type: "SET_METHOD", method }),
+      startSurvey: () => dispatch({ type: "START_SURVEY" }),
       setRespondent: (asm, apm, principal) => dispatch({ type: "SET_RESPONDENT", asm, apm, principal }),
       setPowerSupply: (value) => dispatch({ type: "SET_POWER_SUPPLY", value }),
       setStructuralConcern: (value) => dispatch({ type: "SET_STRUCTURAL_CONCERN", value }),
@@ -599,24 +572,20 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
       reviewRemovePhoto: (name, id) => dispatch({ type: "REVIEW_REMOVE_PHOTO", name, id }),
       setComplaints: (value) => dispatch({ type: "SET_COMPLAINTS", value }),
       setLastSurveyId: (surveyId) => dispatch({ type: "SET_LAST_SURVEY_ID", surveyId }),
-      m1SetScore: (name, value) => dispatch({ type: "M1_SET_SCORE", name, value }),
-      m1AddPhoto: (name, asset) => dispatch({ type: "M1_ADD_PHOTO", name, asset }),
-      m1RemovePhoto: (name, id) => dispatch({ type: "M1_REMOVE_PHOTO", name, id }),
-      m1SetNote: (name, value) => dispatch({ type: "M1_SET_NOTE", name, value }),
-      m2SetFloor: (floorLevel, autoName) => dispatch({ type: "M2_SET_FLOOR", floorLevel, autoName }),
-      m2SetLocationType: (floorLevel, locationType, autoName) =>
-        dispatch({ type: "M2_SET_LOCATION_TYPE", floorLevel, locationType, autoName }),
-      m2SetLocationName: (name) => dispatch({ type: "M2_SET_LOCATION_NAME", name }),
-      m2SetClassroom: (floorLevel, grade, section) => dispatch({ type: "M2_SET_CLASSROOM", floorLevel, grade, section }),
-      m2CurrentSetScore: (name, value) => dispatch({ type: "M2_CURRENT_SET_SCORE", name, value }),
-      m2CurrentAddPhoto: (name, asset) => dispatch({ type: "M2_CURRENT_ADD_PHOTO", name, asset }),
-      m2CurrentRemovePhoto: (name, id) => dispatch({ type: "M2_CURRENT_REMOVE_PHOTO", name, id }),
-      m2CurrentSetNote: (name, value) => dispatch({ type: "M2_CURRENT_SET_NOTE", name, value }),
-      m2FinalizeCurrent: () => dispatch({ type: "M2_FINALIZE_CURRENT" }),
-      m2DiscardCurrent: () => dispatch({ type: "M2_DISCARD_CURRENT" }),
-      m2ResumeLocation: (id) => dispatch({ type: "M2_RESUME_LOCATION", id }),
+      locSetFloor: (floorLevel, autoName) => dispatch({ type: "LOC_SET_FLOOR", floorLevel, autoName }),
+      locSetLocationType: (floorLevel, locationType, autoName) =>
+        dispatch({ type: "LOC_SET_LOCATION_TYPE", floorLevel, locationType, autoName }),
+      locSetLocationName: (name) => dispatch({ type: "LOC_SET_LOCATION_NAME", name }),
+      locSetClassroom: (floorLevel, grade, section) => dispatch({ type: "LOC_SET_CLASSROOM", floorLevel, grade, section }),
+      locCurrentSetScore: (name, value) => dispatch({ type: "LOC_CURRENT_SET_SCORE", name, value }),
+      locCurrentAddPhoto: (name, asset) => dispatch({ type: "LOC_CURRENT_ADD_PHOTO", name, asset }),
+      locCurrentRemovePhoto: (name, id) => dispatch({ type: "LOC_CURRENT_REMOVE_PHOTO", name, id }),
+      locCurrentSetNote: (name, value) => dispatch({ type: "LOC_CURRENT_SET_NOTE", name, value }),
+      locFinalizeCurrent: () => dispatch({ type: "LOC_FINALIZE_CURRENT" }),
+      locDiscardCurrent: () => dispatch({ type: "LOC_DISCARD_CURRENT" }),
+      locResumeLocation: (id) => dispatch({ type: "LOC_RESUME_LOCATION", id }),
       loadDraft: (draftState) => dispatch({ type: "LOAD_DRAFT", state: draftState }),
-      discardMethodProgress: () => dispatch({ type: "DISCARD_METHOD_PROGRESS" }),
+      discardProgress: () => dispatch({ type: "DISCARD_PROGRESS" }),
       pauseTimer: () => dispatch({ type: "PAUSE_TIMER" }),
       resumeTimer: () => dispatch({ type: "RESUME_TIMER" }),
       reset: () => dispatch({ type: "RESET" }),

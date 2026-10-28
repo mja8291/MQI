@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
   API_VERSION,
-  METHOD2_HEADER,
-  METHOD2_TAB,
+  RESPONSES_HEADER,
+  RESPONSES_TAB,
   RUBRIC_VERSION,
   UPLOAD_CHUNK_BYTES,
   base64Encode,
-  scoreMethod2For,
+  scoreSurveyFor,
   uuidv7,
 } from '@mqi/shared';
-import type { ApiResponse, AttachmentMeta, Method2Location, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
+import type { ApiResponse, AttachmentMeta, SurveyLocation, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../dev/server';
@@ -35,11 +35,11 @@ function login(email: string, password = DEV_PASSWORD): string {
 }
 
 type Loc = SubmittedSurvey['locations'][number];
-function location(name: string, type: Method2Location['type'], scores: Method2Location['scores'], photos: Loc['photos'] = {}, notes: Record<string, string> = {}): Loc {
+function location(name: string, type: SurveyLocation['type'], scores: SurveyLocation['scores'], photos: Loc['photos'] = {}, notes: Record<string, string> = {}): Loc {
   return { id: name, floorLevel: type === 'Roof' ? 'Roof' : 'Ground', type, name, scores, photos, notes };
 }
 
-/** A complete, valid Method 2 survey with one photo, scored exactly as the phone would. */
+/** A complete, valid survey with one photo, scored exactly as the phone would. */
 function makeSurvey(overrides: Partial<SubmittedSurvey> = {}): { survey: SubmittedSurvey; attachments: AttachmentMeta[] } {
   const id = ids();
   const photoId = ids();
@@ -61,10 +61,9 @@ function makeSurvey(overrides: Partial<SubmittedSurvey> = {}): { survey: Submitt
       { Plaster: 'Cracked near the tank' },
     ),
   ];
-  const r = scoreMethod2For(locations, RUBRIC_VERSION);
+  const r = scoreSurveyFor(locations, RUBRIC_VERSION);
   const survey: SubmittedSurvey = {
     id,
-    method: 2,
     rubricVersion: RUBRIC_VERSION,
     school: { schoolId: '947', name: 'OGS Trust Campus', region: 'South West', area: 'Gadap West I' },
     asm: 'ASM',
@@ -108,7 +107,7 @@ function push(session: string, ...items: { survey: SubmittedSurvey; attachments:
   return call<{ results: PushResult[] }>('sync.push', { items: items.map((it, i) => ({ outboxId: i + 1, ...it })) }, session);
 }
 
-const rowsFor = (surveyId: string) => env.responses.objects(METHOD2_TAB).filter((r) => r['Survey ID'] === surveyId);
+const rowsFor = (surveyId: string) => env.responses.objects(RESPONSES_TAB).filter((r) => r['Survey ID'] === surveyId);
 const attachmentRows = (surveyId: string) => env.responses.objects('MQI Survey Attachments').filter((r) => r['Survey ID'] === surveyId);
 
 beforeEach(() => {
@@ -226,7 +225,7 @@ describe('scope of every action', () => {
     expect(code(call('admin.issuePassword', { userId: 'x' }, r))).toBe('FORBIDDEN');
     expect(code(push(r, makeSurvey()))).toBe('FORBIDDEN');
     expect(code(call('dashboard.get', {}, r))).toBe('ok');
-    expect(code(call('export.rows', { tab: METHOD2_TAB, offset: 0, limit: 10 }, r))).toBe('ok');
+    expect(code(call('export.rows', { offset: 0, limit: 10 }, r))).toBe('ok');
   });
 
   test('everything except sign-up, login and client.log needs a session', () => {
@@ -256,17 +255,17 @@ describe('sync.push', () => {
   });
 
   test('follows a reordered live header and only appends new columns at the end', () => {
-    const tab = env.responses.tabs.get(METHOD2_TAB)!;
+    const tab = env.responses.tabs.get(RESPONSES_TAB)!;
     const before = tab[0]!.map(String);
     // Someone moved columns around in the sheet.
     const reordered = [before[3]!, before[0]!, ...before.filter((_, i) => i !== 0 && i !== 3)];
-    env.responses.tabs.set(METHOD2_TAB, [reordered]);
+    env.responses.tabs.set(RESPONSES_TAB, [reordered]);
     const t = login('surveyor@tcf.test');
     const item = makeSurvey();
     ok(push(t, item));
-    const header = env.responses.header(METHOD2_TAB)!;
+    const header = env.responses.header(RESPONSES_TAB)!;
     expect(header.slice(0, reordered.length)).toEqual(reordered);
-    expect(new Set(header)).toEqual(new Set([...METHOD2_HEADER]));
+    expect(new Set(header)).toEqual(new Set([...RESPONSES_HEADER]));
     const [row] = rowsFor(item.survey.id);
     expect(row!['School ID']).toBe('947');
   });
@@ -298,10 +297,10 @@ describe('sync.push', () => {
     const t = login('surveyor@tcf.test');
     const a = makeSurvey();
     ok(push(t, a));
-    env.responses.appendRaw(METHOD2_TAB, [['v1-survey', '2026-10-28T05:00:00.000Z']]);
+    env.responses.appendRaw(RESPONSES_TAB, [['v1-survey', '2026-10-28T05:00:00.000Z']]);
     const b = makeSurvey();
     ok(push(t, b));
-    const ids = env.responses.objects(METHOD2_TAB).map((r) => r['Survey ID']);
+    const ids = env.responses.objects(RESPONSES_TAB).map((r) => r['Survey ID']);
     expect(ids).toEqual([a.survey.id, 'v1-survey', b.survey.id]);
   });
 
@@ -407,8 +406,8 @@ describe('reads', () => {
   test('surveys.get rebuilds a written survey (any approved user)', () => {
     const item = makeSurvey();
     ok(push(login('surveyor@tcf.test'), item));
-    const found = ok(call<{ method: number; overall: number; rubricVersion: string; locations: unknown[] }>('surveys.get', { surveyId: item.survey.id }, login('reviewer@tcf.test')));
-    expect(found).toMatchObject({ method: 2, overall: Math.round(item.survey.scores.overall!), rubricVersion: RUBRIC_VERSION });
+    const found = ok(call<{ overall: number; rubricVersion: string; locations: unknown[] }>('surveys.get', { surveyId: item.survey.id }, login('reviewer@tcf.test')));
+    expect(found).toMatchObject({ overall: Math.round(item.survey.scores.overall!), rubricVersion: RUBRIC_VERSION });
     expect(found.locations).toHaveLength(1);
     expect(code(call('surveys.get', { surveyId: 'missing' }, login('reviewer@tcf.test')))).toBe('NOT_FOUND');
   });
@@ -426,10 +425,10 @@ describe('reads', () => {
     const s = login('surveyor@tcf.test');
     for (let i = 0; i < 3; i++) ok(push(s, makeSurvey()));
     const r = login('reviewer@tcf.test');
-    const p1 = ok(call<{ rows: unknown[]; hasMore: boolean; header: string[] }>('export.rows', { tab: METHOD2_TAB, offset: 0, limit: 2 }, r));
+    const p1 = ok(call<{ rows: unknown[]; hasMore: boolean; header: string[] }>('export.rows', { offset: 0, limit: 2 }, r));
     expect(p1.rows).toHaveLength(2);
     expect(p1.hasMore).toBe(true);
-    const p2 = ok(call<{ rows: unknown[]; hasMore: boolean }>('export.rows', { tab: METHOD2_TAB, offset: 2, limit: 2 }, r));
+    const p2 = ok(call<{ rows: unknown[]; hasMore: boolean }>('export.rows', { offset: 2, limit: 2 }, r));
     expect(p2.rows).toHaveLength(1);
     expect(p2.hasMore).toBe(false);
   });

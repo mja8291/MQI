@@ -1,19 +1,17 @@
-import type { Category, Condition, FloorLevel, LocationType, Method2Group } from "../types";
+import type { Category, Condition, FloorLevel, LocationType, RubricGroup } from "../types";
 import { OK_UNSAFE, ROOF_ACCESS } from "./condition-overrides";
 
 /**
- * Method 2 — 31 item groups (Safety 9 / Functionality 15 / Aesthetics 7),
- * rubric version 2026-10-28, read from the "MQI Assessment Rubrics (Method
- * B)" tab of the revised rubric workbook: names, order, "Category Weightage"
+ * The survey rubric — 31 item groups (Safety 9 / Functionality 15 / Aesthetics 7),
+ * rubric version 2026-10-28, read from the item-group tab of the revised rubric workbook: names, order, "Category Weightage"
  * and the per-group Location column come straight from it, and each
- * division's weights sum to 100. This is now the app's only scoring method —
- * Method 1 can no longer be started (see survey/method/page.tsx).
+ * division's weights sum to 100. This is the app's only rubric.
  *
  * History of this list (each earlier one frozen as a snapshot — see
  * rubric-version.ts):
- *   - 2026-10-27   30 groups (method2-v20261027-items.ts)
- *   - 2026-10-27.2 31 groups (method2-v20261027-2-items.ts)
- *   - 2026-10-27.3 33 groups (method2-v20261027-3-items.ts)
+ *   - 2026-10-27   30 groups (items-v20261027.ts)
+ *   - 2026-10-27.2 31 groups (items-v20261027-2.ts)
+ *   - 2026-10-27.3 33 groups (items-v20261027-3.ts)
  *   - 2026-10-28   this list: + Window Shades (Safety); Taps + Wash Basin
  *                  merged into "Wash Basin/Taps"; Electrical Fixtures +
  *                  Switch/Dimmer Sheet merged; W.Cs/Commodes and Plaque
@@ -22,7 +20,7 @@ import { OK_UNSAFE, ROOF_ACCESS } from "./condition-overrides";
  *                  /tanks"; "Internal Flooring" renamed "Internal Flooring
  *                  condition"; most weights and several locations changed.
  * All of it replaced the original 45-item / 6-work-category version (frozen
- * in method2-legacy-items.ts): Method B scores whole item *groups* per
+ * in items-legacy.ts): this list scores whole item *groups* per
  * location, and has no Work Category column, so a location's groups are
  * sectioned by division (Safety / Functionality / Aesthetics) instead.
  *
@@ -33,10 +31,10 @@ import { OK_UNSAFE, ROOF_ACCESS } from "./condition-overrides";
  *     condition-overrides.ts.
  * Not in the sheet, derived here:
  *   - principalMaintained (drives the Minor score) is true when every item
- *     the sheet's own Method A "Item Group" column files under the group is
+ *     the sheet's own item-level "Item Group" column files under the group is
  *     one of its "*" (school-maintained) items. Distribution Board is mixed
  *     (Energy & Power * + Electrical Wiring) and stays with Engineering;
- *     Window Shades has no Method A item and is treated as Engineering's.
+ *     Window Shades has no item-level entry and is treated as Engineering's.
  *   - Safety groups aggregate across locations by worst case, the others by
  *     average — unchanged from the previous version.
  * Where this list follows the sheet literally even though it changed from
@@ -46,12 +44,12 @@ import { OK_UNSAFE, ROOF_ACCESS } from "./condition-overrides";
  * External Plumbing is at Exterior Facade / Roof, no longer External
  * Development.
  */
-function worst(item: Omit<Method2Group, "aggregation" | "category"> & { category: "Safety" }): Method2Group {
+function worst(item: Omit<RubricGroup, "aggregation" | "category"> & { category: "Safety" }): RubricGroup {
   return { ...item, aggregation: "worst" };
 }
 function average(
-  item: Omit<Method2Group, "aggregation" | "category"> & { category: "Functionality" | "Aesthetics" }
-): Method2Group {
+  item: Omit<RubricGroup, "aggregation" | "category"> & { category: "Functionality" | "Aesthetics" }
+): RubricGroup {
   return { ...item, aggregation: "average" };
 }
 
@@ -64,7 +62,7 @@ const ROOF: LocationType = "Roof";
 const OTHER_ROOM: LocationType = "Other Room (Staff, Principal, Admin, Store etc.)";
 const LAB: LocationType = "Lab (Wet/Dry/DLP)";
 
-export const METHOD2_GROUPS: Method2Group[] = [
+export const RUBRIC_GROUPS: RubricGroup[] = [
   // Safety — 25% of overall, 9 groups
   worst({ name: "Boundary wall", category: "Safety", weight: 8, locations: [EXT_DEV] }),
   worst({ name: "Main Gate", category: "Safety", weight: 7, locations: [EXT_DEV] }),
@@ -239,7 +237,7 @@ export const METHOD2_GROUPS: Method2Group[] = [
 ];
 
 /** Display order of a location's scoring sections. */
-export const METHOD2_SECTIONS: Category[] = ["Safety", "Functionality", "Aesthetics"];
+export const RUBRIC_SECTIONS: Category[] = ["Safety", "Functionality", "Aesthetics"];
 
 export const LOCATION_TYPES: LocationType[] = [
   CLASSROOM,
@@ -257,7 +255,7 @@ export const FLOOR_LEVELS: FloorLevel[] = ["External", "Ground", "First", "Secon
 // Roof is deliberately excluded here (2026-09-19, per the rubric sheet's
 // "Level Option Page" — Roof's own row has no location-type options at
 // all): it's already its own floor level with its own auto-created
-// location (see chooseFloor's Roof special-case in m2/page.tsx), so
+// location (see chooseFloor's Roof special-case in scoring/page.tsx), so
 // offering it again as a type card *within* Ground/First/etc. was a
 // redundant, confusing duplicate route to the exact same location shape.
 const GROUND_LIKE_TYPES: LocationType[] = [CLASSROOM, CORRIDOR, TOILET, OTHER_ROOM, LAB];
@@ -297,7 +295,7 @@ export const LOCATION_NAME_OPTIONS: Partial<Record<LocationType, string[]>> = {
 
 // Round 3 Task 12: Classroom naming isn't free text or a flat "Classroom 1,
 // Classroom 2..." list — it's this Grade x Section combinator (see
-// M2_SET_CLASSROOM in survey-context.tsx, name = `${grade} ${section}`).
+// LOC_SET_CLASSROOM in survey-context.tsx, name = `${grade} ${section}`).
 // Nursery slots in as an additional grade, pairing with a section like
 // every other grade, rather than as a one-off special case.
 /**
@@ -321,22 +319,22 @@ export const CLASSROOM_GRADES_WITH_OPTIONAL_SECTION = ["Library", "Art Room/Libr
 /** Campuses use either lettered or coloured sections — offer both, ASM picks whichever applies. */
 export const CLASSROOM_SECTIONS = ["A", "B", "C", "D", "E", "Red", "Yellow", "Green", "Blue"];
 
-export function method2GroupsForLocation(type: LocationType): Method2Group[] {
-  return METHOD2_GROUPS.filter((g) => g.locations.includes(type));
+export function rubricGroupsForLocation(type: LocationType): RubricGroup[] {
+  return RUBRIC_GROUPS.filter((g) => g.locations.includes(type));
 }
 
 /** True once every item group applicable to this location has a score — the same completeness rule the scoring page enforces, applied to a whole recorded location at once. */
-export function isMethod2LocationComplete(location: { type: LocationType; scores: Record<string, Condition> }): boolean {
-  return method2GroupsForLocation(location.type).every((g) => Boolean(location.scores[g.name]));
+export function isLocationComplete(location: { type: LocationType; scores: Record<string, Condition> }): boolean {
+  return rubricGroupsForLocation(location.type).every((g) => Boolean(location.scores[g.name]));
 }
 
-export function method2GroupsForLocationAndSection(type: LocationType, section: Category): Method2Group[] {
-  return method2GroupsForLocation(type).filter((g) => g.category === section);
+export function rubricGroupsForLocationAndSection(type: LocationType, section: Category): RubricGroup[] {
+  return rubricGroupsForLocation(type).filter((g) => g.category === section);
 }
 
 /** Group counts per section for a specific location type — drives the scoring page's section counts (location-specific, not global). */
 export function sectionCountsForLocation(type: LocationType): Record<Category, number> {
   const counts: Record<Category, number> = { Safety: 0, Functionality: 0, Aesthetics: 0 };
-  for (const group of method2GroupsForLocation(type)) counts[group.category]++;
+  for (const group of rubricGroupsForLocation(type)) counts[group.category]++;
   return counts;
 }

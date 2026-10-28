@@ -1,8 +1,9 @@
 import ExcelJS from "exceljs";
+import { RESPONSES_TAB } from "@mqi/shared";
 import type { ExportRowsResult } from "@mqi/shared";
 
 /**
- * FR-EXP-2: both response tabs, in the sheet's own column order (v2 reads them through
+ * FR-EXP-2: the responses tab, in the sheet's own column order (v2 reads it through
  * export.rows; v1 built the same workbook on the server).
  */
 function addSheet(wb: ExcelJS.Workbook, name: string, data: Pick<ExportRowsResult, "header" | "rows">) {
@@ -16,12 +17,8 @@ function addSheet(wb: ExcelJS.Workbook, name: string, data: Pick<ExportRowsResul
   for (const row of data.rows) sheet.addRow(data.header.map((_, i) => row[i] ?? ""));
 }
 
-export function buildAllResponsesWorkbook(
-  method1: Pick<ExportRowsResult, "header" | "rows">,
-  method2: Pick<ExportRowsResult, "header" | "rows">
-): ExcelJS.Workbook {
+export function buildAllResponsesWorkbook(responses: Pick<ExportRowsResult, "header" | "rows">): ExcelJS.Workbook {
   const wb = new ExcelJS.Workbook();
-  addSheet(wb, "Method 1 Responses", method1);
-  addSheet(wb, "Method 2 Responses", method2);
+  addSheet(wb, RESPONSES_TAB, responses);
   return wb;
 }

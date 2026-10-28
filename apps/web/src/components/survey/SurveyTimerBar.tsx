@@ -35,14 +35,14 @@ function computeElapsed(startTime: string, pausedAt: string | null, pausedSecond
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 /**
- * Persistent bar showing elapsed time since the method was chosen (see
- * survey-context SET_METHOD), with a Pause/Resume control and — Round 3
+ * Persistent bar showing elapsed time since the survey started (see
+ * survey-context START_SURVEY), with a Pause/Resume control and — Round 3
  * Task 9 — a Save draft control. Rendered once in survey/layout.tsx so it's
- * present across the whole m1/m2/review flow without every page wiring it
+ * present across the whole locations/review flow without every page wiring it
  * in individually; that's also why Save draft lives here rather than on any
  * one page — "close the app and finish later" needs to work from wherever
  * the surveyor happens to be mid-assessment, not just from Review. Renders
- * nothing before a method is picked (no startTime yet) or on the Done
+ * nothing before the survey starts (no startTime yet) or on the Done
  * screen (assessment is over — the timer's job is done, see submit.ts for
  * the final tally).
  */
@@ -70,7 +70,7 @@ export function SurveyTimerBar() {
 
   const runSave = useCallback(async () => {
     const s = stateRef.current;
-    if (!s.school || !s.method || !s.surveyId) return; // nothing to save yet
+    if (!s.school || !s.started || !s.surveyId) return; // nothing to save yet
     if (savingRef.current) return; // a save is already in flight — it'll pick up this state or the next debounce will
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
@@ -117,7 +117,7 @@ export function SurveyTimerBar() {
   // a save at least every AUTOSAVE_MAX_WAIT_MS instead of the debounce
   // resetting indefinitely.
   useEffect(() => {
-    if (!state.school || !state.method || !state.surveyId) return;
+    if (!state.school || !state.started || !state.surveyId) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => void runSave(), AUTOSAVE_DEBOUNCE_MS);
     if (!maxWaitTimerRef.current) {
@@ -129,15 +129,15 @@ export function SurveyTimerBar() {
   // down) both assume *some* orderly event gives autosave a chance to run
   // before data is at risk — a pause in typing, or the page being
   // backgrounded/unloaded. Neither assumption holds for the single most
-  // fragile moment in the whole flow: the instant a method is first chosen
-  // (SET_METHOD, which mints surveyId) leaves a survey that exists only in
+  // fragile moment in the whole flow: the instant the survey first starts
+  // (START_SURVEY, which mints surveyId) leaves a survey that exists only in
   // memory, with nothing in IndexedDB yet to recover — see
   // ACTIVE_SURVEY_STORAGE_KEY in survey-context.tsx, which points at this
   // surveyId but has nothing to load until a draft actually lands. A real
   // Android app-process kill under memory pressure isn't a graceful
   // navigation or backgrounding event; it doesn't reliably fire pagehide or
   // visibilitychange at all, so if that happens inside the debounce's ~2s
-  // window (confirmed reported live: connection dropped, tapped a method,
+  // window (confirmed reported live: connection dropped, tapped Start survey,
   // landed straight back on Home with nothing to resume into), autosave
   // never got a chance to run even once. Saving immediately the moment a
   // new surveyId first appears — instead of waiting on the debounce — means
@@ -185,7 +185,7 @@ export function SurveyTimerBar() {
   // this interval's callback instead. The very first tick lands up to a
   // minute after mount/pause/resume; until then this shows the last value
   // computed, which needs no correction at mount (elapsed is ~0 the instant
-  // a method is chosen) and is at worst a minute stale right after a resume.
+  // the survey starts) and is at worst a minute stale right after a resume.
   //
   // Deliberately once-per-minute, not once-per-second re-labeled as
   // "min" — the whole point (Task 6 addendum) is cutting the visual churn

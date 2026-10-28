@@ -1,5 +1,5 @@
-import { CRITICAL_ITEMS, criticalColumn, method1ItemsFor, method2GroupsFor } from '@mqi/shared';
-import type { Condition, Method2Location } from '@mqi/shared';
+import { CRITICAL_ITEMS, criticalColumn, rubricGroupsFor } from '@mqi/shared';
+import type { Condition, SurveyLocation } from '@mqi/shared';
 
 /**
  * Turns response-tab rows (header-keyed, formatted strings exactly as the Sheets API returns
@@ -20,19 +20,11 @@ export interface StoredScores {
   criticalItems: Record<string, number | null>;
 }
 
-export interface Method2Fixture {
+export interface SurveyFixture {
   surveyId: string;
   rubricVersion: string;
   timestamp: string;
-  locations: Pick<Method2Location, 'id' | 'floorLevel' | 'type' | 'name' | 'scores'>[];
-  stored: StoredScores;
-}
-
-export interface Method1Fixture {
-  surveyId: string;
-  rubricVersion: string;
-  timestamp: string;
-  scores: Record<string, Condition>;
+  locations: Pick<SurveyLocation, 'id' | 'floorLevel' | 'type' | 'name' | 'scores'>[];
   stored: StoredScores;
 }
 
@@ -68,7 +60,7 @@ export function rowsFromGrid(grid: readonly (readonly unknown[])[]): Row[] {
     .map((r) => Object.fromEntries(header.map((h, i) => [h, String(r[i] ?? '')])));
 }
 
-export function method2Fixtures(rows: readonly Row[]): Method2Fixture[] {
+export function surveyFixtures(rows: readonly Row[]): SurveyFixture[] {
   const bySurvey = new Map<string, Row[]>();
   for (const r of rows) {
     const id = r['Survey ID'];
@@ -78,7 +70,7 @@ export function method2Fixtures(rows: readonly Row[]): Method2Fixture[] {
   return [...bySurvey.entries()].map(([surveyId, locationRows]) => {
     const first = locationRows[0]!;
     const version = first['Rubric Version'] ?? '';
-    const groups = method2GroupsFor(version);
+    const groups = rubricGroupsFor(version);
     return {
       surveyId,
       rubricVersion: version,
@@ -91,8 +83,8 @@ export function method2Fixtures(rows: readonly Row[]): Method2Fixture[] {
         }
         return {
           id: String(i),
-          floorLevel: (row['Floor Level'] || 'Ground') as Method2Location['floorLevel'],
-          type: (row['Location Type'] || 'Classroom') as Method2Location['type'],
+          floorLevel: (row['Floor Level'] || 'Ground') as SurveyLocation['floorLevel'],
+          type: (row['Location Type'] || 'Classroom') as SurveyLocation['type'],
           name: row['Location Name'] ?? '',
           scores,
         };
@@ -100,18 +92,4 @@ export function method2Fixtures(rows: readonly Row[]): Method2Fixture[] {
       stored: stored(first),
     };
   });
-}
-
-export function method1Fixtures(rows: readonly Row[]): Method1Fixture[] {
-  return rows
-    .filter((r) => r['Survey ID'])
-    .map((r) => {
-      const version = r['Rubric Version'] ?? '';
-      const scores: Record<string, Condition> = {};
-      for (const item of method1ItemsFor(version)) {
-        const v = r[item.name];
-        if (v && CONDITIONS.has(v)) scores[item.name] = v as Condition;
-      }
-      return { surveyId: r['Survey ID']!, rubricVersion: version, timestamp: r['Timestamp'] ?? '', scores, stored: stored(r) };
-    });
 }

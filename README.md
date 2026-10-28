@@ -149,16 +149,16 @@ PBKDF2-HMAC-SHA256 over `HMAC(pepper, password)` with a 16-byte per-user salt, b
 
 Scores must keep the meaning they had when submitted, so every rubric version stays frozen:
 
-1. Copy `packages/shared/src/rubric/method2-items.ts` to `method2-v<old version>-items.ts` and rename its export (for example `METHOD2_GROUPS_20261028`). Never edit it again.
-2. Edit `method2-items.ts`. Each division's weights must sum to 100 (a test checks this).
+1. Copy `packages/shared/src/rubric/items.ts` to `items-v<old version>.ts` and rename its export (for example `RUBRIC_GROUPS_20261028`). Never edit it again.
+2. Edit `items.ts`. Each division's weights must sum to 100 (a test checks this).
 3. Bump `RUBRIC_VERSION` in `rubric/rubric-version.ts`.
-4. In `rubric/versions.ts`, map the old version to the frozen list in `method2GroupsFor`, and add it to `KNOWN_RUBRIC_VERSIONS`.
+4. In `rubric/versions.ts`, map the old version to the frozen list in `rubricGroupsFor`, and add it to `KNOWN_RUBRIC_VERSIONS`.
 5. Run `npm run check`, then deploy the **server first**, then the web app. Phones still on the old version keep submitting with the old version stamped; the server recomputes with that version and accepts it.
-6. New item columns are added to the end of `Method 2 Responses` automatically on the first submission that uses them.
+6. New item columns are added to the end of `MQI Survey Responses` automatically on the first submission that uses them.
 
 ## Golden parity fixtures
 
-`tools/fixtures/data/method2.json` holds real production surveys (names stripped). The suite in `tools/fixtures/src/golden.test.ts` checks that v2 scoring reproduces every stored score. To refresh from production (read-only), download the responses spreadsheet as .xlsx into `tools/fixtures/raw/` (gitignored), then:
+`tools/fixtures/data/surveys.json` holds real production surveys (names stripped). The suite in `tools/fixtures/src/golden.test.ts` checks that v2 scoring reproduces every stored score. To refresh from production (read-only), download the responses spreadsheet as .xlsx into `tools/fixtures/raw/` (gitignored), then:
 
 ```bash
 npm run export -w @mqi/fixtures -- --xlsx tools/fixtures/raw/MQI-Analysis.xlsx

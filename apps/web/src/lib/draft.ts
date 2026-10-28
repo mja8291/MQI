@@ -42,15 +42,15 @@ export async function discardSubmittedDraft(surveyId: string): Promise<void> {
 /**
  * Snapshots the in-progress survey to IndexedDB so it survives closing the
  * app (Round 3 Task 9). Doesn't touch startTime/pausedAt/pausedSeconds —
- * this is a mid-progress save, not a "return to method selection" action,
+ * this is a mid-progress save, not a "return to survey details" action,
  * so the timer keeps running exactly as it was.
  */
 export async function saveDraft(state: SurveyState): Promise<void> {
-  if (!state.school || !state.method) {
-    throw new Error("Can't save a draft before a school and method are chosen");
+  if (!state.school || !state.started) {
+    throw new Error("Can't save a draft before a school is chosen and the survey started");
   }
   if (state.surveyId && submittedSurveyIds.has(state.surveyId)) return; // see submittedSurveyIds
-  // surveyId is minted alongside method (SET_METHOD) and survives LOAD_DRAFT
+  // surveyId is minted when the survey starts (START_SURVEY) and survives LOAD_DRAFT
   // on resume, so it's already the stable identity for "this one assessment
   // attempt" — reusing it as the drafts-store key is what makes a repeat
   // Save draft tap overwrite the same record instead of forking a new one.
@@ -60,10 +60,9 @@ export async function saveDraft(state: SurveyState): Promise<void> {
   const snapshot: SurveyState = {
     ...state,
     reviewPhotos: settlePhotos(state.reviewPhotos ?? {}),
-    m1: { ...state.m1, photos: settlePhotos(state.m1.photos) },
-    m2: {
-      locations: state.m2.locations.map((l) => ({ ...l, photos: settlePhotos(l.photos) })),
-      current: state.m2.current ? { ...state.m2.current, photos: settlePhotos(state.m2.current.photos) } : null,
+    scoring: {
+      locations: state.scoring.locations.map((l) => ({ ...l, photos: settlePhotos(l.photos) })),
+      current: state.scoring.current ? { ...state.scoring.current, photos: settlePhotos(state.scoring.current.photos) } : null,
     },
   };
   await saveDraftToDb(toDraft(state, snapshot));
@@ -74,7 +73,7 @@ export async function saveDraft(state: SurveyState): Promise<void> {
 }
 
 function toDraft(state: SurveyState, snapshot: SurveyState): SurveyDraft {
-  return { surveyId: state.surveyId!, savedAt: new Date().toISOString(), schoolName: state.school!.name, method: state.method!, state: snapshot };
+  return { surveyId: state.surveyId!, savedAt: new Date().toISOString(), schoolName: state.school!.name, state: snapshot };
 }
 
 /**
@@ -85,7 +84,7 @@ function toDraft(state: SurveyState, snapshot: SurveyState): SurveyDraft {
  * isn't open yet.
  */
 export function saveDraftOnUnload(state: SurveyState): void {
-  if (!state.school || !state.method || !state.surveyId || submittedSurveyIds.has(state.surveyId)) return;
+  if (!state.school || !state.started || !state.surveyId || submittedSurveyIds.has(state.surveyId)) return;
   try {
     if (!db.isOpen()) throw new Error("not open");
     const tx = db.backendDB().transaction("drafts", "readwrite");

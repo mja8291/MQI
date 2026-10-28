@@ -131,7 +131,7 @@ export interface RubricItem {
   hideNA?: boolean;
 }
 
-export interface Method2Group extends RubricItem {
+export interface RubricGroup extends RubricItem {
   /** Safety items aggregate by worst-case (minimum); Functionality/Aesthetics aggregate by average. */
   aggregation: "worst" | "average";
   /** Which location types this item group is scored at. */
@@ -148,7 +148,7 @@ export type LocationType =
   | "Other Room (Staff, Principal, Admin, Store etc.)"
   | "Lab (Wet/Dry/DLP)";
 
-/** Method 2's first pick — which floor the location being scored is on. */
+/** The first pick — which floor the location being scored is on. */
 export type FloorLevel = "External" | "Ground" | "First" | "Second" | "Third" | "Fourth" | "Roof";
 
 export interface ItemState {
@@ -168,7 +168,7 @@ export function emptyItemState(): ItemState {
  */
 export type PhotoRef = string;
 
-export interface Method2Location {
+export interface SurveyLocation {
   id: string;
   floorLevel: FloorLevel;
   type: LocationType;
@@ -217,7 +217,6 @@ export type RatingBand = "Poor" | "Average" | "Good" | "Excellent";
 
 export interface SurveySubmission {
   surveyId: string;
-  method: 1 | 2;
   school: School;
   asm: string;
   apm: string;
@@ -231,6 +230,6 @@ export interface SurveySubmission {
   aesthetics: number | null;
   ratingBand: RatingBand | null;
   scores: Record<string, Condition>;
-  locations?: Method2Location[];
+  locations?: SurveyLocation[];
   attachments: { itemName: string; locationName: string; photoUrl?: string; note?: string }[];
 }

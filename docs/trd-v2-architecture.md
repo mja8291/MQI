@@ -25,7 +25,7 @@ The phone is the source of truth until a survey reaches the server. The app writ
 2. validates the schema and rules;
 3. **recomputes the scores** with the survey's rubric version and rejects a mismatch;
 4. creates a ledger row (`Surveys`: state writing);
-5. appends one row per location to `Method 2 Responses` and the note rows to `MQI Survey Attachments`, each with one atomic RAW `values.append`;
+5. appends one row per location to `MQI Survey Responses` and the note rows to `MQI Survey Attachments`, each with one atomic RAW `values.append`;
 6. registers photo records (`Files`);
 7. marks the ledger `written` and logs to `ChangeLog`.
 

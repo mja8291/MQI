@@ -1,9 +1,8 @@
 
 import { buildSingleSurveyWorkbook } from "./single-survey-workbook";
 import { buildSingleSurveyPdf } from "./single-survey-pdf";
-import { aggregateMethod2, ratingBand } from "@/lib/scoring";
-import { METHOD1_ITEMS } from "@/lib/data/method1-items";
-import { METHOD2_GROUPS } from "@/lib/data/method2-items";
+import { aggregateLocations, ratingBand } from "@/lib/scoring";
+import { RUBRIC_GROUPS } from "@/lib/data/items";
 import type { SurveyState } from "@/lib/survey-context";
 import type { DrillingCheck, ScoreResult, SiteChecks } from "@/lib/types";
 
@@ -60,20 +59,18 @@ export function draftExportFilenameBase(state: SurveyState): string {
 }
 
 export async function buildDraftExcelBlob({ state }: DraftExportParams): Promise<Blob> {
-  const method = state.method === 2 ? 2 : 1;
   const links = photoLinksByItem(state);
 
   const wb = buildSingleSurveyWorkbook({
     surveyId: state.surveyId ?? "draft",
     campusName: state.school?.name ?? "",
-    method,
     submittedAt: NOT_SUBMITTED_LABEL,
     startTime: state.startTime ?? "",
     endTime: "",
     timeTakenSeconds: liveElapsedSeconds(state),
-    conditions: method === 1 ? state.m1.scores : {},
-    aggregatedScores: method === 2 ? aggregateMethod2(state.m2.locations) : undefined,
-    items: method === 1 ? METHOD1_ITEMS : METHOD2_GROUPS,
+    conditions: {},
+    aggregatedScores: aggregateLocations(state.scoring.locations),
+    items: RUBRIC_GROUPS,
   });
 
   if (links.length > 0) {
@@ -110,24 +107,19 @@ export async function buildDraftPdfBlob({
   siteChecks,
   complaints,
 }: DraftExportParams): Promise<Blob> {
-  const method = state.method === 2 ? 2 : 1;
-  const items = method === 1 ? METHOD1_ITEMS : METHOD2_GROUPS;
-  const itemValues: Record<string, string> =
-    method === 1
-      ? Object.fromEntries(items.map((i) => [i.name, state.m1.scores[i.name] ?? ""]))
-      : Object.fromEntries(
-          Object.entries(aggregateMethod2(state.m2.locations)).map(([name, score]) => [
-            name,
-            `Aggregated (${Math.round(score)}%)`,
-          ])
-        );
+  const items = RUBRIC_GROUPS;
+  const itemValues: Record<string, string> = Object.fromEntries(
+    Object.entries(aggregateLocations(state.scoring.locations)).map(([name, score]) => [
+      name,
+      `Aggregated (${Math.round(score)}%)`,
+    ])
+  );
 
   const bytes = await buildSingleSurveyPdf({
     surveyId: state.surveyId ?? "draft",
     campusName: state.school?.name ?? "",
     region: state.school?.region ?? "",
     area: state.school?.area ?? "",
-    method,
     submittedAt: NOT_SUBMITTED_LABEL,
     startTime: state.startTime ?? "",
     endTime: "",

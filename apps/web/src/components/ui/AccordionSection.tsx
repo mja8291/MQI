@@ -16,9 +16,8 @@ interface AccordionSectionProps {
 }
 
 /**
- * One collapsible section of a Round 3 Task 11 accordion page — shared
- * between Method 1's category sections (m1/page.tsx) and Method 2's
- * work-category sections (m2/category/page.tsx), which previously lived on
+ * One collapsible section of a Round 3 Task 11 accordion page — used
+ * by the work-category sections (locations/category/page.tsx), which previously lived on
  * two separate pages each (a picker page + a per-section scoring page).
  * Collapsed by default; the page hosting these is responsible for the
  * one-open-at-a-time behavior (this component only knows its own

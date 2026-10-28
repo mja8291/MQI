@@ -1,9 +1,9 @@
 import type { RubricItem } from "../types";
 
 /**
- * FROZEN snapshot of Method 2's item list as it stood before the 2026-10-27
- * rubric change (Method 2 moved from 45 individual items in 6 work categories
- * to 30 item groups — see method2-items.ts). Never edited again. Surveys
+ * FROZEN snapshot of the item list as it stood before the 2026-10-27
+ * rubric change (the survey moved from 45 individual items in 6 work categories
+ * to 30 item groups — see items.ts). Never edited again. Surveys
  * submitted before that change carry no "Rubric Version" value and were
  * scored against exactly these items/weights, so the Excel/PDF export of an
  * old survey has to read them back the same way (see find-survey.ts) or its
@@ -35,7 +35,7 @@ const ROOF = "Roof";
 const OTHER_ROOM = "Other Room (Staff, Principal, Admin, Store etc.)";
 const LAB = "Lab (Wet/Dry/DLP)";
 
-export const LEGACY_METHOD2_GROUPS: LegacyGroup[] = [
+export const LEGACY_RUBRIC_GROUPS: LegacyGroup[] = [
   // Plumbing Works — 8 items, all Functionality
   average({
     name: "Water Storage (Overhead Tank) *",

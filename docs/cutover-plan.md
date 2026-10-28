@@ -8,7 +8,7 @@ v2 runs on a new address (`tcf-mqi-app-761a8.web.app`) and cannot read anything 
 
 - v1 keeps writing to **MQI Analysis**; v2 writes to **MQI Spreadsheet** (decision D14 in `docs/parity-notes.md`). Both use the same tab names and headers, so rows from either can be stacked for analysis.
 - During the parallel run each app's dashboard shows **only its own** surveys. A combined view needs both spreadsheets (for example an `IMPORTRANGE` of MQI Analysis below MQI Spreadsheet's rows in a separate analysis file); v2 never reads MQI Analysis.
-- v2 adds one column at the end of `Method 2 Responses`: **Source App** (`v2` on every v2 row).
+- v2 adds one column at the end of `MQI Survey Responses`: **Source App** (`v2` on every v2 row).
 - v1's `Users` tab, its photo folder and its Drive OAuth token are left alone. Retiring them is a separate decision.
 
 ## 2. Before the first user moves (go/no-go)

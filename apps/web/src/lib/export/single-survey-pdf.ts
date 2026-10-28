@@ -8,7 +8,6 @@ export interface SingleSurveyPdfInput {
   campusName: string;
   region: string;
   area: string;
-  method: 1 | 2;
   submittedAt: string;
   /** "" if this survey predates the Start/End Time columns. */
   startTime: string;
@@ -32,7 +31,7 @@ export interface SingleSurveyPdfInput {
   safety: number | null;
   aesthetics: number | null;
   ratingBand: string;
-  /** Item name -> display value: a condition ("Good"/"Ok"/…) for Method 1, or "Aggregated (NN%)" for Method 2. */
+  /** Item name -> display value ("Aggregated (NN%)"). */
   itemValues: Record<string, string>;
   items: RubricItem[];
 }
@@ -91,7 +90,7 @@ export async function buildSingleSurveyPdf(input: SingleSurveyPdfInput): Promise
     submittedDate && !Number.isNaN(submittedDate.getTime())
       ? submittedDate.toLocaleString()
       : input.submittedAt || new Date().toLocaleString();
-  text(`Method ${input.method} · ${submittedLabel}`, MARGIN, 9, font, INK_SOFT);
+  text(submittedLabel, MARGIN, 9, font, INK_SOFT);
   y -= 18;
   line();
   y -= 18;

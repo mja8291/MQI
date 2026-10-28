@@ -12,7 +12,7 @@ const API = 'http://localhost:8787';
 const PHOTO = fileURLToPath(new URL('../public/icons/icon-192.png', import.meta.url));
 
 interface DevState {
-  method2: Record<string, string | number>[];
+  responses: Record<string, string | number>[];
   attachments: Record<string, string | number>[];
   files: number;
 }
@@ -85,7 +85,7 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   const reopened = await context.newPage();
   reopened.on('pageerror', (e) => errors.push(e.message));
   await reopened.goto('/');
-  await expect(reopened).toHaveURL(/\/survey\/m2$/);
+  await expect(reopened).toHaveURL(/\/survey\/locations$/);
   await expect(reopened.getByText(/Exterior Facade 1/)).toBeVisible();
 
   // Review: every Appendix C question; roof not clean → a photo is required.
@@ -105,7 +105,7 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   await reopened.locator('input[type=checkbox]').last().check();
   await reopened.getByRole('button', { name: 'Submit survey' }).click();
   await expect(reopened.getByRole('heading', { name: 'Saved offline' })).toBeVisible();
-  expect((await devState()).method2.length).toBe(before.method2.length); // nothing reached the server
+  expect((await devState()).responses.length).toBe(before.responses.length); // nothing reached the server
 
   // Queue shows it waiting.
   await reopened.goto('/?tab=queue');
@@ -115,7 +115,7 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   await context.setOffline(false);
   await expect.poll(async () => (await devState()).files, { timeout: 60_000 }).toBe(before.files + 2);
   const after = await devState();
-  const rows = after.method2.slice(before.method2.length);
+  const rows = after.responses.slice(before.responses.length);
   expect(rows).toHaveLength(2);
   expect(new Set(rows.map((r) => r['Survey ID'])).size).toBe(1);
   expect(rows.map((r) => r['Location Name']).sort()).toEqual(['Exterior Facade 1', 'Roof 1']);
@@ -127,7 +127,7 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   await reopened.reload();
   await expect(reopened.getByText('Nothing in the queue')).toBeVisible({ timeout: 30_000 });
   const again = await devState();
-  expect(again.method2.length).toBe(after.method2.length);
+  expect(again.responses.length).toBe(after.responses.length);
   expect(again.attachments.length).toBe(after.attachments.length);
   expect(again.files).toBe(after.files);
   expect(errors).toEqual([]);

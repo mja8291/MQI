@@ -1,4 +1,4 @@
-import { ATTACHMENTS_HEADER, ATTACHMENTS_TAB, METHOD2_HEADER, METHOD2_TAB } from '@mqi/shared';
+import { ATTACHMENTS_HEADER, ATTACHMENTS_TAB, RESPONSES_HEADER, RESPONSES_TAB } from '@mqi/shared';
 import { ensureAdmin } from './auth';
 import { Ctx, PROP } from './context';
 import type { Env } from './ports';
@@ -15,7 +15,7 @@ export const SCHEMA_VERSION = '1';
  */
 export function ensureSchema(env: Env): { created: string[] } {
   const created = ensureSystemTabs(env);
-  ensureHeader(env, METHOD2_TAB, METHOD2_HEADER);
+  ensureHeader(env, RESPONSES_TAB, RESPONSES_HEADER);
   ensureHeader(env, ATTACHMENTS_TAB, ATTACHMENTS_HEADER);
   return { created };
 }

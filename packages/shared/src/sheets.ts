@@ -1,9 +1,10 @@
 import { CRITICAL_ITEMS, ratingBand } from './scoring';
-import { METHOD2_GROUPS } from './rubric/method2-items';
+import { RUBRIC_GROUPS } from './rubric/items';
 import type { AttachmentMeta, SubmittedSurvey } from './survey';
 
 /**
- * Port of v1 src/lib/sheets/responses.ts: same tabs, same header names, same values.
+ * Port of v1 src/lib/sheets/responses.ts: same header names, same values. The responses tab is
+ * v1's responses tab renamed (parity-notes D15); its header is unchanged.
  *
  * v1 wrote every value as a string with valueInputOption USER_ENTERED, so Sheets turned
  * numeric strings ("85") into numbers. v2 writes RAW (no formula injection), so it must send
@@ -11,8 +12,7 @@ import type { AttachmentMeta, SubmittedSurvey } from './survey';
  * NUMERIC_COLUMNS is that list; tests/fixtures check it against the live tab's cell types.
  */
 
-export const METHOD1_TAB = 'Method 1 Responses';
-export const METHOD2_TAB = 'Method 2 Responses';
+export const RESPONSES_TAB = 'MQI Survey Responses';
 export const ATTACHMENTS_TAB = 'MQI Survey Attachments';
 
 export type Cell = string | number;
@@ -73,13 +73,13 @@ const TRAILING_HEADER = [
   'Source App',
 ];
 
-export const METHOD2_HEADER = [
+export const RESPONSES_HEADER = [
   ...COMMON_HEADER,
   'Floor Level',
   'Location Type',
   'Classroom Grade',
   'Classroom Section',
-  ...METHOD2_GROUPS.map((g) => g.name),
+  ...RUBRIC_GROUPS.map((g) => g.name),
   ...TRAILING_HEADER,
 ];
 
@@ -172,8 +172,8 @@ function commonFields(s: SubmittedSurvey, submitter: Submitter, timestamp: strin
   return fields;
 }
 
-/** One row per location (v1 appendMethod2Response), header name → value. */
-export function method2Rows(s: SubmittedSurvey, submitter: Submitter, timestamp: string): Record<string, string>[] {
+/** One row per location (v1 responses.ts), header name → value. */
+export function responseRows(s: SubmittedSurvey, submitter: Submitter, timestamp: string): Record<string, string>[] {
   return s.locations.map((loc) => {
     const fields: Record<string, string> = {
       ...commonFields(s, submitter, timestamp, loc.name),

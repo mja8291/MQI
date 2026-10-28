@@ -15,7 +15,7 @@ export interface PhotoAsset {
   status: 'saved';
 }
 
-export interface Method2Location {
+export interface SurveyLocation {
   id: string;
   floorLevel: FloorLevel;
   type: LocationType;

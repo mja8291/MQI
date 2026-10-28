@@ -7,7 +7,6 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { deleteDraft, discardSurvey, retrySurvey, type QueuedSubmission, type SurveyDraft } from "@/lib/offline/db";
 import { DRAFTS_CHANGED_EVENT } from "@/lib/draft";
 import { flushPendingSubmissions, LAST_SYNC_KEY } from "@/lib/offline/sync";
-import { METHOD1_ITEMS } from "@/lib/data/method1-items";
 
 /** Coarse "how long ago" — these are lists of a handful of items at most, not worth a date library. */
 function relativeTime(iso: string): string {
@@ -21,11 +20,8 @@ function relativeTime(iso: string): string {
 }
 
 function draftProgress(d: SurveyDraft): string {
-  if (d.method === 1) {
-    return `Method 1 · ${Object.keys(d.state.m1.scores).length} of ${METHOD1_ITEMS.length} items scored`;
-  }
-  const done = d.state.m2.locations.length;
-  const current = d.state.m2.current ? " + 1 being scored" : "";
+  const done = d.state.scoring.locations.length;
+  const current = d.state.scoring.current ? " + 1 being scored" : "";
   return `${done} location${done === 1 ? "" : "s"} recorded${current}`;
 }
 
@@ -150,11 +146,7 @@ export function QueueTab({ drafts, pending, syncing, loaded, refresh }: QueueTab
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-ink truncate">{p.payload.school.name}</div>
                     <div className="text-[11px] text-ink-faint">
-                      {p.payload.method === 2 && locations > 0
-                        ? `${locations} location${locations === 1 ? "" : "s"} · `
-                        : p.payload.method === 1
-                          ? "Method 1 · "
-                          : ""}
+                      {locations > 0 ? `${locations} location${locations === 1 ? "" : "s"} · ` : ""}
                       submitted {relativeTime(p.createdAt)}
                       {photos > 0 ? ` · ${photos} photo${photos === 1 ? "" : "s"} still to upload` : ""}
                     </div>

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { API_VERSION, RUBRIC_VERSION, UPLOAD_CHUNK_BYTES, scoreMethod2For, uuidv7 } from '@mqi/shared';
-import type { AttachmentMeta, Method2Location, SubmittedSurvey, WhoAmI } from '@mqi/shared';
+import { API_VERSION, RESPONSES_TAB, RUBRIC_VERSION, UPLOAD_CHUNK_BYTES, scoreSurveyFor, uuidv7 } from '@mqi/shared';
+import type { AttachmentMeta, SurveyLocation, SubmittedSurvey, WhoAmI } from '@mqi/shared';
 // The real server core, in-process, on the in-memory Sheets/Drive fake.
 import { createMemoryEnv } from '../../../../gas/src/adapters/memory';
 import type { MemoryEnv } from '../../../../gas/src/adapters/memory';
@@ -44,7 +44,7 @@ async function makeQueued(opts: { photoBytes?: number; tamper?: boolean } = {}):
   const id = uuidv7(rnd, Date.now() + seq++);
   const photoId = uuidv7(rnd, Date.now() + seq++);
   const withPhoto = opts.photoBytes !== undefined;
-  const loc: Method2Location = {
+  const loc: SurveyLocation = {
     id: 'r1',
     floorLevel: 'Roof',
     type: 'Roof',
@@ -62,10 +62,9 @@ async function makeQueued(opts: { photoBytes?: number; tamper?: boolean } = {}):
     photos: withPhoto ? { Plaster: [photoId] } : {},
     notes: {},
   };
-  const r = scoreMethod2For([loc], RUBRIC_VERSION);
+  const r = scoreSurveyFor([loc], RUBRIC_VERSION);
   const survey: SubmittedSurvey = {
     id,
-    method: 2,
     rubricVersion: RUBRIC_VERSION,
     school: { schoolId: '947', name: 'OGS Trust Campus', region: 'South West', area: 'Gadap West I' },
     asm: 'A',
@@ -108,13 +107,13 @@ async function makeQueued(opts: { photoBytes?: number; tamper?: boolean } = {}):
   return survey;
 }
 
-const rows = (id: string) => env.responses.objects('Method 2 Responses').filter((r) => r['Survey ID'] === id);
+const rows = (id: string) => env.responses.objects(RESPONSES_TAB).filter((r) => r['Survey ID'] === id);
 const photoRows = (id: string) => env.responses.objects('MQI Survey Attachments').filter((r) => r['Survey ID'] === id && r['Photo URL']);
 
 describe('submit is local and atomic', () => {
   test('record + outbox entry + draft removal in one transaction; a double tap queues once', async () => {
     const id = uuidv7(rnd);
-    await saveDraft({ surveyId: id, savedAt: new Date().toISOString(), schoolName: 'X', method: 2, state: {} as never });
+    await saveDraft({ surveyId: id, savedAt: new Date().toISOString(), schoolName: 'X', state: {} as never });
     offline = true;
     const s = await makeQueued();
     await queueSurvey(s, []);

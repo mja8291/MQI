@@ -18,7 +18,6 @@ export interface SurveyDraft {
   surveyId: string;
   savedAt: string;
   schoolName: string;
-  method: 1 | 2;
   state: SurveyState;
 }
 
@@ -177,7 +176,7 @@ export interface QueuedSubmission {
   attempts?: number;
   lastAttemptAt?: string;
   lastError?: { kind: SyncFailureKind; message: string };
-  payload: { surveyId: string; method: 1 | 2; school: School; locations?: unknown[] };
+  payload: { surveyId: string; school: School; locations?: unknown[] };
   /** Photos not yet on the server. */
   pendingPhotos: unknown[];
 }
@@ -194,7 +193,7 @@ export async function getPendingSubmissions(): Promise<QueuedSubmission[]> {
       attempts: s.attempts,
       lastAttemptAt: s.lastAttemptAt,
       lastError: s.lastError,
-      payload: { surveyId: s.id, method: 2, school: s.survey.school, locations: s.survey.locations },
+      payload: { surveyId: s.id, school: s.survey.school, locations: s.survey.locations },
       pendingPhotos: Array.from({ length: unsent }),
     });
   }

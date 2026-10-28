@@ -1,4 +1,4 @@
-import { METHOD1_TAB, METHOD2_TAB, buildDashboard, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import { RESPONSES_TAB, buildDashboard, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
 import type { DashboardData, ExportRowsResult, FoundSurvey, SchoolsResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
@@ -42,26 +42,25 @@ export function schools(ctx: Ctx): SchoolsResult {
 
 export function dashboard(ctx: Ctx): DashboardData {
   return cached(ctx.env, 'dashboard', DASHBOARD_TTL, () =>
-    buildDashboard(schools(ctx).schools.length, allRows(ctx.env, METHOD1_TAB), allRows(ctx.env, METHOD2_TAB)),
+    buildDashboard(schools(ctx).schools.length, allRows(ctx.env, RESPONSES_TAB)),
   );
 }
 
 export function surveyGet(ctx: Ctx, raw: unknown): FoundSurvey {
   const { surveyId } = surveyGetPayload.parse(raw);
   const ids = new Set([surveyId]);
-  const m1 = rowsAt(ctx.env, METHOD1_TAB, findRows(ctx.env, METHOD1_TAB, 'Survey ID', ids));
-  const m2 = m1.length ? [] : rowsAt(ctx.env, METHOD2_TAB, findRows(ctx.env, METHOD2_TAB, 'Survey ID', ids));
-  const found = foundSurveyFromRows(surveyId, m1[0], m2);
+  const rows = rowsAt(ctx.env, RESPONSES_TAB, findRows(ctx.env, RESPONSES_TAB, 'Survey ID', ids));
+  const found = foundSurveyFromRows(surveyId, rows);
   if (!found) return fail('NOT_FOUND', 'Survey not found.');
   return found;
 }
 
 export function exportRows(ctx: Ctx, raw: unknown): ExportRowsResult {
   const p = exportRowsPayload.parse(raw);
-  const header = ctx.env.responses.header(p.tab) ?? [];
-  const last = ctx.env.responses.lastRow(p.tab);
+  const header = ctx.env.responses.header(RESPONSES_TAB) ?? [];
+  const last = ctx.env.responses.lastRow(RESPONSES_TAB);
   const available = Math.max(0, last - 1 - p.offset);
   const n = Math.min(p.limit, available);
-  const rows = n > 0 ? ctx.env.responses.readRows(p.tab, 2 + p.offset, n) : [];
+  const rows = n > 0 ? ctx.env.responses.readRows(RESPONSES_TAB, 2 + p.offset, n) : [];
   return { header, rows, hasMore: p.offset + n < last - 1 };
 }

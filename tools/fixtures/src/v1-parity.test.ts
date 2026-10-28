@@ -4,8 +4,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type ExcelJS from 'exceljs';
-import { API_VERSION, RUBRIC_VERSION, buildDashboard, foundSurveyFromRows, scoreMethod2For, uuidv7 } from '@mqi/shared';
-import type { Method2Location, SheetRow, SubmittedSurvey, WhoAmI } from '@mqi/shared';
+import { PDFArray, PDFDocument, decodePDFRawStream } from 'pdf-lib';
+import type { PDFRawStream } from 'pdf-lib';
+import { API_VERSION, RESPONSES_TAB, RUBRIC_VERSION, buildDashboard, foundSurveyFromRows, scoreSurveyFor, uuidv7 } from '@mqi/shared';
+import type { SurveyLocation, SheetRow, SubmittedSurvey, WhoAmI } from '@mqi/shared';
 import { createMemoryEnv } from '../../../apps/gas/src/adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../../../apps/gas/src/dev/server';
 import { handleRequest } from '../../../apps/gas/src/core/router';
@@ -15,7 +17,9 @@ import { buildSingleSurveyPdf as v2Pdf } from '../../../apps/web/src/lib/export/
 import { pdfInput, workbookInput } from '../../../apps/web/src/lib/export/submitted';
 
 /**
- * Phase 5 exit: v2's downloads and dashboard equal v1's. v1's own modules run from the read-only
+ * Phase 5 exit: v2's downloads and dashboard equal v1's, except that v2 no longer shows a survey
+ * "method" (parity-notes D15): the Excel drops v1's Method row (O3/P3; the rows below move up
+ * one) and the PDF drops the "Method 2 · " prefix before the date. Everything else must match. v1's own modules run from the read-only
  * reference clone (master 0a4a75c) with only its Google read layer replaced by the same rows,
  * so any difference in logic shows up here. Skipped when reference/ is absent.
  */
@@ -24,7 +28,7 @@ const V1_PRESENT = process.env.MQI_V1_PRESENT === '1';
 
 // ---- the rows both apps read ----
 
-const sample = JSON.parse(readFileSync(resolve(import.meta.dirname, '../data/sample-method2-rows.json'), 'utf8')) as {
+const sample = JSON.parse(readFileSync(resolve(import.meta.dirname, '../data/sample-rows.json'), 'utf8')) as {
   headerAtoCD: string[];
   headerTail: string[];
   rows: string[][];
@@ -43,7 +47,7 @@ function v2WrittenRows(): SheetRow[] {
   if (!login.ok) throw new Error('login');
   const session = (login.data as WhoAmI).sessionToken;
   const rnd = (n: number) => crypto.getRandomValues(new Uint8Array(n));
-  const loc = (name: string, type: Method2Location['type'], floorLevel: Method2Location['floorLevel'], scores: Method2Location['scores']) =>
+  const loc = (name: string, type: SurveyLocation['type'], floorLevel: SurveyLocation['floorLevel'], scores: SurveyLocation['scores']) =>
     ({ id: name, floorLevel, type, name, scores, photos: {}, notes: {} }) as SubmittedSurvey['locations'][number];
   const locations = [
     loc('Roof 1', 'Roof', 'Roof', { 'Access to roof area /tanks': 'Very Poor', 'Roof Screeding/roof drainage': 'Good', 'Water Storage (Overhead Tank)': 'Poor', 'External Plumbing': 'Ok', 'Grill Gate': 'N/A', 'Solar Panels/Inverter/Batteries': 'Good', Plaster: 'Poor', Masonry: 'Ok' }),
@@ -60,10 +64,9 @@ function v2WrittenRows(): SheetRow[] {
       Plaster: 'Good',
     }),
   ];
-  const r = scoreMethod2For(locations as Method2Location[], RUBRIC_VERSION);
+  const r = scoreSurveyFor(locations as SurveyLocation[], RUBRIC_VERSION);
   const survey: SubmittedSurvey = {
     id: uuidv7(rnd),
-    method: 2,
     rubricVersion: RUBRIC_VERSION,
     school: { schoolId: '947', name: 'OGS Trust Campus', region: 'South West', area: 'Gadap West I' },
     asm: 'A',
@@ -98,8 +101,8 @@ function v2WrittenRows(): SheetRow[] {
   };
   const pushed = call('sync.push', { items: [{ outboxId: 1, survey, attachments: [] }] }, session);
   if (!pushed.ok) throw new Error(JSON.stringify(pushed.error));
-  const header = env.responses.header('Method 2 Responses')!;
-  return env.responses.readRows('Method 2 Responses', 2, env.responses.lastRow('Method 2 Responses') - 1).map((cells) =>
+  const header = env.responses.header(RESPONSES_TAB)!;
+  return env.responses.readRows(RESPONSES_TAB, 2, env.responses.lastRow(RESPONSES_TAB) - 1).map((cells) =>
     Object.fromEntries(header.map((h, i) => [h, cells[i] ?? ''])),
   );
 }
@@ -123,6 +126,36 @@ vi.mock('../../../reference/src/lib/sheets/read', () => ({
 vi.mock('../../../reference/src/lib/sheets/client', () => ({ sheetsConfigured: () => true, getSheetsClient: async () => ({}) }));
 vi.mock('../../../reference/src/lib/sheets/schools', () => ({ getSchools: async () => SCHOOLS }));
 
+/** v1's Excel with its Method row removed and the info rows below it moved up one (D15). */
+function withoutMethodRow(v1: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(v1)) {
+    const m = /^(.*)!R(\d+)C(15|16)$/.exec(key);
+    if (!m) {
+      out[key] = value;
+      continue;
+    }
+    const row = Number(m[2]);
+    if (row === 3) continue;
+    out[row > 3 && row <= 7 ? `${m[1]}!R${row - 1}C${m[3]}` : key] = value;
+  }
+  return out;
+}
+
+/** A PDF's page content with every text string decoded, so two PDFs can be compared by what they draw. */
+async function pdfContent(bytes: Uint8Array): Promise<string> {
+  const doc = await PDFDocument.load(bytes);
+  return doc
+    .getPages()
+    .map((page) => {
+      const contents = page.node.Contents()!;
+      const streams = contents instanceof PDFArray ? contents.asArray().map((ref) => doc.context.lookup(ref)) : [contents];
+      return streams.map((st) => Buffer.from(decodePDFRawStream(st as PDFRawStream).decode()).toString('latin1')).join('\n');
+    })
+    .join('\f')
+    .replace(/<([0-9A-Fa-f]*)>/g, (_m, hex: string) => `(${Buffer.from(hex, 'hex').toString('latin1')})`);
+}
+
 /** Every cell of every sheet: address → value (formulas included). */
 function cells(wb: ExcelJS.Workbook): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -144,7 +177,7 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
     vi.useRealTimers();
   });
 
-  test.each(surveyIds.map((id) => [id]))('Excel for %s: every cell and formula matches v1', async (id) => {
+  test.each(surveyIds.map((id) => [id]))('Excel for %s: every cell and formula matches v1 (less the Method row)', async (id) => {
     const { findSurvey } = await import('../../../reference/src/lib/export/find-survey');
     const { buildSingleSurveyWorkbook: v1Workbook } = await import('../../../reference/src/lib/export/single-survey-workbook');
     const found = (await findSurvey('parity', id))!;
@@ -161,11 +194,11 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
       aggregatedScores: found.aggregatedScores,
       items: found.items,
     });
-    const v2Found = foundSurveyFromRows(id, undefined, ALL_M2.filter((r) => r['Survey ID'] === id))!;
-    expect(cells(v2Workbook(workbookInput(v2Found)))).toEqual(cells(v1));
+    const v2Found = foundSurveyFromRows(id, ALL_M2.filter((r) => r['Survey ID'] === id))!;
+    expect(cells(v2Workbook(workbookInput(v2Found)))).toEqual(withoutMethodRow(cells(v1)));
   });
 
-  test.each(surveyIds.map((id) => [id]))('PDF for %s: byte-identical to v1', async (id) => {
+  test.each(surveyIds.map((id) => [id]))('PDF for %s: draws exactly what v1 draws (less the Method label)', async (id) => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-28T06:00:00.000Z'));
     const { findSurvey } = await import('../../../reference/src/lib/export/find-survey');
@@ -205,17 +238,20 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
       itemValues,
       items: found.items,
     });
-    const v2Found = foundSurveyFromRows(id, undefined, ALL_M2.filter((r) => r['Survey ID'] === id))!;
+    const v2Found = foundSurveyFromRows(id, ALL_M2.filter((r) => r['Survey ID'] === id))!;
     const v2 = await v2Pdf(pdfInput(v2Found));
     vi.useRealTimers();
-    expect(Buffer.from(v2).equals(Buffer.from(v1))).toBe(true);
+    const v1Content = await pdfContent(v1);
+    expect(v1Content).toContain('(Method 2 \u00b7 ');
+    expect(await pdfContent(v2)).toEqual(v1Content.replace('(Method 2 \u00b7 ', '('));
   });
 
   test('dashboard figures match v1', async () => {
     const { getDashboardData } = await import('../../../reference/src/lib/sheets/dashboard');
     const v1 = await getDashboardData();
-    const v2 = buildDashboard(SCHOOLS.length, [], ALL_M2);
-    expect(v2).toEqual(v1);
+    const v2 = buildDashboard(SCHOOLS.length, ALL_M2);
+    // v1 tags each campus with its method; v2 has no methods (D15).
+    expect(v2).toEqual({ ...v1, schools: v1.schools.map(({ method: _method, ...rest }: { method: number }) => rest) });
     expect(v2.captured).toBe(3); // 947 (three surveys, latest wins), 499, 107
   });
 

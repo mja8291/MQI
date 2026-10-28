@@ -67,10 +67,10 @@ export default function FindSchoolPage() {
     setQuery("");
   }
 
-  function continueToMethod() {
+  function continueToDetails() {
     if (!selected) return;
     setSchool(selected);
-    router.push("/survey/method");
+    router.push("/survey/details");
   }
 
   return (
@@ -170,7 +170,7 @@ export default function FindSchoolPage() {
       ) : null}
 
       <div className="mt-auto pt-4 border-t border-border">
-        <Button onClick={continueToMethod} disabled={!selected}>
+        <Button onClick={continueToDetails} disabled={!selected}>
           Continue
         </Button>
       </div>
