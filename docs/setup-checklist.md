@@ -29,20 +29,19 @@ Production holds 18 surveys; 4 are in the tests now.
 
 ## 4. Apps Script (staging first)
 
-1. Turn on the Apps Script API: https://script.google.com/home/usersettings → **On**.
-2. In the Terminal panel, run this and sign in as the department account:
-   ```bash
-   cd apps/gas && npx clasp login
-   ```
-3. Tell me, and I'll create the staging script and push the code.
-4. In the Apps Script editor (I'll send the link), open Project Settings → Script Properties and add:
+Done on 2026-10-28: the staging script **MQI v2 API (staging)** exists (https://script.google.com/d/1IFuzUvQ9FnOAFgBxu2R3Qhh0_ZIyMZd_hUXreq5CdLcz3028MP7pPxny/edit), its code is pushed, and it is deployed as a web app (deployment `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg`, version 1). The staging web app is live at https://tcf-mqi-app-761a8-staging.web.app and calls that deployment. It cannot sign anyone in until steps 4–5 below are done.
+
+1. ~~Turn on the Apps Script API~~ (done).
+2. ~~`clasp login`~~ (done, as the department account).
+3. ~~Create the staging script and push the code~~ (done).
+4. In the Apps Script editor (link above), open Project Settings → Script Properties and add:
    - `ENV_NAME` = `staging`
    - `SCHOOLS_SPREADSHEET_ID` = `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q`
    - `SOURCE_RESPONSES_SPREADSHEET_ID` = `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o` (MQI Spreadsheet; `setup()` copies it into `02 Staging`)
    - `ADMIN_EMAIL` and `ADMIN_NAME` = the first administrator (suggest you)
-5. Run `setup()` and accept the permission prompt. Copy the temporary admin password from the execution log.
-6. Run `benchmarkPasswordHash()` and send me the printed table (it goes in the README).
-7. I deploy the web app; you send me nothing more for this step.
+5. In the editor's function list choose `setup`, press **Run**, and accept the permission prompt (it is the department account's own script). Copy the temporary admin password from the execution log.
+6. Run `benchmarkPasswordHash()` the same way and send me the printed table (it goes in the README).
+7. Open https://tcf-mqi-app-761a8-staging.web.app and sign in with `ADMIN_EMAIL` and the temporary password; the app asks you to choose a new one.
 
 ## 5. Staging pilot
 
