@@ -1,5 +1,6 @@
 import { CRITICAL_ITEMS, ratingBand } from './scoring';
-import { RUBRIC_GROUPS } from './rubric/items';
+import { RUBRIC_GROUPS, unsafePartsText } from './rubric/items';
+import { itemsCovered } from './rubric/versions';
 import type { AttachmentMeta, SubmittedSurvey } from './survey';
 
 /**
@@ -72,6 +73,10 @@ const TRAILING_HEADER = [
   'Rubric Version',
   // v2 only (cutover plan): blank on every v1 row, "v2" on every row this app writes.
   'Source App',
+  // v2 (W22): rubric item groups scored at least once in the survey, as a percentage.
+  'Items Covered (%)',
+  // v2 (W24): levels confirmed for the campus, e.g. "External, Ground, First, Roof".
+  'Applicable Levels',
 ];
 
 export const RESPONSES_HEADER = [
@@ -88,6 +93,7 @@ export const ATTACHMENTS_HEADER = ['Survey ID', 'Item Name', 'Location Name', 'P
 
 /** Columns v1 wrote as numeric strings (so USER_ENTERED stored numbers). */
 export const NUMERIC_COLUMNS: ReadonlySet<string> = new Set([
+  'Items Covered (%)',
   'Overall Score',
   'Functionality Score',
   'Safety Score',
@@ -166,6 +172,8 @@ function commonFields(s: SubmittedSurvey, submitter: Submitter, timestamp: strin
     'Time Taken (seconds)': s.timeTakenSeconds === null ? '' : String(s.timeTakenSeconds),
     'Paused Duration (seconds)': String(s.pausedSeconds),
     'Source App': 'v2',
+    'Items Covered (%)': String(Math.round(itemsCovered(s.locations, s.rubricVersion).percent)),
+    'Applicable Levels': s.levels ? s.levels.join(', ') : '',
   };
   for (const [name, score] of Object.entries(s.scores.criticalItems)) {
     fields[criticalColumn(name)] = rounded(score);
@@ -183,7 +191,10 @@ export function responseRows(s: SubmittedSurvey, submitter: Submitter, timestamp
       'Classroom Grade': loc.classroomGrade ?? '',
       'Classroom Section': loc.classroomSection ?? '',
     };
-    for (const [itemName, condition] of Object.entries(loc.scores)) fields[itemName] = condition;
+    for (const [itemName, condition] of Object.entries(loc.scores)) {
+      const parts = loc.unsafeParts?.[itemName];
+      fields[itemName] = parts?.length ? unsafePartsText(parts) : condition;
+    }
     return fields;
   });
 }

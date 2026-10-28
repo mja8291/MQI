@@ -1,5 +1,5 @@
-import { RESPONSES_TAB, buildDashboard, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
-import type { DashboardData, ExportRowsResult, FoundSurvey, SchoolsResult } from '@mqi/shared';
+import { RESPONSES_TAB, cellCondition, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import type { DashboardData, ExportRowsResult, FoundSurvey, SchoolsResult, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import type { Env } from './ports';
@@ -64,4 +64,34 @@ export function exportRows(ctx: Ctx, raw: unknown): ExportRowsResult {
   const n = Math.min(p.limit, available);
   const rows = n > 0 ? ctx.env.responses.readRows(RESPONSES_TAB, 2 + p.offset, n) : [];
   return { header, rows, hasMore: p.offset + n < last - 1 };
+}
+
+/** v2 (W30): the latest External Development location recorded for a sibling campus (same e-compound). */
+export function siblingExternal(ctx: Ctx, raw: unknown): SiblingExternalResult {
+  const { schoolId } = siblingExternalPayload.parse(raw);
+  const list = schools(ctx).schools;
+  const me = list.find((s) => s.schoolId === schoolId);
+  if (!me?.eCompoundNo) return { found: null };
+  const siblings = new Set(list.filter((s) => s.eCompoundNo === me.eCompoundNo && s.schoolId !== schoolId).map((s) => s.schoolId));
+  if (!siblings.size) return { found: null };
+  const rows = rowsAt(ctx.env, RESPONSES_TAB, findRows(ctx.env, RESPONSES_TAB, 'School ID', siblings)).filter(
+    (row) => row['Location Type'] === 'External Development',
+  );
+  const latest = rows.sort((a, b) => (b['Timestamp'] ?? '').localeCompare(a['Timestamp'] ?? ''))[0];
+  if (!latest) return { found: null };
+  const groups = rubricGroupsForLocation('External Development').map((g) => g.name);
+  const scores: Record<string, string> = {};
+  for (const name of groups) {
+    const value = cellCondition(latest[name] ?? '');
+    if (value) scores[name] = value;
+  }
+  return {
+    found: {
+      campusName: latest['Campus Name'] ?? '',
+      schoolId: latest['School ID'] ?? '',
+      surveyId: latest['Survey ID'] ?? '',
+      date: latest['Timestamp'] ?? '',
+      scores,
+    },
+  };
 }

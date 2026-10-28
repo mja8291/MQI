@@ -19,7 +19,7 @@ export type BuildingStructure =
   | "Hybrid (Load-Bearing+RCC)"
   | "Unknown";
 
-export type CenterBeam = "YES" | "NO" | "N/A";
+export type CenterBeam = "YES" | "NO" | "Somewhere present, somewhere absent" | "N/A";
 
 export type TypeOfStructure = "RCC (Frame)" | "Load-bearing" | "Hybrid" | "N/A";
 
@@ -73,7 +73,7 @@ export type OverflowDisposal = "Provided" | "Not provided";
  * The "Structural Checks Recorded Alongside Condition" questions from the
  * TCF Engineering slide that aren't already covered by their own field
  * (Type of Structure, Center Beam, and the drilling check have theirs):
- * roof access type, roof & drainage, and building-proximity risk factors.
+ * roof access type, roof & drainage, and building and area features (risk factors).
  * Recorded on the last page only — none of it feeds a score. "No" on the two
  * roof-cleanliness questions needs a photo (see isSiteChecksComplete).
  */
@@ -128,6 +128,13 @@ export interface RubricItem {
    * narrower, relabeled set of buttons. N/A remains selectable regardless.
    */
   conditionOverride?: { condition: Exclude<Condition, "N/A">; label: string }[];
+  /**
+   * v2 (W21): the item's Unsafe is split into parts that can be picked together, e.g. Column and
+   * Wall. Any part scores as the item's Unsafe; the sheet shows "Column Unsafe, Wall Unsafe".
+   */
+  unsafeParts?: string[];
+  /** v2 (W20): name shown on screen when it differs from the column name, e.g. "Window Shades (Chajja)". */
+  label?: string;
   /** v2 (W12): an instruction shown under the item name, e.g. how to test it on site. */
   guidance?: string;
   /** Drops N/A from the picker entirely — for an item where "not applicable" never makes sense (e.g. "Access to roof area /tanks": you're standing at the roof access, so it's either there or it isn't). */
@@ -183,6 +190,8 @@ export interface SurveyLocation {
   /** Multiple photos per item are allowed; each is an attachment id (see PhotoRef). */
   photos: Record<string, readonly unknown[]>;
   notes: Record<string, string>;
+  /** v2 (W21): which parts were marked unsafe, for items with RubricItem.unsafeParts (e.g. ["Column", "Wall"]). */
+  unsafeParts?: Record<string, string[]>;
 }
 
 export interface School {

@@ -108,7 +108,7 @@ export function SurveyTimerBar() {
     await new Promise((resolve) => setTimeout(resolve, 0));
     await runSave();
     clearActiveSurveyPointers();
-    window.location.assign("/?tab=queue");
+    window.location.assign("/?tab=incomplete"); // W28: a saved draft is listed under Incomplete
   }, [pauseTimer, runSave]);
 
   // Debounced autosave: any survey action reschedules the debounce timer, so

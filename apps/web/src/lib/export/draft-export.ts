@@ -1,3 +1,4 @@
+import { RUBRIC_VERSION, itemsCovered } from "@mqi/shared";
 
 import { buildSingleSurveyWorkbook } from "./single-survey-workbook";
 import { buildSingleSurveyPdf } from "./single-survey-pdf";
@@ -68,6 +69,7 @@ export async function buildDraftExcelBlob({ state }: DraftExportParams): Promise
     startTime: state.startTime ?? "",
     endTime: "",
     timeTakenSeconds: liveElapsedSeconds(state),
+    itemsCoveredPercent: itemsCovered(state.scoring.locations, RUBRIC_VERSION).percent,
     conditions: {},
     aggregatedScores: aggregateLocations(state.scoring.locations),
     items: RUBRIC_GROUPS,
@@ -124,6 +126,7 @@ export async function buildDraftPdfBlob({
     startTime: state.startTime ?? "",
     endTime: "",
     timeTakenSeconds: liveElapsedSeconds(state),
+    itemsCoveredPercent: itemsCovered(state.scoring.locations, RUBRIC_VERSION).percent,
     apm: state.apm,
     asm: state.asm,
     principal: state.principal,

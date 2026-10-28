@@ -32,6 +32,7 @@ const ROUTES: Record<ActionName, Route> = {
   'files.get': { handler: files.get, permission: 'surveyDownload' },
   'dashboard.get': { handler: (c) => reads.dashboard(c), permission: 'dashboard' },
   'schools.list': { handler: (c) => reads.schools(c) },
+  'schools.siblingExternal': { handler: reads.siblingExternal, permission: 'survey' },
   'surveys.get': { handler: reads.surveyGet, permission: 'surveyDownload' },
   'export.rows': { handler: reads.exportRows, permission: 'exportAll' },
   'admin.users.list': { handler: (c) => auth.listUsers(c), permission: 'users' },

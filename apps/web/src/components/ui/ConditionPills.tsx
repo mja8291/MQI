@@ -11,6 +11,53 @@ interface ConditionPillsProps {
   hideNA?: boolean;
 }
 
+/**
+ * v2 (W21): for items whose Unsafe is split into parts (Wall/Column): OK, one pill per part
+ * ("Column Unsafe", "Wall Unsafe" — any combination), N/A.
+ */
+export function UnsafePartsPills({
+  value,
+  parts,
+  allParts,
+  onChange,
+  onPartsChange,
+}: {
+  value: Condition | undefined;
+  parts: string[];
+  allParts: string[];
+  onChange: (value: Condition) => void;
+  onPartsChange: (parts: string[]) => void;
+}) {
+  const pill = (active: boolean) =>
+    `min-h-10 inline-flex items-center rounded-full border px-3.5 text-[12.5px] ${
+      active ? "bg-brand border-brand text-white" : "bg-white border-border text-ink-soft"
+    }`;
+  return (
+    <div className="flex flex-wrap gap-2">
+      <button type="button" onClick={() => onChange("Good")} className={pill(value === "Good")}>
+        OK
+      </button>
+      {allParts.map((part) => {
+        const active = parts.includes(part);
+        return (
+          <button
+            key={part}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onPartsChange(active ? parts.filter((p) => p !== part) : allParts.filter((p) => p === part || parts.includes(p)))}
+            className={pill(active)}
+          >
+            {part} Unsafe
+          </button>
+        );
+      })}
+      <button type="button" onClick={() => onChange("N/A")} className={pill(value === "N/A")}>
+        N/A
+      </button>
+    </div>
+  );
+}
+
 export function ConditionPills({ value, onChange, options, hideNA }: ConditionPillsProps) {
   const pills: { condition: Condition; label: string }[] = options
     ? hideNA

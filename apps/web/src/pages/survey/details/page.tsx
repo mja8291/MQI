@@ -44,7 +44,7 @@ export default function SurveyDetailsPage() {
     if (!detailsComplete) return;
     setRespondent(asm.trim(), joinStaff(staff), principal.trim());
     startSurvey();
-    router.push("/survey/locations");
+    router.push("/survey/levels");
   }
 
   if (!state.school) return null;

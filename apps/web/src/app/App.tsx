@@ -18,6 +18,7 @@ const Dashboard = lazy(() => import('@/pages/dashboard/page'));
 const Admin = lazy(() => import('@/pages/admin/page'));
 const FindSchool = lazy(() => import('@/pages/survey/find-school/page'));
 const Details = lazy(() => import('@/pages/survey/details/page'));
+const Levels = lazy(() => import('@/pages/survey/levels/page'));
 const Resume = lazy(() => import('@/pages/survey/resume/page'));
 const Locations = lazy(() => import('@/pages/survey/locations/page'));
 const Location = lazy(() => import('@/pages/survey/locations/location/page'));
@@ -59,6 +60,7 @@ export function App() {
                   >
                     <Route path="find-school" element={<FindSchool />} />
                     <Route path="details" element={<Details />} />
+                    <Route path="levels" element={<Levels />} />
                     <Route path="resume" element={<Resume />} />
                     <Route path="locations" element={<Locations />} />
                     <Route path="locations/location" element={<Location />} />

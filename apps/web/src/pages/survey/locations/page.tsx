@@ -9,14 +9,18 @@ import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useSurvey } from "@/lib/survey-context";
-import { FLOOR_LEVELS, isLocationComplete } from "@/lib/data/items";
+import { applicableLevels, isLocationComplete } from "@/lib/data/items";
 import { scoreSurvey } from "@/lib/scoring";
 import type { FloorLevel } from "@/lib/types";
+
+/** v2 (W25): fewer locations than this asks for confirmation before Review and submit. */
+const MIN_LOCATIONS = 15;
 
 export default function FloorPage() {
   const router = useRouter();
   const { state, hydrated, locSetFloor, locResumeLocation, discardProgress } = useSurvey();
   const [confirmBack, setConfirmBack] = useState(false);
+  const [confirmFew, setConfirmFew] = useState(false);
 
   useEffect(() => {
     // See survey/locations/page.tsx's matching effect for why this waits.
@@ -49,6 +53,19 @@ export default function FloorPage() {
   return (
     <ScreenShell>
       <TopBar title="Floor level" onBack={() => setConfirmBack(true)} />
+      {/* v2 (W25): a full campus usually has 15+ locations; check before reviewing with fewer. */}
+      <ConfirmDialog
+        open={confirmFew}
+        title="Have you covered every location?"
+        message={`Only ${totalLocations} location${totalLocations === 1 ? "" : "s"} recorded. A campus normally needs at least ${MIN_LOCATIONS}. Make sure every required location has been scored.`}
+        confirmLabel="Proceed anyway"
+        cancelLabel="Remain on Floor level page"
+        onConfirm={() => {
+          setConfirmFew(false);
+          router.push("/survey/review");
+        }}
+        onCancel={() => setConfirmFew(false)}
+      />
       <ConfirmDialog
         open={confirmBack}
         title="Discard this assessment?"
@@ -56,12 +73,20 @@ export default function FloorPage() {
         onConfirm={confirmDiscardAndGoBack}
         onCancel={() => setConfirmBack(false)}
       />
-      <p className="text-[12.5px] text-ink-soft leading-snug mb-3.5">
-        Pick the floor of the location you&apos;re about to score.
-      </p>
+      <div className="flex items-start justify-between gap-3 mb-3.5">
+        <p className="text-[12.5px] text-ink-soft leading-snug">Pick the floor of the location you&apos;re about to score.</p>
+        {/* v2 (W24): change which levels this campus has. */}
+        <button
+          type="button"
+          onClick={() => router.push("/survey/levels")}
+          className="shrink-0 text-[12.5px] font-semibold text-brand-deep underline"
+        >
+          Change levels
+        </button>
+      </div>
 
       <div className="grid grid-cols-2 gap-2.5 mb-5">
-        {FLOOR_LEVELS.map((floor) => {
+        {applicableLevels(state.levels).map((floor) => {
           // v2 (W16): each floor shows how many locations are recorded on it.
           const onFloor = state.scoring.locations.filter((l) => l.floorLevel === floor).length;
           return (
@@ -129,7 +154,10 @@ export default function FloorPage() {
             </div>
           </div>
         </div>
-        <Button disabled={!canSubmit} onClick={() => router.push("/survey/review")}>
+        <Button
+          disabled={!canSubmit}
+          onClick={() => (totalLocations < MIN_LOCATIONS ? setConfirmFew(true) : router.push("/survey/review"))}
+        >
           Review and submit
         </Button>
         {totalLocations === 0 ? (

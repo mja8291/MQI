@@ -13,6 +13,8 @@ export interface SingleSurveyPdfInput {
   startTime: string;
   endTime: string;
   timeTakenSeconds: number | null;
+  /** v2 (W22): items covered, %; null = not recorded (older survey). */
+  itemsCoveredPercent?: number | null;
   apm: string;
   asm: string;
   principal: string;
@@ -99,6 +101,7 @@ export async function buildSingleSurveyPdf(input: SingleSurveyPdfInput): Promise
   const rows: [string, string][] = [
     ["Campus", `${input.campusName} (${input.region} · ${input.area})`],
     ["Survey ID", input.surveyId],
+    ...(input.itemsCoveredPercent != null ? ([["Items covered", `${Math.round(input.itemsCoveredPercent)}%`]] as [string, string][]) : []),
     ["Engineering Staff", input.apm || "—"],
     ["ASM", input.asm || "—"],
     ["Principal", input.principal || "—"],

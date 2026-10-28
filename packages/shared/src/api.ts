@@ -173,6 +173,8 @@ export interface FoundSurvey {
   startTime: string;
   endTime: string;
   timeTakenSeconds: number | null;
+  /** v2 (W22): blank (null) for surveys written before the column existed. */
+  itemsCoveredPercent: number | null;
   conditions: Record<string, string>;
   aggregatedScores?: Record<string, number>;
   items: RubricItem[];
@@ -221,6 +223,15 @@ export interface DashboardData {
 
 export type SchoolsResult = { schools: School[] };
 
+/**
+ * v2 (W30): External Development is shared by the campuses of one e-compound. The latest one
+ * recorded for a sibling campus pre-fills the next sibling's survey (editable).
+ */
+export const siblingExternalPayload = z.object({ schoolId: z.string().min(1).max(64) });
+export type SiblingExternalResult = {
+  found: { campusName: string; schoolId: string; surveyId: string; date: string; scores: Record<string, string> } | null;
+};
+
 // ---- admin ----
 
 export interface AdminUser {
@@ -261,6 +272,7 @@ export const ACTIONS = [
   'files.get',
   'dashboard.get',
   'schools.list',
+  'schools.siblingExternal',
   'surveys.get',
   'export.rows',
   'admin.users.list',

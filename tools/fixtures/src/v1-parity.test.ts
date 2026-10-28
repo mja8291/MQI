@@ -223,7 +223,8 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
       items: found.items,
     });
     const v2Found = foundSurveyFromRows(id, ALL_M2.filter((r) => r['Survey ID'] === id))!;
-    expect(cells(v2Workbook(workbookInput(v2Found)))).toEqual(withoutMethodRow(cells(v1)));
+    // Items covered (W22) is new in v2; compared separately below.
+    expect(cells(v2Workbook(workbookInput({ ...v2Found, itemsCoveredPercent: null })))).toEqual(withoutMethodRow(cells(v1)));
   });
 
   test.each(surveyIds.map((id) => [id]))('PDF for %s: draws the same text as v1 (less D15/W11/W17 changes)', async (id) => {
@@ -267,11 +268,20 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
       items: found.items,
     });
     const v2Found = foundSurveyFromRows(id, ALL_M2.filter((r) => r['Survey ID'] === id))!;
-    const v2 = await v2Pdf(pdfInput(v2Found));
+    const v2 = await v2Pdf(pdfInput({ ...v2Found, itemsCoveredPercent: null }));
     vi.useRealTimers();
     const v1Text = await pdfText(v1);
     expect(v1Text.some((t) => t.startsWith('Method 2 \u00b7 '))).toBe(true);
     expect(await pdfText(v2)).toEqual(v1TextAsV2(v1Text));
+  });
+
+  test('W22: v2 downloads add Items covered for surveys that recorded it', async () => {
+    const id = writtenRows[0]!['Survey ID']!;
+    const v2Found = foundSurveyFromRows(id, ALL_M2.filter((r) => r['Survey ID'] === id))!;
+    expect(v2Found.itemsCoveredPercent).toBeGreaterThan(0);
+    const c = cells(v2Workbook(workbookInput(v2Found)));
+    expect(Object.entries(c).find(([, v]) => v === 'Items Covered (%)')).toBeTruthy();
+    expect(await pdfText(await v2Pdf(pdfInput(v2Found)))).toContain('Items covered');
   });
 
   test('dashboard figures match v1', async () => {

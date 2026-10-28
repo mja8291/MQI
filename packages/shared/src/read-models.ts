@@ -2,6 +2,7 @@ import type { CapturedSchool, DashboardData, FoundSurvey } from './api';
 import { CRITICAL_ITEMS, aggregateLocations, ratingBand } from './scoring';
 import { criticalColumn } from './sheets';
 import { rubricGroupsFor } from './rubric/versions';
+import { cellCondition } from './rubric/items';
 import type { Condition, DrillingCheck, SurveyLocation, RatingBand, School, SiteChecks } from './types';
 
 /**
@@ -237,6 +238,7 @@ function common(surveyId: string, first: SheetRow): Omit<FoundSurvey, 'rubricVer
     startTime: first['Start Time'] ?? '',
     endTime: first['End Time'] || first['Timestamp'] || '',
     timeTakenSeconds: num(first['Time Taken (seconds)']),
+    itemsCoveredPercent: num(first['Items Covered (%)']),
   };
 }
 
@@ -249,8 +251,8 @@ export function foundSurveyFromRows(surveyId: string, rows: readonly SheetRow[])
   const locations: SurveyLocation[] = rows.map((row, i) => {
     const scores: Record<string, Condition> = {};
     for (const group of groups) {
-      const value = row[group.name];
-      if (value) scores[group.name] = value as Condition;
+      const value = cellCondition(row[group.name] ?? '');
+      if (value) scores[group.name] = value;
     }
     return {
       id: String(i),

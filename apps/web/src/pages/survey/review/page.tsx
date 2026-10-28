@@ -9,6 +9,8 @@ import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
+import { useAuth } from "@/lib/auth/client";
+import { RUBRIC_VERSION, itemsCovered } from "@mqi/shared";
 import { CATEGORIES, CRITICAL_ITEMS, ratingBand, scoreSurvey } from "@/lib/scoring";
 import { isLocationComplete } from "@/lib/data/items";
 import {
@@ -16,12 +18,9 @@ import {
   BUILDING_STRUCTURE_QUESTION,
   CENTER_BEAM_OPTIONS,
   CENTER_BEAM_QUESTION,
-  DRILLING_DONE_QUESTION,
-  DRILLING_POINT_OPTIONS,
-  DRILLING_POINT_QUESTION,
-  DRILLING_REPAIR_QUESTION,
-  OATH_TEXT,
+  oathText,
   OVERFLOW_OPTIONS,
+  OVERFLOW_HINT,
   OVERFLOW_QUESTION,
   POWER_SUPPLY_OPTIONS,
   RISK_FACTOR_OPTIONS,
@@ -29,9 +28,6 @@ import {
   RISK_FACTOR_QUESTION,
   ROOF_ACCESS_TYPE_OPTIONS,
   ROOF_ACCESS_TYPE_QUESTION,
-  SCREED_THICKNESS_LABEL,
-  SLAB_ASSESSMENT_QUESTION,
-  SLAB_THICKNESS_LABEL,
   STRUCTURAL_CONCERN_OPTIONS,
   STRUCTURAL_CONCERN_QUESTION,
   YES_NO_OPTIONS,
@@ -66,6 +62,7 @@ import { buildDraftExcelBlob, buildDraftPdfBlob, downloadBlob, draftExportFilena
 import { FileSpreadsheet, FileText } from "lucide-react";
 
 export default function ReviewPage() {
+  const { user } = useAuth();
   const router = useRouter();
   const {
     state,
@@ -86,7 +83,8 @@ export default function ReviewPage() {
   const [centerBeam, setLocalCenterBeam] = useState<CenterBeam | "">(state.centerBeam);
   // Spread over the empty shapes so a draft saved before a field existed
   // (e.g. slabAssessment) opens with it blank rather than undefined.
-  const [drilling, setDrilling] = useState<DrillingCheck>({ ...emptyDrillingCheck(), ...state.drillingCheck });
+  const drilling: DrillingCheck = { ...emptyDrillingCheck(), ...state.drillingCheck };
+  const hasRoof = state.scoring.locations.some((l) => l.type === "Roof");
   const [site, setSite] = useState<SiteChecks>({ ...emptySiteChecks(), ...state.siteChecks });
   const [complaints, setLocalComplaints] = useState(state.complaints);
   const [oath, setOath] = useState(false);
@@ -108,6 +106,8 @@ export default function ReviewPage() {
     if (incomplete) router.replace("/survey/locations");
   }, [hydrated, state.school, state.started, state.scoring.locations, router]);
 
+  // v2 (W22): rubric groups scored at least once.
+  const coverage = itemsCovered(state.scoring.locations, RUBRIC_VERSION);
   const result = useMemo(
     () => scoreSurvey(state.scoring.locations),
     [state.scoring.locations]
@@ -170,7 +170,7 @@ export default function ReviewPage() {
     Boolean(structuralConcern) &&
     Boolean(buildingStructure) &&
     Boolean(centerBeam) &&
-    isDrillingCheckComplete(drilling) &&
+    (!hasRoof || isDrillingCheckComplete(drilling)) &&
     isSiteChecksComplete(site, reviewPhotos) &&
     !submitting &&
     photosUploading === 0;
@@ -298,6 +298,7 @@ export default function ReviewPage() {
         <RecapRow k="ASM" v={state.asm || "—"} />
         <RecapRow k="Principal" v={state.principal || "—"} />
         <RecapRow k="Locations recorded" v={String(state.scoring.locations.length)} />
+        <RecapRow k="Items covered" v={`${coverage.covered} of ${coverage.total} (${Math.round(coverage.percent)}%)`} />
         {elapsedSeconds !== null ? <RecapRow k="Time on assessment" v={formatDuration(elapsedSeconds)} /> : null}
       </div>
 
@@ -441,6 +442,7 @@ export default function ReviewPage() {
             </option>
           ))}
         </select>
+        <p className="text-[11.5px] text-ink-soft leading-snug mt-1.5">{OVERFLOW_HINT}</p>
       </Field>
 
       <Field label={SITE_PHOTO_ROOF_CLEAN}>
@@ -475,95 +477,14 @@ export default function ReviewPage() {
       </Field>
       {site.rainSpoutsClear === "No" ? <ReviewPhotoField itemName={SITE_PHOTO_RAIN_SPOUTS} required /> : null}
 
-      <SectionLabel>Drilling &amp; observation</SectionLabel>
-
-      <Field label={DRILLING_DONE_QUESTION}>
-        <select
-          value={drilling.done}
-          onChange={(e) => setDrilling({ ...drilling, done: e.target.value as DrillingCheck["done"] })}
-          className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
-        >
-          <option value="">Select an answer</option>
-          <option value="YES">YES</option>
-          <option value="NO">NO</option>
-        </select>
-      </Field>
-
-      {drilling.done === "YES" ? (
-        <div className="rounded-xl border border-border bg-card px-3 pt-3 mb-4">
-          <Field label={DRILLING_POINT_QUESTION}>
-            <select
-              value={drilling.pointMarked}
-              onChange={(e) => setDrilling({ ...drilling, pointMarked: e.target.value as DrillingCheck["pointMarked"] })}
-              className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
-            >
-              <option value="">Select an answer</option>
-              {DRILLING_POINT_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <ReviewPhotoField itemName={SITE_PHOTO_DRILLING_POINT} />
-
-          <Field label={SLAB_THICKNESS_LABEL}>
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="any"
-              placeholder="mm"
-              value={drilling.slabThicknessMm}
-              onChange={(e) => setDrilling({ ...drilling, slabThicknessMm: e.target.value })}
-              className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
-            />
-          </Field>
-
-          <Field label={SLAB_ASSESSMENT_QUESTION}>
-            <select
-              value={drilling.slabAssessment ?? ""}
-              onChange={(e) => setDrilling({ ...drilling, slabAssessment: e.target.value as DrillingCheck["slabAssessment"] })}
-              className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
-            >
-              <option value="">Select an answer</option>
-              {DRILLING_POINT_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <ReviewPhotoField itemName={SITE_PHOTO_SLAB_THICKNESS} />
-
-          <Field label={SCREED_THICKNESS_LABEL}>
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="any"
-              placeholder="mm"
-              value={drilling.screedThicknessMm}
-              onChange={(e) => setDrilling({ ...drilling, screedThicknessMm: e.target.value })}
-              className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
-            />
-          </Field>
-
-          <Field label={DRILLING_REPAIR_QUESTION}>
-            <select
-              value={drilling.holeRepaired}
-              onChange={(e) => setDrilling({ ...drilling, holeRepaired: e.target.value as DrillingCheck["holeRepaired"] })}
-              className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
-            >
-              <option value="">Select an answer</option>
-              <option value="YES">YES</option>
-              <option value="NO">NO</option>
-            </select>
-          </Field>
-        </div>
+      {/* v2 (W27): Drilling & observation is answered while scoring a Roof location. */}
+      {hasRoof && !isDrillingCheckComplete(drilling) ? (
+        <p role="status" className="mb-4 rounded-lg bg-band-poor-tint px-3 py-2 text-[12.5px] leading-snug text-band-poor">
+          Drilling &amp; observation is not answered yet: open a Roof location from the Floor level page and complete it there.
+        </p>
       ) : null}
 
-      <SectionLabel>Building proximity</SectionLabel>
+      <SectionLabel>Building and area features</SectionLabel>
 
       <Field label={RISK_FACTOR_QUESTION}>
         <div className="space-y-2">
@@ -615,7 +536,7 @@ export default function ReviewPage() {
           onChange={(e) => setOath(e.target.checked)}
           className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--brand)]"
         />
-        {OATH_TEXT}
+        {oathText(user?.name ?? "")}
       </label>
 
       {photosUploading > 0 ? (

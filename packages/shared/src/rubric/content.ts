@@ -9,8 +9,10 @@ import type {
   TypeOfStructure,
 } from "../types";
 
-export const OATH_TEXT =
-  "I undertake to affirm that I am the Administration & Support Manager of the above mentioned school and that the responses provided in the assessment form are in accordance with the provided instructions and guidance. The provided ratings are, to the best of my knowledge, a true and actual representation of the school condition.";
+/** v2 (W20): the declaration is made by the signed-in engineering staff member, by name. */
+export function oathText(name: string): string {
+  return `I undertake to affirm that I am ${name.trim() || "[Name]"}, staff of Engineering Department of TCF as mentioned in this login session and that the responses provided in the assessment form are in accordance with the provided instructions and guidance. The provided ratings are, to the best of my knowledge, a true and actual representation of the school condition.`;
+}
 
 export const POWER_SUPPLY_OPTIONS: PowerSupply[] = [
   "Grid (Wapda/K.E/LESCO etc.)",
@@ -32,7 +34,7 @@ export const TYPE_OF_STRUCTURE_QUESTION = "Type of Structure (visual inspection)
 export const TYPE_OF_STRUCTURE_OPTIONS: TypeOfStructure[] = ["RCC (Frame)", "Load-bearing", "Hybrid", "N/A"];
 
 export const CENTER_BEAM_QUESTION = "Center Beam in Classrooms (visual inspection)";
-export const CENTER_BEAM_OPTIONS: CenterBeam[] = ["YES", "NO", "N/A"];
+export const CENTER_BEAM_OPTIONS: CenterBeam[] = ["YES", "NO", "Somewhere present, somewhere absent", "N/A"];
 
 // Slab / roof-screeding drilling check — "Drilling & Observation" block of
 // the rubric workbook's "Safety Related" tab (wording of the first item is
@@ -46,14 +48,16 @@ export const DRILLING_REPAIR_QUESTION = "Was the drilled hole repaired with grou
 export const SLAB_ASSESSMENT_QUESTION = "Slab thickness assessment";
 
 // "Structural Checks Recorded Alongside Condition" slide (TCF Engineering):
-// the visual-inspection, roof & drainage and building-proximity questions
+// the visual-inspection, roof & drainage and building and area features questions
 // that aren't Type of Structure / Center Beam / the drilling check above.
 export const ROOF_ACCESS_TYPE_QUESTION = "Access to roof area / tanks (type of access)";
 export const ROOF_ACCESS_TYPE_OPTIONS: RoofAccessType[] = ["Proper staircase", "Ladder", "None", "N/A"];
-export const OVERFLOW_QUESTION = "Overflow disposal system";
+export const OVERFLOW_QUESTION = "Proper overflow disposal system";
+/** v2 (W20): shown under the question. */
+export const OVERFLOW_HINT = "Proper disposal of overflow water off the roof (not spilled over the roof area).";
 export const OVERFLOW_OPTIONS: OverflowDisposal[] = ["Provided", "Not provided"];
 export const YES_NO_OPTIONS = ["Yes", "No"] as const;
-export const RISK_FACTOR_QUESTION = "Building proximity: risk factors (mark any that apply)";
+export const RISK_FACTOR_QUESTION = "Building and area features: risk factors (mark any that apply)";
 export const RISK_FACTOR_OTHER = "Any other";
 export const RISK_FACTOR_OPTIONS = [
   "Compromised construction quality",

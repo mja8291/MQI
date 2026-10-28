@@ -1,5 +1,8 @@
 
-import { isUnsafe } from "@mqi/shared";
+import { emptyDrillingCheck, isDrillingCheckComplete, isUnsafe } from "@mqi/shared";
+import { DrillingCheckFields } from "@/components/survey/DrillingCheckFields";
+import { getSiblingExternal } from "@/lib/sibling-external";
+import type { SiblingExternal } from "@/lib/sibling-external";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ScreenShell } from "@/components/ui/ScreenShell";
@@ -41,6 +44,8 @@ export default function CategoryPage() {
     locCurrentRemovePhoto,
     locCurrentSetNote,
     locFinalizeCurrent,
+    locCurrentSetUnsafeParts,
+    setDrillingCheck,
     locDiscardCurrent,
   } = useSurvey();
   const current = state.scoring.current;
@@ -55,6 +60,14 @@ export default function CategoryPage() {
     removePhoto: locCurrentRemovePhoto,
   });
   const [openCategory, setOpenCategory] = useState<Category | null>(null);
+  // v2 (W30): shown when External Development was pre-filled from a sibling campus.
+  const [sibling, setSibling] = useState<SiblingExternal | null>(null);
+  const currentType = state.scoring.current?.type;
+  const schoolId = state.school?.schoolId;
+  useEffect(() => {
+    if (currentType !== "External Development" || !schoolId) return;
+    void getSiblingExternal(schoolId).then(setSibling);
+  }, [currentType, schoolId]);
   const [attemptedSave, setAttemptedSave] = useState(false);
   const [confirmBack, setConfirmBack] = useState(false);
 
@@ -84,7 +97,11 @@ export default function CategoryPage() {
     return { wc, items, answered, total: items.length, unsafeMissing, complete: answered === items.length && unsafeMissing === 0 };
   });
   const incomplete = categoryStatus.filter((c) => !c.complete);
-  const allComplete = incomplete.length === 0;
+  // v2 (W27): a Roof location also carries the survey's Drilling & observation answers.
+  const isRoof = type === "Roof";
+  const drilling = { ...emptyDrillingCheck(), ...state.drillingCheck };
+  const drillingDone = !isRoof || isDrillingCheckComplete(drilling);
+  const allComplete = incomplete.length === 0 && drillingDone;
 
   function targetRoute() {
     const floorLevel = current!.floorLevel;
@@ -156,6 +173,12 @@ export default function CategoryPage() {
       <div className="bg-brand-tint text-brand-deep text-[13px] font-semibold rounded-xl px-3.5 py-2.5 mb-4">
         {current.floorLevel} — {type} — {current.name}
       </div>
+      {type === "External Development" && sibling ? (
+        <p role="status" className="-mt-2 mb-4 rounded-lg border border-border bg-card px-3 py-2 text-[12px] leading-snug text-ink-soft">
+          Filled in from <span className="font-semibold text-ink">{sibling.campusName}</span> (same e-compound), surveyed{" "}
+          {new Date(sibling.date).toLocaleDateString()}. Check each item and change anything that differs today.
+        </p>
+      ) : null}
 
       {categoryStatus.map(({ wc, items, answered, total }) => (
         <AccordionSection
@@ -176,6 +199,8 @@ export default function CategoryPage() {
               photos={current!.photos[item.name] ?? []}
               note={current!.notes[item.name]}
               onScoreChange={(v) => locCurrentSetScore(item.name, v)}
+              unsafeParts={current!.unsafeParts?.[item.name]}
+              onUnsafePartsChange={(parts) => locCurrentSetUnsafeParts(item.name, parts)}
               onAddPhoto={(f) => handleAddPhoto(item.name, f)}
               onRemovePhoto={(id) => handleRemovePhoto(item.name, id)}
               onNoteChange={(v) => locCurrentSetNote(item.name, v)}
@@ -185,13 +210,22 @@ export default function CategoryPage() {
         </AccordionSection>
       ))}
 
+      {isRoof ? (
+        <div className={`rounded-2xl border bg-card px-4 pt-4 pb-1 mb-3 ${attemptedSave && !drillingDone ? "border-band-poor" : "border-border"}`}>
+          <div className="text-[15px] font-semibold text-ink mb-3">Drilling &amp; observation</div>
+          <DrillingCheckFields drilling={drilling} onChange={setDrillingCheck} />
+        </div>
+      ) : null}
+
       <BottomBar>
         <Button variant={allComplete ? "primary" : "muted"} onClick={saveSelectionAndReturn}>
           Save Selection and Return
         </Button>
         {attemptedSave && !allComplete ? (
           <p className="text-center text-[11.5px] text-band-poor mt-2.5">
-            {incomplete.some((c) => c.unsafeMissing > 0) && incomplete.every((c) => c.answered === c.total)
+            {incomplete.length === 0 && !drillingDone
+              ? "Complete Drilling & observation (thicknesses must be positive numbers)."
+              : incomplete.some((c) => c.unsafeMissing > 0) && incomplete.every((c) => c.answered === c.total)
               ? "Attach a photo to every item marked Unsafe."
               : incomplete.length === 1
                 ? `"${incomplete[0]!.wc}" still has unscored items or an Unsafe item without a photo.`

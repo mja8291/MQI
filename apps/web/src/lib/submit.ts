@@ -50,6 +50,7 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
       scores: loc.scores,
       photos,
       notes: loc.notes,
+      ...(loc.unsafeParts && Object.keys(loc.unsafeParts).length ? { unsafeParts: loc.unsafeParts } : {}),
     });
   }
   const reviewPhotos: Record<string, string[]> = {};
@@ -75,6 +76,7 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
     siteChecks: state.siteChecks,
     complaints: state.complaints,
     declaration: true,
+    ...(state.levels ? { levels: state.levels } : {}),
     locations,
     reviewPhotos,
     startTime: state.startTime,

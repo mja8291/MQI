@@ -52,9 +52,15 @@ interface QueueTabProps {
   syncing: boolean;
   loaded: boolean;
   refresh: () => Promise<void>;
+  /** v2 (W28): Home shows drafts ("Incomplete") and queued surveys ("Sync Pending") as separate tabs. */
+  show: "drafts" | "pending";
+  /** Set when a submission just could not get through (weak or no connection). */
+  weakConnection?: boolean;
 }
 
-export function QueueTab({ drafts, pending, syncing, loaded, refresh }: QueueTabProps) {
+export function QueueTab({ drafts: allDrafts, pending: allPending, syncing, loaded, refresh, show, weakConnection }: QueueTabProps) {
+  const drafts = show === "drafts" ? allDrafts : [];
+  const pending = show === "pending" ? allPending : [];
   const router = useRouter();
   const [discarding, setDiscarding] = useState<SurveyDraft | null>(null);
   const [discardingQueued, setDiscardingQueued] = useState<QueuedSubmission | null>(null);
@@ -97,10 +103,12 @@ export function QueueTab({ drafts, pending, syncing, loaded, refresh }: QueueTab
   if (drafts.length === 0 && pending.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-sm font-medium text-ink mb-1">Nothing in the queue</p>
+        <p className="text-sm font-medium text-ink mb-1">{show === "drafts" ? "No incomplete surveys" : "Nothing waiting to sync"}</p>
         <p className="text-[12.5px] text-ink-soft leading-relaxed">
-          Surveys you&apos;re filling in, and finished ones waiting to sync, show up here.
-          {lastSync ? ` Last synced ${relativeTime(lastSync)}.` : ""}
+          {show === "drafts"
+            ? "Surveys you have started but not submitted show up here."
+            : "Submitted surveys show up here until they have reached the server."}
+          {show === "pending" && lastSync ? ` Last synced ${relativeTime(lastSync)}.` : ""}
         </p>
       </div>
     );
@@ -108,10 +116,24 @@ export function QueueTab({ drafts, pending, syncing, loaded, refresh }: QueueTab
 
   return (
     <div>
-      <p className="text-[12.5px] text-ink-soft mb-4">
-        {drafts.length} in progress · {pending.length} waiting to sync
-        {lastSync ? ` · last synced ${relativeTime(lastSync)}` : ""}
-      </p>
+      {show === "pending" ? (
+        <>
+          {weakConnection || pending.some((p) => p.lastError) ? (
+            // v2 (W29): the phone keeps retrying by itself; a good connection gets it through.
+            <div role="status" className="mb-4 rounded-xl border border-band-poor bg-band-poor-tint px-3.5 py-3 text-[12.5px] leading-snug text-band-poor">
+              <p className="font-semibold mb-0.5">Not uploaded yet — weak or no connection</p>
+              <p>
+                Your survey is safe on this phone and the app keeps trying on its own. Connect to good Wi-Fi and tap{" "}
+                <span className="font-semibold">Sync now</span>. The answers go first; photos follow.
+              </p>
+            </div>
+          ) : null}
+          <p className="text-[12.5px] text-ink-soft mb-4">
+            {pending.length} waiting to sync
+            {lastSync ? ` · last synced ${relativeTime(lastSync)}` : ""}
+          </p>
+        </>
+      ) : null}
 
       {pending.length > 0 ? (
         <section className="mb-5">
@@ -182,7 +204,7 @@ export function QueueTab({ drafts, pending, syncing, loaded, refresh }: QueueTab
       {drafts.length > 0 ? (
         <section>
           <h2 className="text-xs font-semibold text-brand-deep uppercase tracking-wide mb-2">
-            In progress ({drafts.length})
+            Incomplete ({drafts.length})
           </h2>
           <div className="rounded-xl border border-border bg-card divide-y divide-border overflow-hidden">
             {drafts.map((d) => (

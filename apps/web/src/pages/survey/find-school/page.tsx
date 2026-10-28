@@ -10,6 +10,7 @@ import type { School } from "@/lib/types";
 import { cacheSchools, getCachedSchools } from "@/lib/offline/db";
 import { api, isAuthError } from "@/lib/api";
 import { notifyAuthRequired } from "@/lib/auth/events";
+import { prefetchSiblingExternal } from "@/lib/sibling-external";
 import type { SchoolsResult } from "@mqi/shared";
 
 export default function FindSchoolPage() {
@@ -93,6 +94,7 @@ export default function FindSchoolPage() {
     if (!selected) return;
     // Only the four survey fields travel with the survey; the details are for this screen.
     setSchool({ schoolId: selected.schoolId, name: selected.name, region: selected.region, area: selected.area });
+    if (details?.eCompoundNo) prefetchSiblingExternal(selected.schoolId);
     router.push("/survey/details");
   }
 

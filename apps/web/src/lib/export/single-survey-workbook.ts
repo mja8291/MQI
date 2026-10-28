@@ -11,6 +11,8 @@ export interface SingleSurveyExportInput {
   startTime: string;
   endTime: string;
   timeTakenSeconds: number | null;
+  /** v2 (W22): items covered, %; null = not recorded (older survey). */
+  itemsCoveredPercent?: number | null;
   /** Item name -> condition text ("Good"/"Ok"/"Poor"/"Very Poor"), omitted/blank means N/A / unscored. */
   conditions: Record<string, string>;
   /**
@@ -82,6 +84,10 @@ export function buildSingleSurveyWorkbook(input: SingleSurveyExportInput): Excel
   sheet.getCell("O6").value = "Time Taken";
   sheet.getCell("P6").value =
     input.timeTakenSeconds === null ? "—" : formatDurationFriendly(input.timeTakenSeconds);
+  if (input.itemsCoveredPercent != null) {
+    sheet.getCell("O7").value = "Items Covered (%)";
+    sheet.getCell("P7").value = Math.round(input.itemsCoveredPercent);
+  }
 
   const firstDataRow = 2;
   let r = firstDataRow;

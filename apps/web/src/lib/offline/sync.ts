@@ -7,7 +7,7 @@ import type { OutboxSurvey, SyncFailureKind } from './db';
 
 /**
  * The sync engine. Single-flight (a Web Lock, so only one tab syncs), safe to call from any
- * trigger. Push: surveys in outbox order, up to PUSH_BATCH_MAX a call; a permanent rejection
+ * trigger. Push: surveys in outbox order, one per call (W29); a permanent rejection
  * marks that survey failed and the queue moves on. Photos: queued once the server holds the
  * survey; chunked, resumable per chunk, checksummed. Survey data always goes before any photo, and a
  * stuck photo holds back only its own survey's photos (W15). Only LOCK_TIMEOUT, RATE_LIMITED and INTERNAL (and no
@@ -15,6 +15,13 @@ import type { OutboxSurvey, SyncFailureKind } from './db';
  */
 
 export const SYNC_CHANGED_EVENT = 'mqi-sync-changed';
+
+/**
+ * v2 (W29): one survey per request ("packets, not combined") — a small request is far more likely
+ * to get through a weak connection, and one survey's trouble never holds back another's. The
+ * server still accepts up to PUSH_BATCH_MAX.
+ */
+const SURVEYS_PER_CALL = Math.min(1, PUSH_BATCH_MAX);
 export const LAST_SYNC_KEY = 'mqi-last-sync';
 
 function notifyChanged() {
@@ -73,8 +80,8 @@ async function pushSurveys(force: boolean): Promise<boolean> {
   const entries = await db.outbox.orderBy('seq').filter((e) => e.kind === 'survey').toArray();
   const dueIds = new Set((await due('pending', force)).map((s) => s.id));
   const queue = entries.filter((e) => dueIds.has(e.surveyId));
-  for (let i = 0; i < queue.length; i += PUSH_BATCH_MAX) {
-    const batch = queue.slice(i, i + PUSH_BATCH_MAX);
+  for (let i = 0; i < queue.length; i += SURVEYS_PER_CALL) {
+    const batch = queue.slice(i, i + SURVEYS_PER_CALL);
     const surveys = (await db.surveys.bulkGet(batch.map((b) => b.surveyId))).filter((s): s is OutboxSurvey => !!s);
     let results: PushResult[];
     try {

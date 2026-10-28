@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Check, CloudOff, Download, FileText, Loader2 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ScreenShell } from "@/components/ui/ScreenShell";
 import { useSurvey } from "@/lib/survey-context";
 import { db } from "@/lib/offline/db";
@@ -32,6 +32,20 @@ export default function DonePage() {
   const onServer = record?.status === "synced" || record?.status === "uploading";
   const sending = record?.status === "pending" && !record.lastError;
   const offline = !onServer && !sending;
+
+  // v2 (W29): a weak or missing connection lands on Sync Pending, which explains what to do and
+  // keeps retrying — as soon as the first attempt fails, or after 20 s still sending.
+  const router = useRouter();
+  const failedToSend = record !== undefined && offline && record.status !== "failed";
+  useEffect(() => {
+    if (failedToSend) {
+      router.replace("/?tab=sync&weak=1");
+      return;
+    }
+    if (!sending) return;
+    const t = setTimeout(() => router.replace("/?tab=sync&weak=1"), 20_000);
+    return () => clearTimeout(t);
+  }, [failedToSend, sending, router]);
 
   async function download(kind: "excel" | "pdf") {
     if (!surveyId || busy) return;
@@ -90,8 +104,8 @@ export default function DonePage() {
       )}
 
       {offline || sending ? (
-        <Link href="/?tab=queue" className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-brand text-white mb-2.5">
-          View queue
+        <Link href="/?tab=sync" className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-brand text-white mb-2.5">
+          View Sync Pending
         </Link>
       ) : null}
       <Link

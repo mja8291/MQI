@@ -43,6 +43,7 @@ export const locationSchema = z.object({
   /** item name → attachment ids */
   photos: z.record(z.string().max(120), z.array(ID).max(20)),
   notes: z.record(z.string().max(120), text(2000)),
+  unsafeParts: z.record(z.string().max(120), z.array(z.string().max(40)).max(4)).optional(),
 });
 
 export const drillingCheckSchema = z.object({
@@ -86,11 +87,13 @@ export const submittedSurveySchema = z.object({
   structuralConcern: blankOr(['YES', 'NO']),
   buildingStructure: blankOr(['Load-Bearing', 'RCC', 'Precast', 'Hybrid (RCC+Precast)', 'Hybrid (Load-Bearing+RCC)', 'Unknown']),
   typeOfStructure: blankOr(['RCC (Frame)', 'Load-bearing', 'Hybrid', 'N/A']),
-  centerBeam: blankOr(['YES', 'NO', 'N/A']),
+  centerBeam: blankOr(['YES', 'NO', 'Somewhere present, somewhere absent', 'N/A']),
   drillingCheck: drillingCheckSchema,
   siteChecks: siteChecksSchema,
   complaints: text(5000),
   declaration: z.literal(true),
+  /** v2 (W24): the levels confirmed on the Applicable levels page. */
+  levels: z.array(z.enum(FLOOR_LEVELS as [FloorLevel, ...FloorLevel[]])).max(7).optional(),
   locations: z.array(locationSchema).min(1).max(300),
   /** Last-page photos: question text → attachment ids. */
   reviewPhotos: z.record(z.string().max(200), z.array(ID).max(20)),
@@ -139,7 +142,9 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
   need(!!s.buildingStructure, 'buildingStructure', 'Suggest the structural type of the building.');
   // v2 (W17): Type of Structure (visual inspection) is no longer asked; it stays in the schema for older drafts.
   need(!!s.centerBeam, 'centerBeam', 'Answer the centre beam question.');
-  need(isDrillingCheckComplete(s.drillingCheck), 'drillingCheck', 'Complete the drilling check (thicknesses must be positive numbers).');
+  // v2 (W27): asked with a Roof location, so required only when the survey has one.
+  const hasRoof = s.locations.some((l) => l.type === 'Roof');
+  if (hasRoof || s.drillingCheck.done) need(isDrillingCheckComplete(s.drillingCheck), 'drillingCheck', 'Complete the drilling check (thicknesses must be positive numbers).');
   if (s.drillingCheck.done === 'YES') {
     need(positive(s.drillingCheck.slabThicknessMm), 'drillingCheck.slabThicknessMm', 'Slab thickness must be a positive number.');
     need(positive(s.drillingCheck.screedThicknessMm), 'drillingCheck.screedThicknessMm', 'Screeding thickness must be a positive number.');

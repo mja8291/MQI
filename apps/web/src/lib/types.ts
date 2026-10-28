@@ -25,4 +25,6 @@ export interface SurveyLocation {
   scores: Record<string, Condition>;
   photos: Record<string, PhotoAsset[]>;
   notes: Record<string, string>;
+  /** v2 (W21): parts marked unsafe for items with unsafeParts (Wall/Column). */
+  unsafeParts?: Record<string, string[]>;
 }

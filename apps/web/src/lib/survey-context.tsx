@@ -25,6 +25,7 @@ interface CurrentLocation {
   classroomGrade?: string;
   classroomSection?: string;
   scores: Record<string, Condition>;
+  unsafeParts?: Record<string, string[]>;
   /** Multiple photos per item are allowed. Each uploads to Drive individually on attach — see PhotoAsset. */
   photos: Record<string, PhotoAsset[]>;
   notes: Record<string, string>;
@@ -34,6 +35,8 @@ export interface SurveyState {
   school: School | null;
   /** True from the moment the survey starts (respondent details confirmed). */
   started: boolean;
+  /** v2 (W24): levels confirmed for this campus; null until chosen (older drafts: every level). */
+  levels: FloorLevel[] | null;
   asm: string;
   apm: string;
   principal: string;
@@ -132,6 +135,7 @@ function initialState(): SurveyState {
   return {
     school: null,
     started: false,
+    levels: null,
     asm: "",
     apm: "",
     principal: "",
@@ -171,6 +175,7 @@ type Action =
   | { type: "SET_SCHOOL"; school: School }
   | { type: "START_SURVEY" }
   | { type: "SET_RESPONDENT"; asm: string; apm: string; principal: string }
+  | { type: "SET_LEVELS"; levels: FloorLevel[] }
   | { type: "SET_POWER_SUPPLY"; value: PowerSupply }
   | { type: "SET_STRUCTURAL_CONCERN"; value: StructuralConcern }
   | { type: "SET_BUILDING_STRUCTURE"; value: BuildingStructure }
@@ -187,6 +192,7 @@ type Action =
   | { type: "LOC_SET_LOCATION_NAME"; name: string }
   | { type: "LOC_SET_CLASSROOM"; floorLevel: FloorLevel; grade: string; section: string }
   | { type: "LOC_CURRENT_SET_SCORE"; name: string; value: Condition }
+  | { type: "LOC_CURRENT_SET_UNSAFE_PARTS"; name: string; parts: string[] }
   | { type: "LOC_CURRENT_ADD_PHOTO"; name: string; asset: PhotoAsset }
   | { type: "LOC_CURRENT_REMOVE_PHOTO"; name: string; id: string }
   | { type: "LOC_CURRENT_SET_NOTE"; name: string; value: string }
@@ -248,6 +254,8 @@ function reducer(state: SurveyState, action: Action): SurveyState {
         pausedAt: null,
         pausedSeconds: 0,
       };
+    case "SET_LEVELS":
+      return { ...state, levels: action.levels };
     case "SET_RESPONDENT":
       return { ...state, asm: action.asm, apm: action.apm, principal: action.principal };
     case "SET_POWER_SUPPLY":
@@ -311,13 +319,33 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       current.name = action.section ? `${action.grade} ${action.section}` : action.grade;
       return { ...state, scoring: { ...state.scoring, current } };
     }
+    case "LOC_CURRENT_SET_UNSAFE_PARTS": {
+      // v2 (W21): any part marked → the item's Unsafe score; none left → unscored again.
+      const current = state.scoring.current;
+      if (!current) return state;
+      const scores = { ...current.scores };
+      const unsafeParts = { ...(current.unsafeParts ?? {}) };
+      if (action.parts.length) {
+        scores[action.name] = "Very Poor";
+        unsafeParts[action.name] = action.parts;
+      } else {
+        delete scores[action.name];
+        delete unsafeParts[action.name];
+      }
+      return { ...state, scoring: { ...state.scoring, current: { ...current, scores, unsafeParts } } };
+    }
     case "LOC_CURRENT_SET_SCORE":
       return state.scoring.current
         ? {
             ...state,
             scoring: {
               ...state.scoring,
-              current: { ...state.scoring.current, scores: { ...state.scoring.current.scores, [action.name]: action.value } },
+              current: {
+                ...state.scoring.current,
+                scores: { ...state.scoring.current.scores, [action.name]: action.value },
+                // Picking OK or N/A clears any unsafe parts (W21).
+                unsafeParts: Object.fromEntries(Object.entries(state.scoring.current.unsafeParts ?? {}).filter(([k]) => k !== action.name)),
+              },
             },
           }
         : state;
@@ -357,6 +385,7 @@ function reducer(state: SurveyState, action: Action): SurveyState {
         scores: current.scores,
         photos: current.photos,
         notes: current.notes,
+        ...(current.unsafeParts && Object.keys(current.unsafeParts).length ? { unsafeParts: current.unsafeParts } : {}),
       };
       return { ...state, scoring: { ...state.scoring, locations: [...state.scoring.locations, location], current: null } };
     }
@@ -383,6 +412,7 @@ function reducer(state: SurveyState, action: Action): SurveyState {
         scores: location.scores,
         photos: location.photos,
         notes: location.notes,
+        unsafeParts: location.unsafeParts,
       };
       return {
         ...state,
@@ -444,6 +474,7 @@ interface SurveyContextValue {
   setSchool: (school: School) => void;
   startSurvey: () => void;
   setRespondent: (asm: string, apm: string, principal: string) => void;
+  setLevels: (levels: FloorLevel[]) => void;
   setPowerSupply: (value: PowerSupply) => void;
   setStructuralConcern: (value: StructuralConcern) => void;
   setBuildingStructure: (value: BuildingStructure) => void;
@@ -460,6 +491,7 @@ interface SurveyContextValue {
   locSetLocationName: (name: string) => void;
   locSetClassroom: (floorLevel: FloorLevel, grade: string, section: string) => void;
   locCurrentSetScore: (name: string, value: Condition) => void;
+  locCurrentSetUnsafeParts: (name: string, parts: string[]) => void;
   locCurrentAddPhoto: (name: string, asset: PhotoAsset) => void;
   locCurrentRemovePhoto: (name: string, id: string) => void;
   locCurrentSetNote: (name: string, value: string) => void;
@@ -561,6 +593,7 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
       setSchool: (school) => dispatch({ type: "SET_SCHOOL", school }),
       startSurvey: () => dispatch({ type: "START_SURVEY" }),
       setRespondent: (asm, apm, principal) => dispatch({ type: "SET_RESPONDENT", asm, apm, principal }),
+      setLevels: (levels) => dispatch({ type: "SET_LEVELS", levels }),
       setPowerSupply: (value) => dispatch({ type: "SET_POWER_SUPPLY", value }),
       setStructuralConcern: (value) => dispatch({ type: "SET_STRUCTURAL_CONCERN", value }),
       setBuildingStructure: (value) => dispatch({ type: "SET_BUILDING_STRUCTURE", value }),
@@ -578,6 +611,7 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
       locSetLocationName: (name) => dispatch({ type: "LOC_SET_LOCATION_NAME", name }),
       locSetClassroom: (floorLevel, grade, section) => dispatch({ type: "LOC_SET_CLASSROOM", floorLevel, grade, section }),
       locCurrentSetScore: (name, value) => dispatch({ type: "LOC_CURRENT_SET_SCORE", name, value }),
+      locCurrentSetUnsafeParts: (name, parts) => dispatch({ type: "LOC_CURRENT_SET_UNSAFE_PARTS", name, parts }),
       locCurrentAddPhoto: (name, asset) => dispatch({ type: "LOC_CURRENT_ADD_PHOTO", name, asset }),
       locCurrentRemovePhoto: (name, id) => dispatch({ type: "LOC_CURRENT_REMOVE_PHOTO", name, id }),
       locCurrentSetNote: (name, value) => dispatch({ type: "LOC_CURRENT_SET_NOTE", name, value }),

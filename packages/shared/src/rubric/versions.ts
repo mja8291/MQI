@@ -41,3 +41,18 @@ export function scoreSurveyFor(locations: SurveyLocation[], version: string | nu
   const aggregated = aggregateLocations(locations, groups);
   return scoreItemSet(groups, (item) => aggregated[item.name], criticalNameFor(version));
 }
+
+/**
+ * v2 (W22): share of the rubric's item groups scored (anything but N/A) at least once anywhere in
+ * the survey, e.g. 28 of 31 → 90.3. A measure of how much of the campus the survey covered.
+ */
+export function itemsCovered(
+  locations: readonly { scores: Record<string, string> }[],
+  version: string | null | undefined
+): { covered: number; total: number; percent: number } {
+  const groups = rubricGroupsFor(version);
+  const scored = new Set<string>();
+  for (const loc of locations) for (const [name, value] of Object.entries(loc.scores)) if (value && value !== 'N/A') scored.add(name);
+  const covered = groups.filter((g) => scored.has(g.name)).length;
+  return { covered, total: groups.length, percent: groups.length ? (covered / groups.length) * 100 : 0 };
+}

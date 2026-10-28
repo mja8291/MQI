@@ -95,6 +95,7 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
     weight: 10,
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM, LAB, FACADE],
     conditionOverride: OK_UNSAFE,
+    unsafeParts: ["Column", "Wall"],
   }),
   worst({
     name: "Roof Screeding/roof drainage",
@@ -105,6 +106,7 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
   }),
   worst({
     name: "Window Shades",
+    label: "Window Shades (Chajja)",
     category: "Safety",
     weight: 7,
     locations: [FACADE],
@@ -253,6 +255,16 @@ export const LOCATION_TYPES: LocationType[] = [
 
 export const FLOOR_LEVELS: FloorLevel[] = ["External", "Ground", "First", "Second", "Third", "Fourth", "Roof"];
 
+/** v2 (W24): levels the surveyor confirms for the campus. External is always on. */
+export const DEFAULT_LEVELS: FloorLevel[] = ["External", "Ground", "First", "Roof"];
+export const REQUIRED_LEVELS: FloorLevel[] = ["External"];
+export const NO_ROOF_MESSAGE = "Leave Roof unticked only if another vertical campus is built above this campus.";
+/** The chosen levels in floor order (External first, Roof last); null (older drafts) → every level. */
+export function applicableLevels(levels: readonly FloorLevel[] | null | undefined): FloorLevel[] {
+  if (!levels) return FLOOR_LEVELS;
+  return FLOOR_LEVELS.filter((l) => REQUIRED_LEVELS.includes(l) || levels.includes(l));
+}
+
 // Roof is deliberately excluded here (2026-09-19, per the rubric sheet's
 // "Level Option Page" — Roof's own row has no location-type options at
 // all): it's already its own floor level with its own auto-created
@@ -351,4 +363,16 @@ export function sectionCountsForLocation(type: LocationType): Record<Category, n
   const counts: Record<Category, number> = { Safety: 0, Functionality: 0, Aesthetics: 0 };
   for (const group of rubricGroupsForLocation(type)) counts[group.category]++;
   return counts;
+}
+
+/** v2 (W21): the sheet text for parts marked unsafe, e.g. "Column Unsafe, Wall Unsafe". */
+export function unsafePartsText(parts: readonly string[]): string {
+  return parts.map((p) => `${p} Unsafe`).join(", ");
+}
+
+/** Reads a response cell back as a condition: "… Unsafe" text (W21) is that item's Unsafe score. */
+export function cellCondition(value: string): Condition | undefined {
+  if (!value) return undefined;
+  if (/\bUnsafe\b/.test(value)) return "Very Poor";
+  return value as Condition;
 }

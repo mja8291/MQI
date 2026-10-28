@@ -8,7 +8,7 @@ import { can } from "@mqi/shared";
 import { QueueTab } from "./QueueTab";
 import { useQueue } from "./useQueue";
 
-type Tab = "start" | "queue";
+type Tab = "start" | "incomplete" | "sync";
 
 /**
  * Home is two tabs. "Start" is the front door (new survey, dashboard);
@@ -23,18 +23,33 @@ export function HomeTabs() {
   const [tab, setTab] = useState<Tab>("start");
   const [confirmSignOut, setConfirmSignOut] = useState(false);
 
-  // "/?tab=queue" (the Done screen's "View queue") opens straight on the queue.
+  const [weak, setWeak] = useState(false);
+  // "/?tab=sync" (Done screen, weak connection) and "/?tab=incomplete" open straight on that tab;
+  // "?tab=queue" (older links) opens Sync Pending.
   useEffect(() => {
     queueMicrotask(() => {
-      if (new URLSearchParams(window.location.search).get("tab") === "queue") setTab("queue");
+      const params = new URLSearchParams(window.location.search);
+      const t = params.get("tab");
+      if (t === "sync" || t === "queue") setTab("sync");
+      if (t === "incomplete") setTab("incomplete");
+      if (params.get("weak") === "1") setWeak(true);
     });
   }, []);
 
   const count = queue.drafts.length + queue.pending.length;
   const needsAttention = queue.pending.some((p) => p.status === "failed" || p.lastError?.kind === "auth" || p.lastError?.kind === "server");
+  const badge = (n: number, warn: boolean, label: string) =>
+    n > 0 ? (
+      <span
+        aria-label={`${n} ${label}`}
+        className={`min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center text-white ${warn ? "bg-band-poor" : "bg-brand"}`}
+      >
+        {n}
+      </span>
+    ) : null;
 
   const tabClass = (active: boolean) =>
-    `flex-1 min-h-11 rounded-lg px-3 text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
+    `flex-1 min-h-11 rounded-lg px-1.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap ${
       active ? "bg-white text-brand-deep shadow-sm" : "text-ink-soft"
     }`;
 
@@ -55,18 +70,13 @@ export function HomeTabs() {
         <button type="button" role="tab" aria-selected={tab === "start"} onClick={() => setTab("start")} className={tabClass(tab === "start")}>
           Start
         </button>
-        <button type="button" role="tab" aria-selected={tab === "queue"} onClick={() => setTab("queue")} className={tabClass(tab === "queue")}>
-          Queue
-          {count > 0 ? (
-            <span
-              aria-label={`${count} in the queue`}
-              className={`min-w-5 h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center text-white ${
-                needsAttention ? "bg-band-poor" : "bg-brand"
-              }`}
-            >
-              {count}
-            </span>
-          ) : null}
+        <button type="button" role="tab" aria-selected={tab === "incomplete"} onClick={() => setTab("incomplete")} className={tabClass(tab === "incomplete")}>
+          Incomplete
+          {badge(queue.drafts.length, false, "incomplete")}
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "sync"} onClick={() => setTab("sync")} className={tabClass(tab === "sync")}>
+          Sync Pending
+          {badge(queue.pending.length, needsAttention || queue.pending.some((p) => p.lastError), "waiting to sync")}
         </button>
       </div>
 
@@ -111,22 +121,29 @@ export function HomeTabs() {
               Manage users
             </Link>
           ) : null}
-          {count > 0 ? (
+          {queue.pending.length > 0 ? (
+            // v2 (W29): a standing reminder until every submitted survey has reached the server.
             <button
               type="button"
-              onClick={() => setTab("queue")}
-              className="mt-4 text-[12.5px] text-ink-soft underline self-center"
+              onClick={() => setTab("sync")}
+              className="mt-4 w-full rounded-xl border border-band-poor bg-band-poor-tint px-3.5 py-3 text-left text-[12.5px] leading-snug text-band-poor"
             >
-              {queue.drafts.length > 0 ? `${queue.drafts.length} in progress` : ""}
-              {queue.drafts.length > 0 && queue.pending.length > 0 ? " · " : ""}
-              {queue.pending.length > 0 ? `${queue.pending.length} waiting to sync` : ""} — open queue
+              <span className="font-semibold">
+                {queue.pending.length} submitted survey{queue.pending.length === 1 ? "" : "s"} still to upload.
+              </span>{" "}
+              Connect to good Wi-Fi so it reaches the MQI record — open Sync Pending.
+            </button>
+          ) : null}
+          {queue.drafts.length > 0 ? (
+            <button type="button" onClick={() => setTab("incomplete")} className="mt-3 text-[12.5px] text-ink-soft underline self-center">
+              {queue.drafts.length} incomplete survey{queue.drafts.length === 1 ? "" : "s"} — open
             </button>
           ) : null}
           <div className="flex-1" />
         </div>
       ) : (
         <div className="pb-8">
-          <QueueTab {...queue} />
+          <QueueTab {...queue} show={tab === "incomplete" ? "drafts" : "pending"} weakConnection={tab === "sync" && weak} />
         </div>
       )}
 

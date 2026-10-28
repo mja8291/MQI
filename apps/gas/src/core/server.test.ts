@@ -8,11 +8,12 @@ import {
   UPLOAD_CHUNK_BYTES,
   base64Encode,
   bytesToHex,
+  rubricGroupsForLocation,
   scoreSurveyFor,
   sha256,
   uuidv7,
 } from '@mqi/shared';
-import type { ApiResponse, AttachmentMeta, School, SurveyLocation, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
+import type { ApiResponse, AttachmentMeta, School, SiblingExternalResult, SurveyLocation, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../dev/server';
@@ -429,6 +430,23 @@ describe('reads', () => {
     expect(found).toMatchObject({ overall: Math.round(item.survey.scores.overall!), rubricVersion: RUBRIC_VERSION });
     expect(found.locations).toHaveLength(1);
     expect(code(call('surveys.get', { surveyId: 'missing' }, login('reviewer@tcf.test')))).toBe('NOT_FOUND');
+  });
+
+  test('W30: External Development of a sibling campus (same e-compound) is offered to the next one', () => {
+    const surveyor = login('surveyor@tcf.test');
+    const sibling = (schoolId: string) => ok(call<SiblingExternalResult>('schools.siblingExternal', { schoolId }, surveyor)).found;
+    expect(sibling('948')).toBeNull(); // nothing recorded yet
+    const ext = rubricGroupsForLocation('External Development');
+    const extScores = Object.fromEntries(ext.map((g, i) => [g.name, i === 0 ? 'Poor' : 'Good'])) as SurveyLocation['scores'];
+    const roof = makeSurvey().survey.locations[0]!;
+    ok(push(surveyor, makeSurvey({ locations: [roof, { ...location('External Development 1', 'External Development', extScores), floorLevel: 'External' }] })));
+    const found = sibling('948')!;
+    expect(found).toMatchObject({ campusName: 'OGS Trust Campus', schoolId: '947' });
+    expect(found.scores).toEqual(extScores);
+    expect(sibling('947')).toBeNull(); // a campus is not its own sibling
+    expect(sibling('499')).toBeNull(); // no e-compound
+    // Reviewers cannot start surveys, so they cannot ask either.
+    expect(code(call('schools.siblingExternal', { schoolId: '948' }, login('reviewer@tcf.test')))).toBe('FORBIDDEN');
   });
 
   test('schools list skips inactive campuses; dashboard counts the new survey', () => {

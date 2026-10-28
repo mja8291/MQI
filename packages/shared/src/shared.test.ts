@@ -16,6 +16,12 @@ import {
   scoreSurveyFor,
   submissionIssues,
   submittedSurveySchema,
+  applicableLevels,
+  cellCondition,
+  itemsCovered,
+  oathText,
+  rubricGroupsForLocation,
+  NUMERIC_COLUMNS,
   joinStaff,
   splitStaff,
   toCell,
@@ -204,6 +210,46 @@ describe('submission rules (Appendix C)', () => {
     expect(submissionIssues(survey({ apm: ' ; ' })).map((i) => i.path)).toEqual(['apm']);
     expect(joinStaff([' Ali Khan ', '', 'Sara Ahmed'])).toBe('Ali Khan; Sara Ahmed');
     expect(splitStaff('Ali Khan; Sara Ahmed;')).toEqual(['Ali Khan', 'Sara Ahmed']);
+  });
+
+  test('W21: Column/Wall unsafe parts score as Unsafe, need a photo, and read back from the sheet text', () => {
+    const s = survey();
+    const roof = s.locations[0]!;
+    const room = { ...roof, id: 'KG', type: 'Classroom' as const, floorLevel: 'Ground' as const, name: 'KG A', scores: Object.fromEntries(rubricGroupsForLocation('Classroom').map((g) => [g.name, 'Good'])) };
+    const parts = { ...room, scores: { ...room.scores, 'Wall/Column Condition i.e. cracks': 'Very Poor' as const }, unsafeParts: { 'Wall/Column Condition i.e. cracks': ['Column', 'Wall'] } };
+    const withParts = survey({ locations: [roof, parts as SubmittedSurvey['locations'][number]] });
+    expect(submittedSurveySchema.safeParse(withParts).success).toBe(true);
+    expect(submissionIssues(withParts).map((i) => i.message)).toEqual(['Attach a photo of "Wall/Column Condition i.e. cracks" at KG A: it is marked Unsafe.']);
+    const row = responseRows(withParts, { name: 'S', email: 's@tcf.test' }, '2026-10-28T05:00:00.000Z')[1]!;
+    expect(row['Wall/Column Condition i.e. cracks']).toBe('Column Unsafe, Wall Unsafe');
+    expect(cellCondition('Column Unsafe, Wall Unsafe')).toBe('Very Poor');
+    expect(cellCondition('Wall Unsafe')).toBe('Very Poor');
+    expect(cellCondition('Good')).toBe('Good');
+  });
+
+  test('W22: items covered = groups scored (not N/A) at least once / all groups', () => {
+    const s = survey();
+    const c = itemsCovered(s.locations, RUBRIC_VERSION);
+    expect(c.total).toBe(31);
+    expect(c.covered).toBe(Object.values(s.locations[0]!.scores).filter((v) => v !== 'N/A').length);
+    const row = responseRows(s, { name: 'S', email: 's@tcf.test' }, '2026-10-28T05:00:00.000Z')[0]!;
+    expect(row['Items Covered (%)']).toBe(String(Math.round(c.percent)));
+    expect(NUMERIC_COLUMNS.has('Items Covered (%)')).toBe(true);
+  });
+
+  test('W24/W27: applicable levels are written; drilling is required only with a Roof location', () => {
+    const s = survey({ levels: ['External', 'Ground', 'Roof'] });
+    expect(responseRows(s, { name: 'S', email: 's@tcf.test' }, 'x')[0]!['Applicable Levels']).toBe('External, Ground, Roof');
+    expect(applicableLevels(['Roof', 'Ground'])).toEqual(['External', 'Ground', 'Roof']);
+    const blankDrilling = { done: '', pointMarked: '', slabAssessment: '', slabThicknessMm: '', screedThicknessMm: '', holeRepaired: '' } as const;
+    expect(submissionIssues(survey({ drillingCheck: blankDrilling })).map((i) => i.path)).toContain('drillingCheck');
+    const room = { ...s.locations[0]!, id: 'KG', type: 'Classroom' as const, floorLevel: 'Ground' as const, name: 'KG A', scores: Object.fromEntries(rubricGroupsForLocation('Classroom').map((g) => [g.name, 'Good'])) };
+    expect(submissionIssues(survey({ drillingCheck: blankDrilling, locations: [room as SubmittedSurvey['locations'][number]] })).map((i) => i.path)).not.toContain('drillingCheck');
+  });
+
+  test('W20: center beam accepts the partial answer; the oath names the signed-in staff member', () => {
+    expect(submittedSurveySchema.safeParse(survey({ centerBeam: 'Somewhere present, somewhere absent' })).success).toBe(true);
+    expect(oathText('Ali Khan')).toContain('I am Ali Khan, staff of Engineering Department of TCF');
   });
 
   test('W17: the structural type question accepts Unknown; type of structure is optional', () => {

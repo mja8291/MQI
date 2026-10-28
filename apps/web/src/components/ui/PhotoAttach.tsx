@@ -1,9 +1,11 @@
 
-import { useCallback, useState } from "react";
-import { Camera, Image as ImageIcon, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Camera, Image as ImageIcon, Trash2, X } from "lucide-react";
 import { UnprocessablePhotoError } from "@/lib/image/compress";
 import { compressPhoto } from "@/lib/image/compress-photo";
 import type { PhotoAsset } from "@/lib/types";
+import { getPhoto } from "@/lib/offline/db";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { IconButton } from "./IconButton";
 
 /**
@@ -129,26 +131,116 @@ interface PhotoThumbListProps {
   onRetryPhoto?: (id: string) => void;
 }
 
+/** An object URL for a saved photo's bytes, released when the component goes away. */
+function usePhotoUrl(id: string): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let made: string | null = null;
+    let cancelled = false;
+    void getPhoto(id).then((p) => {
+      if (cancelled || !p?.blob) return;
+      made = URL.createObjectURL(p.blob);
+      setUrl(made);
+    });
+    return () => {
+      cancelled = true;
+      if (made) URL.revokeObjectURL(made);
+    };
+  }, [id]);
+  return url;
+}
+
+function PhotoThumb({ photo, onOpen }: { photo: PhotoAsset; onOpen: () => void }) {
+  const url = usePhotoUrl(photo.id);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`View ${photo.name}`}
+      className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-border bg-surface"
+    >
+      {url ? <img src={url} alt="" className="h-full w-full object-cover" /> : null}
+    </button>
+  );
+}
+
+function PhotoViewer({ photo, onClose, onDelete }: { photo: PhotoAsset; onClose: () => void; onDelete: () => void }) {
+  const url = usePhotoUrl(photo.id);
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div role="dialog" aria-label={photo.name} className="fixed inset-0 z-50 flex flex-col bg-black">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
+        <span className="truncate text-[13px]">
+          {photo.name} ({(photo.size / 1024).toFixed(0)} KB)
+        </span>
+        <button type="button" onClick={onClose} aria-label="Close" className="min-h-11 min-w-11 flex items-center justify-center">
+          <X size={22} />
+        </button>
+      </div>
+      <div className="flex-1 min-h-0 flex items-center justify-center px-3">
+        {url ? <img src={url} alt={photo.name} className="max-h-full max-w-full object-contain" /> : <span className="text-white/70 text-sm">Loading…</span>}
+      </div>
+      <div className="px-4 py-4">
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="w-full min-h-11 rounded-xl bg-band-poor px-5 py-3 text-sm font-semibold text-white flex items-center justify-center gap-2"
+        >
+          <Trash2 size={16} /> Delete photo
+        </button>
+      </div>
+      <ConfirmDialog
+        open={confirming}
+        title="Delete this photo?"
+        message="It will be removed from this item. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          setConfirming(false);
+          onDelete();
+        }}
+        onCancel={() => setConfirming(false)}
+      />
+    </div>
+  );
+}
+
 /**
- * Each attached photo's name and size. In v2 a photo is saved on the phone the moment it is
- * picked and goes to the server with the survey, so there is no per-photo upload state to show.
+ * v2 (W23): the attached photos as thumbnails, each with its name and size; tap one to see it full
+ * screen and delete it. Photos are saved on the phone the moment they are picked and go to the
+ * server with the survey, so there is no per-photo upload state to show here.
  */
 export function PhotoThumbList({ photos, onRemovePhoto }: PhotoThumbListProps) {
+  const [viewing, setViewing] = useState<PhotoAsset | null>(null);
   if (photos.length === 0) return null;
   return (
-    <div className="mt-1 space-y-1">
+    <div className="mt-2 space-y-1.5">
       {photos.map((p) => (
-        <div key={p.id} className="flex items-center justify-between gap-2 text-[11px] text-ink-faint">
-          <span className="truncate">
-            {p.name} ({(p.size / 1024).toFixed(0)} KB)
-          </span>
-          <span className="flex items-center gap-1.5 shrink-0">
-            <button type="button" onClick={() => onRemovePhoto(p.id)} aria-label={`Remove ${p.name}`} className="text-band-poor">
-              <X size={12} />
-            </button>
-          </span>
+        <div key={p.id} className="flex items-center gap-2.5 text-[11px] text-ink-faint">
+          <PhotoThumb photo={p} onOpen={() => setViewing(p)} />
+          <button type="button" onClick={() => setViewing(p)} className="flex-1 min-w-0 text-left">
+            <span className="block truncate text-ink">{p.name}</span>
+            <span>{(p.size / 1024).toFixed(0)} KB · tap to view</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onRemovePhoto(p.id)}
+            aria-label={`Remove ${p.name}`}
+            className="shrink-0 min-h-11 min-w-11 flex items-center justify-center text-band-poor"
+          >
+            <X size={16} />
+          </button>
         </div>
       ))}
+      {viewing ? (
+        <PhotoViewer
+          photo={viewing}
+          onClose={() => setViewing(null)}
+          onDelete={() => {
+            onRemovePhoto(viewing.id);
+            setViewing(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

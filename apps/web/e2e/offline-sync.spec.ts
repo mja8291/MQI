@@ -62,11 +62,20 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   await page.getByPlaceholder("School principal's name").fill('Principal One');
   await page.getByRole('button', { name: /Start survey/ }).click();
 
-  // Location 1: Roof, with a photo on one item.
+  // W24: applicable levels — External always, Ground/First/Roof by default; untick First.
+  await expect(page.getByRole('checkbox', { name: /External/ })).toHaveAttribute('aria-disabled', 'true');
+  await page.getByRole('checkbox', { name: /First/ }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('button', { name: 'First', exact: true })).toHaveCount(0);
+
+  // Location 1: Roof, with a photo on one item, and the drilling check (W27) answered here.
   await page.getByRole('button', { name: 'Roof', exact: true }).click();
   await scoreEverything(page);
   await page.locator('input[type=file][capture]').first().setInputFiles(PHOTO);
-  await expect(page.getByText(/icon-192\.(jpg|png) \(\d+ KB\)/)).toBeVisible();
+  await expect(page.getByText(/\d+ KB · tap to view/)).toBeVisible();
+  await page.getByRole('button', { name: 'Save Selection and Return' }).click();
+  await expect(page.getByText('Complete Drilling & observation (thicknesses must be positive numbers).')).toBeVisible();
+  await page.locator('select').first().selectOption('NO');
   await page.getByRole('button', { name: 'Save Selection and Return' }).click();
   await expect(page.getByText('Locations recorded (1)', { exact: false })).toBeVisible();
 
@@ -93,26 +102,26 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
 
   // Review: every Appendix C question; roof not clean → a photo is required.
   await reopened.getByRole('button', { name: 'Review and submit' }).click();
+  // W25: fewer than 15 locations asks first.
+  await reopened.getByRole('button', { name: 'Proceed anyway' }).click();
   const s = reopened.locator('select');
   await s.nth(0).selectOption('Solar');
   await s.nth(1).selectOption('NO');
   await s.nth(2).selectOption('Unknown'); // W17: new option; the repeated type-of-structure question is gone
-  await s.nth(3).selectOption('YES');
+  await s.nth(3).selectOption('Somewhere present, somewhere absent'); // W20
   await s.nth(4).selectOption('Ladder');
   await s.nth(5).selectOption('Provided');
   await s.nth(6).selectOption('No');
   await s.nth(7).selectOption('Yes');
-  await s.nth(8).selectOption('NO');
-  await expect(s).toHaveCount(9);
+  await expect(s).toHaveCount(8); // W27: the drilling check is on the Roof screen now
   await reopened.locator('input[type=file][capture]').first().setInputFiles(PHOTO);
   await reopened.locator('input[type=checkbox]').last().check();
   await reopened.getByRole('button', { name: 'Submit survey' }).click();
-  await expect(reopened.getByRole('heading', { name: 'Saved offline' })).toBeVisible();
-  expect((await devState()).responses.length).toBe(before.responses.length); // nothing reached the server
-
-  // Queue shows it waiting.
-  await reopened.goto('/?tab=queue');
+  // W29: no connection → straight to Sync Pending, with what to do.
+  await expect(reopened).toHaveURL(/tab=sync/);
+  await expect(reopened.getByText('Not uploaded yet — weak or no connection')).toBeVisible();
   await expect(reopened.getByText(/Waiting to sync \(1\)/)).toBeVisible();
+  expect((await devState()).responses.length).toBe(before.responses.length); // nothing reached the server
 
   // --- back online: it syncs by itself (online event) ---
   await context.setOffline(false);
@@ -124,12 +133,13 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   expect(rows.map((r) => r['Location Name']).sort()).toEqual(['Exterior Facade 1', 'Roof 1']);
   expect(rows.every((r) => r['Submitter Email'] === 'surveyor@tcf.test' && r['Source App'] === 'v2')).toBe(true);
   expect(rows.every((r) => r['Accompanying Engineering Staff'] === 'Dev Surveyor; APM Two' && r['Suggested Structural Type'] === 'Unknown')).toBe(true);
+  expect(rows.every((r) => r['Applicable Levels'] === 'External, Ground, Roof' && Number(r['Items Covered (%)']) > 0)).toBe(true);
   const photoRows = after.attachments.slice(before.attachments.length).filter((r) => r['Photo URL']);
   expect(photoRows).toHaveLength(2);
 
   // Sync again: nothing more is written.
   await reopened.reload();
-  await expect(reopened.getByText('Nothing in the queue')).toBeVisible({ timeout: 30_000 });
+  await expect(reopened.getByText('Nothing waiting to sync')).toBeVisible({ timeout: 30_000 });
   const again = await devState();
   expect(again.responses.length).toBe(after.responses.length);
   expect(again.attachments.length).toBe(after.attachments.length);

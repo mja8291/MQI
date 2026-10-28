@@ -3,7 +3,7 @@ import { Info, StickyNote } from "lucide-react";
 import { useState } from "react";
 import type { Condition, PhotoAsset, RubricItem } from "@/lib/types";
 import { isUnsafe } from "@mqi/shared";
-import { ConditionPills } from "./ConditionPills";
+import { ConditionPills, UnsafePartsPills } from "./ConditionPills";
 import { IconButton } from "./IconButton";
 import { ConditionInfoPanel } from "./ConditionInfoPanel";
 import { PhotoAttachButtons, PhotoThumbList, usePhotoAttachHandler } from "./PhotoAttach";
@@ -16,6 +16,9 @@ interface ItemRowProps {
   photos: PhotoAsset[];
   note: string | undefined;
   onScoreChange: (value: Condition) => void;
+  /** v2 (W21): parts marked unsafe, for items with unsafeParts. */
+  unsafeParts?: string[];
+  onUnsafePartsChange?: (parts: string[]) => void;
   onAddPhoto: (file: File) => void | Promise<void>;
   onRemovePhoto: (id: string) => void;
   onNoteChange: (value: string) => void;
@@ -30,6 +33,8 @@ export function ItemRow({
   photos,
   note,
   onScoreChange,
+  unsafeParts,
+  onUnsafePartsChange,
   onAddPhoto,
   onRemovePhoto,
   onNoteChange,
@@ -47,7 +52,7 @@ export function ItemRow({
           four buttons beside the name pushed the last one off screen and squeezed long names. */}
       <div className="mb-1">
         <span className="text-[13.5px] font-medium text-ink">
-          {item.name}
+          {item.label ?? item.name}
           {pending ? (
             // A badge, not a bare trailing character — several item names
             // already end in "*" (the Minor/principal-maintained marker), so
@@ -77,7 +82,17 @@ export function ItemRow({
         </div>
       </div>
       {item.guidance ? <p className="text-[11.5px] text-ink-soft leading-snug -mt-1 mb-2">{item.guidance}</p> : null}
-      <ConditionPills value={value} onChange={onScoreChange} options={item.conditionOverride} hideNA={item.hideNA} />
+      {item.unsafeParts && onUnsafePartsChange ? (
+        <UnsafePartsPills
+          value={value}
+          parts={unsafeParts ?? []}
+          allParts={item.unsafeParts}
+          onChange={onScoreChange}
+          onPartsChange={onUnsafePartsChange}
+        />
+      ) : (
+        <ConditionPills value={value} onChange={onScoreChange} options={item.conditionOverride} hideNA={item.hideNA} />
+      )}
       {unsafeNeedsPhoto ? (
         <div className="text-[11.5px] font-medium text-band-poor mt-1.5">Marked Unsafe — attach a photo of it to save this location.</div>
       ) : null}
