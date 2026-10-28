@@ -140,10 +140,10 @@ PBKDF2-HMAC-SHA256 over `HMAC(pepper, password)` with a 16-byte per-user salt, b
 
 | Environment | Measured by `benchmarkPasswordHash()` | Iterations chosen |
 | --- | --- | --- |
-| staging | _not yet run_ | default 2000 until run |
+| staging (2026-10-28) | 1000: 498 ms · 1500: 892 ms · 2000: 1217 ms · 2500: 1120 ms · 3000: 1487 ms · 4000: 1814 ms · 5000: 2156 ms | **5000** (highest ≤ 2.2 s) |
 | production | _not yet run_ | default 2000 until run |
 
-(Construction measured 5 000 iterations at about 6 s and 1 000 at about 1 s in Apps Script, so expect roughly 1 500–2 500.) Fill this table in after running the benchmark.
+`benchmarkPasswordHash()` picks the highest count it timed at or under 2.2 s. Apps Script timings vary by about 20 % run to run (2500 beat 2000 above). The admin password set by `setup()` used the default 2000 and moves to 5000 the next time it is changed.
 
 ## Changing the rubric
 
