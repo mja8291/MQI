@@ -1,3 +1,5 @@
+// Not type-checked (tools/fixtures/tsconfig.json excludes it): it loads v1 modules from reference/,
+// whose Next.js and googleapis dependencies are not installed here. Vitest runs it as is.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';

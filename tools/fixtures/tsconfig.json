@@ -8,5 +8,8 @@
   "include": [
     "src",
     "vitest.config.ts"
+  ],
+  "exclude": [
+    "src/v1-parity.test.ts"
   ]
 }
