@@ -1,6 +1,6 @@
 # Cutover plan: v1 → v2
 
-> **Decision D16 (2026-10-28):** the existing Play Store app is updated to open v2, with no connection to v1. v1's unsent surveys and drafts are given up, so sections 3–4 (emptying each v1 queue) no longer apply. Users create v2 accounts; an admin approves them. v1 history stays in MQI Analysis.
+> **Decision D16 (2026-10-28):** the existing Play Store app is updated to open v2, with no connection to v1. v1's unsent surveys and drafts are given up, so sections 3–4 (emptying each v1 queue) no longer apply. Users create v2 accounts; an admin approves them. v1 history stays in MQI Analysis and is not copied into v2; v1 stays live on Vercel as a legacy app, untouched (2026-10-29).
 
 **Status: draft for approval. Nothing here is executed without the product owner's go-ahead.**
 
