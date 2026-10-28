@@ -1,5 +1,7 @@
 # Cutover plan: v1 → v2
 
+> **Decision D16 (2026-10-28):** the existing Play Store app is updated to open v2, with no connection to v1. v1's unsent surveys and drafts are given up, so sections 3–4 (emptying each v1 queue) no longer apply. Users create v2 accounts; an admin approves them. v1 history stays in MQI Analysis.
+
 **Status: draft for approval. Nothing here is executed without the product owner's go-ahead.**
 
 v2 runs on a new address (`tcfmqi.web.app`) and cannot read anything v1 stored on a phone: drafts, queued surveys and photos waiting to upload stay inside v1. The cutover is therefore operational. Each surveyor empties v1 first, then moves. v1 itself is not changed.

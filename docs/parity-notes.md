@@ -21,6 +21,7 @@ The v1 reference is `mja8291/tcf` at master `0a4a75c` (`reference/`). Each entry
 | D13 | Reviewer role | Not enforced | Reviewer cannot submit surveys; downloads and dashboard only | Proposed |
 | D14 | Responses spreadsheet | MQI Analysis `1Hv2lOEx…PCM4` | **MQI Spreadsheet** `1uLCnBNC…T42o`, with response and attachment headers copied exactly from MQI Analysis (2026-10-28). v2's dashboard and "find survey" show v2 surveys only; v1's show v1 only. MQI Analysis stays the source of the golden fixtures. | Product owner |
 | D15 | Survey "methods" | Two methods; the location-by-location one labelled "Method 2" | One survey type, never called a method (2026-10-28). The old item-by-item method is removed everywhere (code, rubric, `Method 1 Responses` tab, dashboard, exports). The responses tab is **`MQI Survey Responses`** (v1: `Method 2 Responses`, same header). The Excel download drops v1's Method row (O3/P3; the rows below move up one); the PDF drops the "Method 2 · " prefix before the date; dashboard rows drop "Method 2"; URLs are `/survey/details` and `/survey/locations`. The parity suite checks everything else still matches v1. | Product owner |
+| D16 | Android app and v1 data | (v1 app opens v1) | The existing Play Store app `app.web.mqi_app_tcf.pk` is updated to open v2 (tcfmqi.web.app) with **no connection to v1**: v1's unsent surveys and drafts on phones are given up; v1 history stays in MQI Analysis and is not shown in v2. Users sign up again in v2 (accounts are separate). | Product owner, 2026-10-28 |
 
 ## Golden parity
 

@@ -2,7 +2,7 @@
 
 **Decision (2026-10-28, option B):** v2 ships as an **update of the existing Play Store app** `app.web.mqi_app_tcf.pk` (first built with PWABuilder for v1). The update changes only the address it opens, from v1's site to **https://tcfmqi.web.app**. Same listing, same package, same signing key; users get v2 through a normal Play Store update.
 
-**That update is the cutover.** On the day a phone installs it, v1's unsent surveys and drafts on that phone can no longer be reached (they belong to v1's address). Release it only when every surveyor's v1 Queue shows "Nothing in the queue" (`docs/cutover-plan.md`, section 3–4). Until then testers use https://tcfmqi.web.app in Chrome (Install app on the sign-in page).
+**That update is the cutover, with no link to v1** (product owner, 2026-10-28, D16): v1's unsent surveys and drafts on a phone are given up when it installs the update; nobody needs to empty v1 first. Testers can use https://tcfmqi.web.app in Chrome (Install app on the sign-in page) before the release.
 
 ## Already done
 
@@ -22,7 +22,8 @@ v1's own site keeps its asset link, so the current app keeps working unchanged u
 4. **Signing key → Use mine:** upload the existing `signing.keystore` with its alias and passwords (from the PWABuilder download for v1). Do **not** let it create a new key: Play rejects an update signed with a different upload key.
 5. App name / launcher name: `TCF MQI Survey` / `MQI Survey` (or keep the current names). Display: standalone. Status bar / navigation colour `#0e5c4d`.
 6. Download the package. Upload the **.aab** in Play Console → **Testing → Internal testing** first; install it on one phone from the testing link and check that it opens **without a browser bar** and shows the new screens (Applicable levels, three Home tabs).
-7. Promote to **Production** on the agreed cutover day.
+7. Promote to **Production** when the internal-testing install is good.
+8. In Play Console → **App content → Privacy policy**, change the URL to **https://tcfmqi.web.app/privacy** (it points at v1's site today).
 
 A browser bar at the top of the app means the asset link does not match the signing key: send the SHA-256 shown in Play Console → Test and release → App integrity → App signing, and it is added to the site.
 
