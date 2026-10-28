@@ -20,7 +20,7 @@ Done on 2026-10-28: the code is at https://github.com/mja8291/MQI (branch `main`
 
 ## 3. Full golden fixtures (about 2 minutes)
 
-Production holds 18 surveys; 4 are in the tests now.
+Done 2026-10-28: all 18 production surveys are in the tests (read directly from MQI Analysis, read only); 17 match exactly, 1 is a known v1-history difference (parity-notes, Golden parity).
 
 1. Open **MQI Analysis** → File → Download → Microsoft Excel (.xlsx).
 2. Save it as `tools/fixtures/raw/MQI-Analysis.xlsx` in this project (the folder is gitignored, so it never leaves this PC).

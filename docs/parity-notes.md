@@ -24,15 +24,15 @@ The v1 reference is `mja8291/tcf` at master `0a4a75c` (`reference/`). Each entry
 
 ## Golden parity
 
-- Production (`MQI Analysis`, `1Hv2lOEx…PCM4`) holds about 246 location rows in **18 surveys**: 15 legacy (blank version), 1 at `2026-10-27` and 2 at `2026-10-28`. That is fewer than the brief's 50, so the suite uses all of them.
-- Four real surveys are checked in so far (two legacy, two at `2026-10-28`, names removed). All reproduce overall, divisions, band, Major/Minor and all seven critical items exactly.
-- **To finish:** export the full workbook (see `tools/fixtures/src/export.ts`) and re-run `npm test`.
+- Production (`MQI Analysis`, `1Hv2lOEx…PCM4`) holds 257 location rows in **18 surveys** (read 2026-10-28): 15 legacy (blank version), 1 at `2026-10-27` and 2 at `2026-10-28`. That is fewer than the brief's 50, so the suite uses all of them.
+- **All 18 are checked in** (`tools/fixtures/data/surveys.json`, scores and location names only). **17 reproduce exactly**: overall, divisions, band, Major/Minor and all seven critical items.
+- **1 differs, as O2 predicted:** `64a9d9c1…` (submitted 2026-09-18) recomputes to overall 84 (84.46; stored 85) and Internal Paint 71 (stored 72); its three division scores match. v1 changed the list on 2026-09-19 (v1 commit `8b0a777`, "Rubric corrections") and froze only the later list as legacy, so today's v1 gives the same 84. The test pins these two values (`V1_HISTORY` in `golden.test.ts`). Decision needed only if old exports must show the original 85: that would need a frozen pre-19-September list, which v1 never had.
 - Precision is the stored integer. The sheet keeps `Math.round(score)`, so "to the decimal" is not checkable against stored values. The Excel export recomputes unrounded values from formulas, and Phase 5 compares those.
 
 ## Observations (v1 behaviour kept, not "fixed")
 
 - **O1.** Legacy (blank-version) rows written before about 2026-08-20 have a different Timestamp on each location row of the same survey (for example `92d33d63…`). v1 later wrote one batched timestamp. v2 writes one timestamp per survey, as current v1 does.
-- **O2.** The blank-version Method 2 list changed several times between 9 Aug and 27 Oct (`git log -- src/lib/data/method2-items.ts`), but v1 freezes only its final pre-27 Oct state as "legacy". A blank-version survey from before such an edit could recompute differently. Any fixture that fails will be listed here, not patched.
+- **O2.** The blank-version Method 2 list changed several times between 9 Aug and 27 Oct (`git log -- src/lib/data/method2-items.ts`), but v1 freezes only its final pre-27 Oct state as "legacy". A blank-version survey from before such an edit could recompute differently. Found: one survey (see Golden parity), recorded rather than patched.
 - **O3.** Rows written at `2026-10-28` reuse legacy columns with identical names (`Plaster`, `Masonry`, `Internal Flooring condition`). This is harmless, because the version decides which columns are read.
 - **O4.** A draft export (Review → Excel/PDF before submitting) lists no photo links in v2: photos stay on the phone until the survey is submitted. v1 listed links for photos that had already uploaded.
 

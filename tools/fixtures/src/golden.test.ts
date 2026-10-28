@@ -16,7 +16,28 @@ const surveys = load<SurveyFixture>('surveys.json');
 
 const r = (n: number | null) => (n === null ? null : Math.round(n));
 
-function expectParity(result: ScoreResult, stored: StoredScores) {
+/**
+ * Surveys v1 itself no longer reproduces (parity-notes O2): scored with a blank-version list that
+ * v1 edited afterwards, while v1 froze only the later list as "legacy". v2 matches today's v1; the
+ * stored value is history. Each entry pins exactly the values that differ, as v2 computes them;
+ * every other stored score must still match.
+ */
+const V1_HISTORY: Record<string, { overall?: number; critical?: Record<string, number> }> = {
+  // Submitted 2026-09-18; v1 changed the list on 2026-09-19 (8b0a777 "Rubric corrections").
+  // Overall 84.46 → 84 (stored 85); Internal Paint 71 (stored 72).
+  '64a9d9c1-1a65-4f5e-8066-07c6e1dbf695': { overall: 84, critical: { 'Internal Paint': 71 } },
+};
+
+function expectParity(result: ScoreResult, stored: StoredScores, surveyId: string) {
+  const known = V1_HISTORY[surveyId];
+  if (known?.overall !== undefined) {
+    expect(r(result.overall)).toBe(known.overall);
+    stored = { ...stored, overall: known.overall };
+  }
+  if (known?.critical) {
+    for (const [name, v] of Object.entries(known.critical)) expect(r(result.criticalItems[name] ?? null)).toBe(v);
+    stored = { ...stored, criticalItems: { ...stored.criticalItems, ...known.critical } };
+  }
   expect({
     overall: r(result.overall),
     functionality: r(result.categories.Functionality.score),
@@ -44,7 +65,7 @@ function expectParity(result: ScoreResult, stored: StoredScores) {
 describe.skipIf(surveys.length === 0)(`golden parity (${surveys.length} production surveys)`, () => {
   test.each(surveys.map((f) => [`${f.surveyId} v=${f.rubricVersion || 'blank'} ${f.timestamp.slice(0, 10)}`, f] as const))('%s', (_label, f) => {
     const locations = f.locations.map((l) => ({ ...l, photos: {}, notes: {} })) as SurveyLocation[];
-    expectParity(scoreSurveyFor(locations, f.rubricVersion), f.stored);
+    expectParity(scoreSurveyFor(locations, f.rubricVersion), f.stored, f.surveyId);
   });
 });
 

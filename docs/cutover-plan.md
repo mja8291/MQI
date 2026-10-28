@@ -18,7 +18,7 @@ v2 runs on a new address (`tcf-mqi-app-761a8.web.app`) and cannot read anything 
 | 1 | Staging pilot checklist (`docs/pilot-checklist.md`) passed on two phones | Engineering | ☐ |
 | 2 | Production Apps Script deployed; `setup()` run; `benchmarkPasswordHash()` run and the number recorded in the README | Engineering | ☐ |
 | 3 | Production `RESPONSES_SPREADSHEET_ID` points at **MQI Spreadsheet**; a test survey from an admin account appears with `Source App = v2`, then is deleted by hand | Engineering | ☐ |
-| 4 | Golden parity suite run on a fresh production export (`npm run export -w @mqi/fixtures -- --xlsx …`, then `npm test`) | Engineering | ☐ |
+| 4 | Golden parity suite run on a fresh production export: done 2026-10-28, 18 surveys, 17 exact, 1 known v1-history difference (parity-notes) | Engineering | ☑ |
 | 5 | Department Drive has ≥ 5 GB free | Admin | ☐ |
 | 6 | v2 Android app (new package) in Play internal testing, opening without a URL bar | Engineering | ☐ |
 | 7 | All surveyor accounts created or approved in **Manage users** | Admin | ☐ |
