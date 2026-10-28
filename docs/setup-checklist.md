@@ -5,7 +5,8 @@ All code for Phases 1–8 is written and tested locally against an in-memory She
 ## Already done (no action)
 
 - v2 Drive root folder `1wCWvRxaik6h2dsm2ExX9cSqJ84vDs9Cm`: `setup()` builds `01 Production`, `02 Staging`, `03 Backups`, `04 Exports` and the System spreadsheets inside it.
-- Production responses spreadsheet identified: **MQI Analysis** `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4` (read-only so far).
+- v2 responses spreadsheet: **MQI Spreadsheet** `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o`. Its `Method 2 Responses`, `Method 1 Responses` and `MQI Survey Attachments` tabs have headers copied exactly from MQI Analysis (130, 90 and 5 columns), with no data rows.
+- v1's responses spreadsheet **MQI Analysis** `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4` is read only; it is used only as the source of the golden scoring fixtures.
 - Firebase project `tcf-mqi-app-761a8` is connected on this PC.
 
 ## 1. GitHub (CI)
@@ -37,7 +38,7 @@ Production holds 18 Method 2 surveys; 4 are in the tests now.
 4. In the Apps Script editor (I'll send the link), open Project Settings → Script Properties and add:
    - `ENV_NAME` = `staging`
    - `SCHOOLS_SPREADSHEET_ID` = `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q`
-   - `SOURCE_RESPONSES_SPREADSHEET_ID` = `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4`
+   - `SOURCE_RESPONSES_SPREADSHEET_ID` = `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o` (MQI Spreadsheet; `setup()` copies it into `02 Staging`)
    - `ADMIN_EMAIL` and `ADMIN_NAME` = the first administrator (suggest you)
 5. Run `setup()` and accept the permission prompt. Copy the temporary admin password from the execution log.
 6. Run `benchmarkPasswordHash()` and send me the printed table (it goes in the README).
@@ -59,7 +60,7 @@ Read `docs/cutover-plan.md`, then decide:
 - the order users move in;
 - who sends the user notice.
 
-Production setup repeats step 4 with `ENV_NAME` = `production` and `RESPONSES_SPREADSHEET_ID` = `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4`. Nothing happens in production until you approve.
+Production setup repeats step 4 with `ENV_NAME` = `production` and `RESPONSES_SPREADSHEET_ID` = `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o` (MQI Spreadsheet). Nothing happens in production until you approve.
 
 ## 8. Drive space
 

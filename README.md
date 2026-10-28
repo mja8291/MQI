@@ -1,10 +1,10 @@
 # TCF MQI v2
 
-Offline-first Maintenance Quality Index survey app for TCF school campuses. It replaces the v1 MQI Survey App (`mja8291/tcf`, Next.js on Vercel) on the "Stack B" architecture. It writes to the **same** response tabs as v1, so the dashboard and analysis carry on unchanged.
+Offline-first Maintenance Quality Index survey app for TCF school campuses. It replaces the v1 MQI Survey App (`mja8291/tcf`, Next.js on Vercel) on the "Stack B" architecture. It writes to its own responses spreadsheet, **MQI Spreadsheet**, whose response tabs have exactly v1's headers (copied from v1's `MQI Analysis`), so v1's row layout, exports and dashboard logic carry over unchanged.
 
 - **Web**: React 19 + Vite + React Router, Tailwind v4, Dexie (IndexedDB), Workbox service worker. Firebase Hosting `tcf-mqi-app-761a8`.
 - **API**: one Google Apps Script web app (TypeScript, bundled by esbuild, deployed with clasp), running as `tcfengineeringdepartment@gmail.com`.
-- **Data**: Google Sheets (v1's responses spreadsheet for survey rows; a v2-only **MQI v2 System** spreadsheet for accounts and ledgers) and Google Drive (photos).
+- **Data**: Google Sheets (MQI Spreadsheet for survey rows; a v2-only **MQI v2 System** spreadsheet for accounts and ledgers) and Google Drive (photos).
 - **Shared**: `packages/shared`, bundled into both. It holds the rubric, scoring (ported unchanged from v1), schemas, rules, permissions and the API contract.
 
 Background and decisions: `docs/migration-plan.md`, `docs/parity-notes.md`, `docs/trd-v2-architecture.md`. Rollout: `docs/pilot-checklist.md`, `docs/cutover-plan.md`. What only you can do: `docs/setup-checklist.md`.
@@ -79,8 +79,8 @@ Set these in the Apps Script editor (Project Settings → Script Properties) **b
 | `ENV_NAME` | yes | `staging` or `production` |
 | `SCHOOLS_SPREADSHEET_ID` | yes | v1's school list spreadsheet, read only (`Schools_Standardized`, `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q`) |
 | `SCHOOLS_SHEET_TAB` | no | Default `Schools (All Units)` |
-| `RESPONSES_SPREADSHEET_ID` | production | v1's responses spreadsheet (`MQI Analysis`, `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4`) |
-| `SOURCE_RESPONSES_SPREADSHEET_ID` | staging | Production responses ID; `setup()` copies it into `02 Staging` and sets `RESPONSES_SPREADSHEET_ID` to the copy |
+| `RESPONSES_SPREADSHEET_ID` | production | v2's responses spreadsheet (`MQI Spreadsheet`, `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o`) |
+| `SOURCE_RESPONSES_SPREADSHEET_ID` | staging | The same production responses ID; `setup()` copies it into `02 Staging` and sets `RESPONSES_SPREADSHEET_ID` to the copy |
 | `ADMIN_EMAIL`, `ADMIN_NAME` | yes | First administrator; `setup()` prints a one-time temporary password to the execution log |
 | `V2_ROOT_FOLDER_ID` | no | Default `1wCWvRxaik6h2dsm2ExX9cSqJ84vDs9Cm` |
 

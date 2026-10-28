@@ -17,8 +17,9 @@ The v1 reference is `mja8291/tcf` at master `0a4a75c` (`reference/`). Each entry
 | D9 | Appending next to v1 | Sheets API `values.append` | Sheets Advanced Service `values.append` (RAW, INSERT_ROWS): the old app takes no script lock, so `getLastRow()+1` could overwrite its rows | Proposed |
 | D10 | Photo rows | Written at submit (link already known) | Note rows are written with the survey. Each photo's row is written when its upload completes, so photo rows can appear minutes after the location rows. | Proposed |
 | D11 | Method 1 | Can finish Method 1 drafts | v2 cannot see v1 drafts, so Method 1 is read-only history (exports and dashboard) | Proposed |
-| D12 | New column | (none) | `Source App`: blank on v1 rows, `v2` on v2 rows, appended at the end of `Method 2 Responses` | Brief |
+| D12 | New column | (none) | `Source App` = `v2` on v2 rows, appended at the end of `Method 2 Responses` on the first write (kept after D14 so rows stay identifiable if the two spreadsheets are combined) | Brief |
 | D13 | Reviewer role | Not enforced | Reviewer cannot submit surveys; downloads and dashboard only | Proposed |
+| D14 | Responses spreadsheet | MQI Analysis `1Hv2lOEx…PCM4` | **MQI Spreadsheet** `1uLCnBNC…T42o`, with `Method 1 Responses`, `Method 2 Responses` and `MQI Survey Attachments` headers copied exactly from MQI Analysis (2026-10-28). v2's dashboard and "find survey" show v2 surveys only; v1's show v1 only. MQI Analysis stays the source of the golden fixtures. | Product owner |
 
 ## Golden parity
 

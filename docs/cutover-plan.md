@@ -6,8 +6,9 @@ v2 runs on a new address (`tcf-mqi-app-761a8.web.app`) and cannot read anything 
 
 ## 1. What stays the same
 
-- Both apps write to the **same** `Method 2 Responses` and `MQI Survey Attachments` tabs with the same headers. Dashboards, pivots and analysis keep working through the parallel run.
-- v2 adds one column at the end of `Method 2 Responses`: **Source App**. It is blank on every v1 row and `v2` on every v2 row, so either app's rows can be filtered.
+- v1 keeps writing to **MQI Analysis**; v2 writes to **MQI Spreadsheet** (decision D14 in `docs/parity-notes.md`). Both use the same tab names and headers, so rows from either can be stacked for analysis.
+- During the parallel run each app's dashboard shows **only its own** surveys. A combined view needs both spreadsheets (for example an `IMPORTRANGE` of MQI Analysis below MQI Spreadsheet's rows in a separate analysis file); v2 never reads MQI Analysis.
+- v2 adds one column at the end of `Method 2 Responses`: **Source App** (`v2` on every v2 row).
 - v1's `Users` tab, its photo folder and its Drive OAuth token are left alone. Retiring them is a separate decision.
 
 ## 2. Before the first user moves (go/no-go)
@@ -16,7 +17,7 @@ v2 runs on a new address (`tcf-mqi-app-761a8.web.app`) and cannot read anything 
 | --- | --- | --- | --- |
 | 1 | Staging pilot checklist (`docs/pilot-checklist.md`) passed on two phones | Engineering | ☐ |
 | 2 | Production Apps Script deployed; `setup()` run; `benchmarkPasswordHash()` run and the number recorded in the README | Engineering | ☐ |
-| 3 | Production `RESPONSES_SPREADSHEET_ID` points at the live responses spreadsheet; a test survey from an admin account appears with `Source App = v2`, then is deleted by hand | Engineering | ☐ |
+| 3 | Production `RESPONSES_SPREADSHEET_ID` points at **MQI Spreadsheet**; a test survey from an admin account appears with `Source App = v2`, then is deleted by hand | Engineering | ☐ |
 | 4 | Golden parity suite run on a fresh production export (`npm run export -w @mqi/fixtures -- --xlsx …`, then `npm test`) | Engineering | ☐ |
 | 5 | Department Drive has ≥ 5 GB free | Admin | ☐ |
 | 6 | v2 Android app (new package) in Play internal testing, opening without a URL bar | Engineering | ☐ |
@@ -37,7 +38,7 @@ v2 runs on a new address (`tcf-mqi-app-761a8.web.app`) and cannot read anything 
 For each surveyor, before step 5:
 
 - Ask them for a screenshot of v1's Queue tab showing **Nothing in the queue**.
-- In `Method 2 Responses`, filter **Submitter Email** = their email and **Source App** = blank. The latest **Timestamp** should match the last survey they remember submitting, with the same campus.
+- In **MQI Analysis** (v1's spreadsheet) → `Method 2 Responses`, filter **Submitter Email** = their email. The latest **Timestamp** should match the last survey they remember submitting, with the same campus.
 - Count their surveys since the start of the month (distinct Survey ID) and compare with what they report.
 - Any mismatch: they stay on v1 until it is resolved.
 
@@ -58,10 +59,10 @@ For each surveyor, before step 5:
 
 - Cutover date: ____ (proposed: start on a Monday, no field visits that morning)
 - Order: pilot users first (2–3 people, one week), then by region: ____
-- The parallel run ends when every surveyor has moved and v1 has written no rows for 14 days (filter `Source App` = blank, newest Timestamp).
+- The parallel run ends when every surveyor has moved and v1 has written no rows for 14 days (newest Timestamp in MQI Analysis).
 
 ## 7. Rollback
 
 - **v2 has a problem, but data is fine:** tell users to keep v2's queued surveys on the phone; they sync when fixed. Redeploy the previous web build (`firebase hosting:clone` or `firebase deploy` from the previous tag) and the previous Apps Script version (`clasp deploy -i <deploymentId> -V <previous version>`).
 - **Users must go back to v1:** v1 is unchanged and still deployed. A surveyor can reinstall it, but first lets v2's queue empty (same rule as above, in reverse).
-- **Bad rows from v2:** filter `Source App = v2` and the Survey IDs from the `ChangeLog` tab of the System spreadsheet. Rows are only ever appended, so removing them by hand restores the previous state.
+- **Bad rows from v2:** in MQI Spreadsheet, filter the Survey IDs from the `ChangeLog` tab of the System spreadsheet. Rows are only ever appended, so removing them by hand restores the previous state.
