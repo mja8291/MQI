@@ -11,7 +11,7 @@ All code for Phases 1–8 is written and tested locally against an in-memory She
 
 ## 1. GitHub (CI)
 
-Done on 2026-10-28: the code is at https://github.com/mja8291/MQI (branch `main`). CI runs typecheck, lint, tests, build and end-to-end on every push. Its parity step clones v1 (`mja8291/tcf`, public), read only. The repo was created **public**; the plan assumed private. It holds no passwords or keys, but it does name the department email, spreadsheet and folder IDs and the staging API address, so switching it to private (GitHub → Settings → Danger Zone → Change visibility) is recommended.
+Done on 2026-10-28: the code is at https://github.com/mja8291/MQI (branch `main`). CI runs typecheck, lint, tests, build and end-to-end on every push. Its parity step clones v1 (`mja8291/tcf`, public), read only. The repo is **public** by the product owner's decision (2026-10-28). Keep it free of secrets: passwords, the session secret and the pepper live only in Script Properties; `.clasp*.json` and `tools/fixtures/raw/` stay gitignored.
 
 ## 2. Schools spreadsheet (done)
 
