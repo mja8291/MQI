@@ -11,8 +11,7 @@ All code for Phases 1–8 is written and tested locally against an in-memory She
 
 ## 1. GitHub (CI)
 
-1. Create an **empty private** repo `mja8291/tcf-mqi-v2` (no README, .gitignore or licence).
-2. Tell me, and I'll add the remote and push. Git Credential Manager asks you to sign in on the first push. CI then runs typecheck, lint, tests, build and end-to-end on every push.
+Done on 2026-10-28: the code is at https://github.com/mja8291/MQI (branch `main`). CI runs typecheck, lint, tests, build and end-to-end on every push. Its parity step clones v1 (`mja8291/tcf`, public), read only. The repo was created **public**; the plan assumed private. It holds no passwords or keys, but it does name the department email, spreadsheet and folder IDs and the staging API address, so switching it to private (GitHub → Settings → Danger Zone → Change visibility) is recommended.
 
 ## 2. Schools spreadsheet (done)
 
