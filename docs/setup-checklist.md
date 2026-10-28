@@ -58,7 +58,16 @@ Read `docs/cutover-plan.md`, then decide:
 - the order users move in;
 - who sends the user notice.
 
-Production setup repeats step 4 with `ENV_NAME` = `production` and `RESPONSES_SPREADSHEET_ID` = `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o` (MQI Spreadsheet). Nothing happens in production until you approve.
+Deployed 2026-10-28 (approved by the product owner; not yet announced to users):
+
+- Script **MQI v2 API (production)**: https://script.google.com/d/1ESMP9tqbRC21Y5sVf7O1WC3tcLnYB8IffxQCi53duT5YvoM3f2oaPDj9/edit, deployment `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` (version 1).
+- Web app: https://tcf-mqi-app-761a8.web.app (calls that deployment).
+
+To finish, in the production script (same clicks as step 4):
+
+1. Script Properties: `ENV_NAME` = `production`; `SCHOOLS_SPREADSHEET_ID` = `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q`; `RESPONSES_SPREADSHEET_ID` = `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o` (MQI Spreadsheet itself, no copy); `ADMIN_EMAIL`; `ADMIN_NAME`.
+2. Run `setup()` (accept permissions), then `benchmarkPasswordHash()`.
+3. Sign in at the production address and change the temporary password.
 
 ## 8. Drive space
 
