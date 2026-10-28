@@ -20,7 +20,7 @@ v2 runs on a new address (`tcfmqi.web.app`) and cannot read anything v1 stored o
 | 3 | Production `RESPONSES_SPREADSHEET_ID` points at **MQI Spreadsheet**; a test survey from an admin account appears with `Source App = v2`, then is deleted by hand | Engineering | ☐ |
 | 4 | Golden parity suite run on a fresh production export: done 2026-10-28, 18 surveys, 17 exact, 1 known v1-history difference (parity-notes) | Engineering | ☑ |
 | 5 | Department Drive has ≥ 5 GB free | Admin | ☐ |
-| 6 | v2 Android app (new package) in Play internal testing, opening without a URL bar | Engineering | ☐ |
+| 6 | Update of the existing Play app `app.web.mqi_app_tcf.pk` (opens tcfmqi.web.app; asset link published 2026-10-28) in Play internal testing, opening without a URL bar. **Promote to production only after every v1 queue is empty** — that update is the cutover for Android users | Engineering | ☐ |
 | 7 | All surveyor accounts created or approved in **Manage users** | Admin | ☐ |
 
 ## 3. Moving one surveyor (repeat per person)

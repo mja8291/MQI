@@ -1,42 +1,31 @@
 # MQI v2 Android app (Trusted Web Activity)
 
-A **new** Android wrapper for v2. It opens the v2 site full-screen (no browser bar) and has its own package name, so it installs next to the current app without replacing it. The current Android app is not touched.
+**Decision (2026-10-28, option B):** v2 ships as an **update of the existing Play Store app** `app.web.mqi_app_tcf.pk` (first built with PWABuilder for v1). The update changes only the address it opens, from v1's site to **https://tcfmqi.web.app**. Same listing, same package, same signing key; users get v2 through a normal Play Store update.
 
-## What you decide first
+**That update is the cutover.** On the day a phone installs it, v1's unsent surveys and drafts on that phone can no longer be reached (they belong to v1's address). Release it only when every surveyor's v1 Queue shows "Nothing in the queue" (`docs/cutover-plan.md`, section 3–4). Until then testers use https://tcfmqi.web.app in Chrome (Install app on the sign-in page).
 
-| Item | Example | Where it goes |
-| --- | --- | --- |
-| Package name | `org.tcf.mqi.v2` | `twa-manifest.json` → `packageId`, and `TWA_PACKAGE_NAME` in `apps/web/env/.env.production` (and `.env.staging` for a staging build) |
-| Signing key | a new upload keystore, or Play App Signing | `TWA_SHA256_FINGERPRINTS` (comma-separated if Play re-signs: list **both** the upload key and the Play app-signing key) |
+## Already done
 
-The site publishes `/.well-known/assetlinks.json` only when both values are set (`apps/web/vite.config.ts`, `assetLinks`), so a placeholder never goes live.
+| Item | Value |
+| --- | --- |
+| Package | `app.web.mqi_app_tcf.pk` |
+| Fingerprints in `/.well-known/assetlinks.json` on tcfmqi.web.app | Play app-signing key `05:D8:78:…:4A:F0`; PWABuilder upload key `EA:5E:11:…:A6:34` (full values in `apps/web/env/.env.production`) |
+| Check | Google's Digital Asset Links API lists both for https://tcfmqi.web.app (verified 2026-10-28) |
 
-## Build the wrapper (once, on a PC with JDK 17)
+v1's own site keeps its asset link, so the current app keeps working unchanged until the update.
 
-```bash
-npm i -g @bubblewrap/cli
-```
+## Build the update (you, once, in PWABuilder)
 
-```bash
-cd android && bubblewrap init --manifest https://tcfmqi.web.app/manifest.webmanifest
-```
+1. Go to https://www.pwabuilder.com, enter **https://tcfmqi.web.app**, then **Package for stores → Android → Options**.
+2. Set **Package ID** to `app.web.mqi_app_tcf.pk` (exactly as now).
+3. Set **App version** higher than the version on Play (Play Console → the app → Releases shows the current version code) — e.g. version `2.0.0`, version code one above the current.
+4. **Signing key → Use mine:** upload the existing `signing.keystore` with its alias and passwords (from the PWABuilder download for v1). Do **not** let it create a new key: Play rejects an update signed with a different upload key.
+5. App name / launcher name: `TCF MQI Survey` / `MQI Survey` (or keep the current names). Display: standalone. Status bar / navigation colour `#0e5c4d`.
+6. Download the package. Upload the **.aab** in Play Console → **Testing → Internal testing** first; install it on one phone from the testing link and check that it opens **without a browser bar** and shows the new screens (Applicable levels, three Home tabs).
+7. Promote to **Production** on the agreed cutover day.
 
-Accept the defaults from the web manifest, then set the package name you chose, and edit `twa-manifest.json` to match `twa-manifest.template.json` (host, colours, `display: fullscreen` fallback `standalone`, orientation portrait). Bubblewrap creates or reuses a keystore. Print its SHA-256 with:
+A browser bar at the top of the app means the asset link does not match the signing key: send the SHA-256 shown in Play Console → Test and release → App integrity → App signing, and it is added to the site.
 
-```bash
-keytool -list -v -keystore android.keystore -alias android
-```
+## Keys and passwords
 
-Put that fingerprint (and Play's app-signing fingerprint, from Play Console → Setup → App integrity) in `TWA_SHA256_FINGERPRINTS`, deploy the site, then:
-
-```bash
-bubblewrap build
-```
-
-## Check it opens without a browser bar
-
-1. Install `app-release-signed.apk` on a phone.
-2. Open https://tcfmqi.web.app/.well-known/assetlinks.json and confirm it lists the package and fingerprints.
-3. Launch the app. A URL bar at the top means asset links do not match: compare the fingerprint, then clear Chrome's data on the phone and relaunch.
-
-Keep `android.keystore` and its passwords out of git, in the department's password store. Losing them means a new Play listing.
+Keep `signing.keystore` and its passwords in the department's password store — never in git, chat, email or a temp folder. Losing them means the app can no longer be updated (unless Play App Signing lets you reset the upload key). The passwords shared on 2026-10-28 in a chat should be treated as exposed: store the keystore safely and limit who has the file.

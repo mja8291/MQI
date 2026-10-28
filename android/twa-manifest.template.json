@@ -1,5 +1,5 @@
 {
-  "packageId": "SET_PACKAGE_NAME",
+  "packageId": "app.web.mqi_app_tcf.pk",
   "host": "tcfmqi.web.app",
   "name": "TCF MQI Survey",
   "launcherName": "MQI Survey",
