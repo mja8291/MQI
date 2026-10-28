@@ -1,10 +1,10 @@
 {
-  "projects": { "default": "tcf-mqi-app-761a8" },
+  "projects": { "default": "tcfmqi" },
   "targets": {
-    "tcf-mqi-app-761a8": {
+    "tcfmqi": {
       "hosting": {
-        "prod": ["tcf-mqi-app-761a8"],
-        "staging": ["tcf-mqi-app-761a8-staging"]
+        "prod": ["tcfmqi"],
+        "staging": ["tcfmqi-staging"]
       }
     }
   }

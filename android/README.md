@@ -18,7 +18,7 @@ npm i -g @bubblewrap/cli
 ```
 
 ```bash
-cd android && bubblewrap init --manifest https://tcf-mqi-app-761a8.web.app/manifest.webmanifest
+cd android && bubblewrap init --manifest https://tcfmqi.web.app/manifest.webmanifest
 ```
 
 Accept the defaults from the web manifest, then set the package name you chose, and edit `twa-manifest.json` to match `twa-manifest.template.json` (host, colours, `display: fullscreen` fallback `standalone`, orientation portrait). Bubblewrap creates or reuses a keystore. Print its SHA-256 with:
@@ -36,7 +36,7 @@ bubblewrap build
 ## Check it opens without a browser bar
 
 1. Install `app-release-signed.apk` on a phone.
-2. Open https://tcf-mqi-app-761a8.web.app/.well-known/assetlinks.json and confirm it lists the package and fingerprints.
+2. Open https://tcfmqi.web.app/.well-known/assetlinks.json and confirm it lists the package and fingerprints.
 3. Launch the app. A URL bar at the top means asset links do not match: compare the fingerprint, then clear Chrome's data on the phone and relaunch.
 
 Keep `android.keystore` and its passwords out of git, in the department's password store. Losing them means a new Play listing.

@@ -2,7 +2,7 @@
 
 Offline-first Maintenance Quality Index survey app for TCF school campuses. It replaces the v1 MQI Survey App (`mja8291/tcf`, Next.js on Vercel) on the "Stack B" architecture. It writes to its own responses spreadsheet, **MQI Spreadsheet**, whose response tabs have exactly v1's headers (copied from v1's `MQI Analysis`), so v1's row layout, exports and dashboard logic carry over unchanged.
 
-- **Web**: React 19 + Vite + React Router, Tailwind v4, Dexie (IndexedDB), Workbox service worker. Firebase Hosting `tcf-mqi-app-761a8`.
+- **Web**: React 19 + Vite + React Router, Tailwind v4, Dexie (IndexedDB), Workbox service worker. Firebase Hosting `tcfmqi`.
 - **API**: one Google Apps Script web app (TypeScript, bundled by esbuild, deployed with clasp), running as `tcfengineeringdepartment@gmail.com`.
 - **Data**: Google Sheets (MQI Spreadsheet for survey rows; a v2-only **MQI v2 System** spreadsheet for accounts and ledgers) and Google Drive (photos).
 - **Shared**: `packages/shared`, bundled into both. It holds the rubric, scoring (ported unchanged from v1), schemas, rules, permissions and the API contract.
@@ -117,7 +117,7 @@ The first `deploy` prints a deployment ID; put its `/exec` URL in `apps/web/env/
 One-time for staging:
 
 ```bash
-firebase hosting:sites:create tcf-mqi-app-761a8-staging
+firebase hosting:sites:create tcfmqi-staging
 ```
 
 Every release:

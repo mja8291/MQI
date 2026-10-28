@@ -1,6 +1,6 @@
 # Staging pilot: field test checklist
 
-Run this on **staging** (`tcf-mqi-app-761a8-staging.web.app`, or the staging TWA) with at least two real Android phones: one mid-range, one low-end. Use test campuses only. After each block, open the staging **MQI Responses (STAGING)** sheet and the **MQI v2 System (STAGING)** sheet to check the result.
+Run this on **staging** (`tcfmqi-staging.web.app`, or the staging TWA) with at least two real Android phones: one mid-range, one low-end. Use test campuses only. After each block, open the staging **MQI Responses (STAGING)** sheet and the **MQI v2 System (STAGING)** sheet to check the result.
 
 Record for every check: phone model, Android/Chrome version, pass/fail, and a note. Anything in the `ErrorLog` tab of the System sheet during the pilot is a finding.
 

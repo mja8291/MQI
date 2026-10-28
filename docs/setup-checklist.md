@@ -7,7 +7,7 @@ All code for Phases 1–8 is written and tested locally against an in-memory She
 - v2 Drive root folder `1wCWvRxaik6h2dsm2ExX9cSqJ84vDs9Cm`: `setup()` builds `01 Production`, `02 Staging`, `03 Backups`, `04 Exports` and the System spreadsheets inside it.
 - v2 responses spreadsheet: **MQI Spreadsheet** `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o`. Its `MQI Survey Responses` and `MQI Survey Attachments` tabs have headers copied exactly from MQI Analysis (130 and 5 columns), with no data rows.
 - v1's responses spreadsheet **MQI Analysis** `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4` is read only; it is used only as the source of the golden scoring fixtures.
-- Firebase project `tcf-mqi-app-761a8` is connected on this PC.
+- Firebase project `tcfmqi` (owned by the department account) hosts production at https://tcfmqi.web.app and staging at https://tcfmqi-staging.web.app. The Firebase CLI uses the department account for this folder (`firebase login:use`). The earlier project `tcf-mqi-app-761a8` (owned by mja8291) is no longer used.
 
 ## 1. GitHub (CI)
 
@@ -28,7 +28,7 @@ Done 2026-10-28: all 18 production surveys are in the tests (read directly from 
 
 ## 4. Apps Script (staging first)
 
-Done on 2026-10-28: the staging script **MQI v2 API (staging)** exists (https://script.google.com/d/1IFuzUvQ9FnOAFgBxu2R3Qhh0_ZIyMZd_hUXreq5CdLcz3028MP7pPxny/edit), its code is pushed, and it is deployed as a web app (deployment `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg`, version 1). The staging web app is live at https://tcf-mqi-app-761a8-staging.web.app and calls that deployment. It cannot sign anyone in until steps 4–5 below are done.
+Done on 2026-10-28: the staging script **MQI v2 API (staging)** exists (https://script.google.com/d/1IFuzUvQ9FnOAFgBxu2R3Qhh0_ZIyMZd_hUXreq5CdLcz3028MP7pPxny/edit), its code is pushed, and it is deployed as a web app (deployment `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg`, version 1). The staging web app is live at https://tcfmqi-staging.web.app and calls that deployment. It cannot sign anyone in until steps 4–5 below are done.
 
 1. ~~Turn on the Apps Script API~~ (done).
 2. ~~`clasp login`~~ (done, as the department account).
@@ -40,7 +40,7 @@ Done on 2026-10-28: the staging script **MQI v2 API (staging)** exists (https://
    - `ADMIN_EMAIL` and `ADMIN_NAME` = the first administrator (suggest you)
 5. In the editor's function list choose `setup`, press **Run**, and accept the permission prompt (it is the department account's own script). Copy the temporary admin password from the execution log.
 6. Run `benchmarkPasswordHash()` the same way and send me the printed table (it goes in the README).
-7. Open https://tcf-mqi-app-761a8-staging.web.app and sign in with `ADMIN_EMAIL` and the temporary password; the app asks you to choose a new one.
+7. Open https://tcfmqi-staging.web.app and sign in with `ADMIN_EMAIL` and the temporary password; the app asks you to choose a new one.
 
 ## 5. Staging pilot
 
@@ -61,7 +61,7 @@ Read `docs/cutover-plan.md`, then decide:
 Deployed 2026-10-28 (approved by the product owner; not yet announced to users):
 
 - Script **MQI v2 API (production)**: https://script.google.com/d/1ESMP9tqbRC21Y5sVf7O1WC3tcLnYB8IffxQCi53duT5YvoM3f2oaPDj9/edit, deployment `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` (version 1).
-- Web app: https://tcf-mqi-app-761a8.web.app (calls that deployment).
+- Web app: https://tcfmqi.web.app (calls that deployment).
 
 To finish, in the production script (same clicks as step 4):
 

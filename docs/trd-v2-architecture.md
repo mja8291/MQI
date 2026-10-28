@@ -13,7 +13,7 @@ The phone is the source of truth until a survey reaches the server. The app writ
 | Device | React 19, Vite, React Router (lazy routes), Tailwind v4, Dexie 4, Workbox service worker; Android TWA wrapper | All screens, scoring, autosave, outbox, photo compression (Web Worker), Excel/PDF generation, session token |
 | API | Google Apps Script V8 web app, TypeScript bundled by esbuild, deployed with clasp; executes as the department account | Auth, permissions, validation, server-side rescoring, idempotent writes, chunked photo upload, reads (schools, dashboard, surveys, exports), error log |
 | Data | Google Sheets and Drive, owned by `tcfengineeringdepartment@gmail.com` | MQI Spreadsheet (responses, append-only; v1's headers); **MQI v2 System** spreadsheet; photo folders under the v2 Drive root |
-| Hosting | Firebase Hosting `tcf-mqi-app-761a8` (+ `-staging`) | Static app shell, strict CSP, asset links |
+| Hosting | Firebase Hosting `tcfmqi` (+ `-staging`) | Static app shell, strict CSP, asset links |
 
 ### 3.2 Request flows
 

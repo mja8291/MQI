@@ -2,7 +2,7 @@
 
 **Status: draft for approval. Nothing here is executed without the product owner's go-ahead.**
 
-v2 runs on a new address (`tcf-mqi-app-761a8.web.app`) and cannot read anything v1 stored on a phone: drafts, queued surveys and photos waiting to upload stay inside v1. The cutover is therefore operational. Each surveyor empties v1 first, then moves. v1 itself is not changed.
+v2 runs on a new address (`tcfmqi.web.app`) and cannot read anything v1 stored on a phone: drafts, queued surveys and photos waiting to upload stay inside v1. The cutover is therefore operational. Each surveyor empties v1 first, then moves. v1 itself is not changed.
 
 ## 1. What stays the same
 
