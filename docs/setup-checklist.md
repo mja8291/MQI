@@ -13,9 +13,10 @@ All code for Phases 1–8 is written and tested locally against an in-memory She
 1. Create an **empty private** repo `mja8291/tcf-mqi-v2` (no README, .gitignore or licence).
 2. Tell me, and I'll add the remote and push. Git Credential Manager asks you to sign in on the first push. CI then runs typecheck, lint, tests, build and end-to-end on every push.
 
-## 2. Send me one ID
+## 2. Schools spreadsheet (done)
 
-- The **schools spreadsheet** ID (v1's `SCHOOLS_SPREADSHEET_ID`, in Vercel → mqi-survey-app → Settings → Environment Variables) and its tab name if it isn't `Schools (All Units)`.
+- **Schools_Standardized** `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q`, owned by the department account. Tab `Schools (All Units)` (v1's default, so `SCHOOLS_SHEET_TAB` stays unset) has the Region, Area, Campus, Campus ID and Unit Status columns v1 reads. Read only.
+- If v1's Vercel `SCHOOLS_SPREADSHEET_ID` points at a different copy, tell me; v2 must read the same list.
 
 ## 3. Full golden fixtures (about 2 minutes)
 
@@ -35,7 +36,7 @@ Production holds 18 Method 2 surveys; 4 are in the tests now.
 3. Tell me, and I'll create the staging script and push the code.
 4. In the Apps Script editor (I'll send the link), open Project Settings → Script Properties and add:
    - `ENV_NAME` = `staging`
-   - `SCHOOLS_SPREADSHEET_ID` = (from step 2)
+   - `SCHOOLS_SPREADSHEET_ID` = `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q`
    - `SOURCE_RESPONSES_SPREADSHEET_ID` = `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4`
    - `ADMIN_EMAIL` and `ADMIN_NAME` = the first administrator (suggest you)
 5. Run `setup()` and accept the permission prompt. Copy the temporary admin password from the execution log.

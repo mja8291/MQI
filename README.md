@@ -77,7 +77,7 @@ Set these in the Apps Script editor (Project Settings → Script Properties) **b
 | Property | Required | Meaning |
 | --- | --- | --- |
 | `ENV_NAME` | yes | `staging` or `production` |
-| `SCHOOLS_SPREADSHEET_ID` | yes | v1's school list spreadsheet (read only) |
+| `SCHOOLS_SPREADSHEET_ID` | yes | v1's school list spreadsheet, read only (`Schools_Standardized`, `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q`) |
 | `SCHOOLS_SHEET_TAB` | no | Default `Schools (All Units)` |
 | `RESPONSES_SPREADSHEET_ID` | production | v1's responses spreadsheet (`MQI Analysis`, `1Hv2lOExQ29WrY7jyGq5_dYiR5Xot4DCt6JZVJXWPCM4`) |
 | `SOURCE_RESPONSES_SPREADSHEET_ID` | staging | Production responses ID; `setup()` copies it into `02 Staging` and sets `RESPONSES_SPREADSHEET_ID` to the copy |
