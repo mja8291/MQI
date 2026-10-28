@@ -6,13 +6,13 @@ Record for every check: phone model, Android/Chrome version, pass/fail, and a no
 
 ## 0. Setup (once per phone)
 
-- [ ] Install the app (Chrome → Add to Home screen, or the staging TWA). It opens full-screen with no URL bar (TWA).
+- [ ] Install the app from Chrome (⋮ → **Add to Home screen** / **Install app**) at `tcfmqi-staging.web.app`. It opens in its own window. (The Android Play app, the TWA, is not built yet.)
 - [ ] Sign up → the screen says the account awaits approval. An admin approves it in **Manage users** → sign in works.
-- [ ] Open **Start new survey** once while online, so the school list and every screen are on the phone.
+- [ ] Open **Start new survey** once while online, so the school list and every screen are on the phone. While the list loads the note says **Updating the campus list…**; it disappears once loaded. It must never say **Offline** while the phone is online.
 
 ## 1. Airplane mode, start to finish
 
-- [ ] Airplane mode **on** before starting. Find school by search, then by Region → Area → School.
+- [ ] Airplane mode **on** before starting. Find school says **Offline — showing the last saved campus list** after a moment. Find school by search, then by Region → Area → School.
 - [ ] Enter the three names, then start. The timer runs.
 - [ ] Record at least one location of every type: Classroom (with section), Classroom "Library" (no section), Toilet, Lab, Other Room, Corridor & Stairs, Exterior Facade, External Development, Roof.
 - [ ] Attach photos with both **Take photo** and **Choose from gallery**. Each shows a name and size under 300 KB within a few seconds, and the screen never freezes.
@@ -49,12 +49,16 @@ Record for every check: phone model, Android/Chrome version, pass/fail, and a no
 - [ ] Admin revokes a user → within a minute that phone is sent to sign-in, with its queued surveys still kept. Re-approve → the user signs in and the queue sends.
 - [ ] Admin issues a temporary password → the user must change it at sign-in, and every other phone of that user is signed out.
 - [ ] Five wrong passwords → locked for 15 minutes.
-- [ ] A Reviewer account can see the dashboard and download copies, but **Start new survey** submissions are refused.
+- [ ] A Reviewer account can see the dashboard and download copies, and does **not** see **Start new survey** (the server would refuse a submission anyway).
 
 ## 6. Dashboard and downloads
 
-- [ ] Dashboard figures (captured, pending, average, bands, regions, critical items) match the v1 dashboard on the same staging data.
-- [ ] Export all (.xlsx) contains both response tabs with all rows.
+- [ ] Dashboard figures match the staging sheet: captured = campuses with at least one survey; average and bands use each campus's latest survey; regions and critical items likewise. (v1's dashboard reads MQI Analysis, a different spreadsheet since decision D14, so it is not the comparison.)
+- [ ] Export all (.xlsx) contains one sheet, **MQI Survey Responses**, with all rows.
+
+## 6a. Wording
+
+- [ ] No screen, download (Excel, PDF, Export all) or address shows the word "Method" (decision D15). Survey addresses are `/survey/details` and `/survey/locations`.
 
 ## 7. Updates
 
