@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { RISK_FACTOR_OPTIONS } from './rubric/content';
-import { FLOOR_LEVELS, LOCATION_TYPES, isLocationComplete } from './rubric/items';
+import { FLOOR_LEVELS, LOCATION_TYPES, isLocationComplete, unsafeWithoutPhoto } from './rubric/items';
 import { rubricGroupsFor } from './rubric/versions';
 import {
   SITE_PHOTO_DRILLING_POINT,
@@ -80,11 +80,11 @@ export const submittedSurveySchema = z.object({
   rubricVersion: text(20),
   school: schoolSchema,
   asm: text(120),
-  apm: text(120),
+  apm: text(600),
   principal: text(120),
   powerSupply: blankOr(['Grid (Wapda/K.E/LESCO etc.)', 'Solar', 'Hybrid (Both Grid & Solar)', 'No Power', 'Other']),
   structuralConcern: blankOr(['YES', 'NO']),
-  buildingStructure: blankOr(['Load-Bearing', 'RCC', 'Precast', 'Hybrid (RCC+Precast)', 'Hybrid (Load-Bearing+RCC)']),
+  buildingStructure: blankOr(['Load-Bearing', 'RCC', 'Precast', 'Hybrid (RCC+Precast)', 'Hybrid (Load-Bearing+RCC)', 'Unknown']),
   typeOfStructure: blankOr(['RCC (Frame)', 'Load-bearing', 'Hybrid', 'N/A']),
   centerBeam: blankOr(['YES', 'NO', 'N/A']),
   drillingCheck: drillingCheckSchema,
@@ -132,13 +132,12 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
   const need = (ok: boolean, path: string, message: string) => {
     if (!ok) issues.push({ path, message });
   };
-  need(!!s.apm.trim(), 'apm', 'Enter the accompanying APM.');
-  need(!!s.asm.trim(), 'asm', 'Enter the responding ASM.');
-  need(!!s.principal.trim(), 'principal', 'Enter the school principal.');
+  // v2 (W11): at least one engineering staff name; ASM and Principal only when present.
+  need(splitStaff(s.apm).length > 0, 'apm', 'Enter the accompanying engineering staff.');
   need(!!s.powerSupply, 'powerSupply', 'Choose the power supply.');
   need(!!s.structuralConcern, 'structuralConcern', 'Answer the structural concern question.');
   need(!!s.buildingStructure, 'buildingStructure', 'Suggest the structural type of the building.');
-  need(!!s.typeOfStructure, 'typeOfStructure', 'Choose the type of structure.');
+  // v2 (W17): Type of Structure (visual inspection) is no longer asked; it stays in the schema for older drafts.
   need(!!s.centerBeam, 'centerBeam', 'Answer the centre beam question.');
   need(isDrillingCheckComplete(s.drillingCheck), 'drillingCheck', 'Complete the drilling check (thicknesses must be positive numbers).');
   if (s.drillingCheck.done === 'YES') {
@@ -158,6 +157,8 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
     need(!names.has(loc.name), `locations.${i}.name`, `Two locations are both named "${loc.name}".`);
     names.add(loc.name);
     need(isLocationComplete(loc), `locations.${i}`, `Score every item at ${loc.name}.`);
+    for (const item of unsafeWithoutPhoto(loc, groups))
+      need(false, `locations.${i}.photos`, `Attach a photo of "${item}" at ${loc.name}: it is marked Unsafe.`);
     for (const item of Object.keys(loc.scores)) need(groupNames.has(item), `locations.${i}.scores`, `Unknown item "${item}" at ${loc.name}.`);
     if (attachmentIds) {
       for (const ids of Object.values(loc.photos)) for (const id of ids) need(attachmentIds.has(id), `locations.${i}.photos`, 'A photo is missing its attachment record.');
@@ -176,4 +177,13 @@ export function applicableReviewPhotoKeys(s: Pick<SubmittedSurvey, 'siteChecks' 
   if (s.siteChecks.rainSpoutsClear === 'No') keys.push(SITE_PHOTO_RAIN_SPOUTS);
   if (s.drillingCheck.done === 'YES') keys.push(SITE_PHOTO_DRILLING_POINT, SITE_PHOTO_SLAB_THICKNESS);
   return keys;
+}
+
+/** Accompanying engineering staff are kept in one cell, "Name A; Name B" (v2, W11). */
+export const STAFF_SEPARATOR = '; ';
+export function splitStaff(value: string): string[] {
+  return value.split(';').map((n) => n.trim()).filter(Boolean);
+}
+export function joinStaff(names: readonly string[]): string {
+  return names.map((n) => n.trim()).filter(Boolean).join(STAFF_SEPARATOR);
 }

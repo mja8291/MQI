@@ -29,7 +29,7 @@ export default function PrivacyPolicyPage() {
         <p>When a TCF staff member completes a survey, the app records:</p>
         <ul>
           <li>The school/campus being assessed, and the region/area it belongs to.</li>
-          <li>The names of the staff present (Accompanying APM, Responding ASM, School Principal).</li>
+          <li>The names of the staff present (accompanying engineering staff, and the ASM and Principal when present).</li>
           <li>Condition scores and optional notes for each maintenance item on the checklist.</li>
           <li>Optional photographs documenting maintenance issues.</li>
         </ul>

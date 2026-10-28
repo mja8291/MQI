@@ -16,6 +16,8 @@ import {
   scoreSurveyFor,
   submissionIssues,
   submittedSurveySchema,
+  joinStaff,
+  splitStaff,
   toCell,
   uuidv7,
 } from './index';
@@ -88,7 +90,7 @@ function survey(overrides: Partial<SubmittedSurvey> = {}): SubmittedSurvey {
   const locations = [
     loc('Roof', 'Roof 1', {
       'Access to roof area /tanks': 'Good',
-      'Roof Screeding/roof drainage': 'Very Poor',
+      'Roof Screeding/roof drainage': 'Good',
       'Water Storage (Overhead Tank)': 'Ok',
       'External Plumbing': 'Good',
       'Grill Gate': 'N/A',
@@ -147,7 +149,7 @@ describe('sheet rows (v1 responses.ts parity)', () => {
     expect(row['Oath']).toBe('Affirm');
     expect(row['Source App']).toBe('v2');
     expect(row['Submitter Email']).toBe('sam@tcf.org.pk');
-    expect(row['Roof Screeding/roof drainage']).toBe('Very Poor');
+    expect(row['Roof Screeding/roof drainage']).toBe('Good');
   });
 
   test('every written field is in the desired header', () => {
@@ -181,6 +183,31 @@ describe('sheet rows (v1 responses.ts parity)', () => {
 describe('submission rules (Appendix C)', () => {
   test('a complete survey passes schema and rules', () => {
     const s = survey();
+    expect(submittedSurveySchema.safeParse(s).success).toBe(true);
+    expect(submissionIssues(s)).toEqual([]);
+  });
+
+  test('W13: an item marked Unsafe needs a photo', () => {
+    const s = survey();
+    const roof = s.locations[0]!;
+    const unsafe = survey({ locations: [{ ...roof, scores: { ...roof.scores, 'Roof Screeding/roof drainage': 'Very Poor' } }] });
+    expect(submissionIssues(unsafe).map((i) => i.message)).toEqual(['Attach a photo of "Roof Screeding/roof drainage" at Roof 1: it is marked Unsafe.']);
+    const withPhoto = survey({ locations: [{ ...unsafe.locations[0]!, photos: { 'Roof Screeding/roof drainage': [uuidv7(rnd)] } }] });
+    expect(submissionIssues(withPhoto)).toEqual([]);
+    // Very Poor on a four-level item is not "Unsafe": no photo needed.
+    const veryPoor = survey({ locations: [{ ...roof, scores: { ...roof.scores, Plaster: 'Very Poor' } }] });
+    expect(submissionIssues(veryPoor)).toEqual([]);
+  });
+
+  test('W11: engineering staff required, ASM and Principal optional', () => {
+    expect(submissionIssues(survey({ asm: '', principal: '' }))).toEqual([]);
+    expect(submissionIssues(survey({ apm: ' ; ' })).map((i) => i.path)).toEqual(['apm']);
+    expect(joinStaff([' Ali Khan ', '', 'Sara Ahmed'])).toBe('Ali Khan; Sara Ahmed');
+    expect(splitStaff('Ali Khan; Sara Ahmed;')).toEqual(['Ali Khan', 'Sara Ahmed']);
+  });
+
+  test('W17: the structural type question accepts Unknown; type of structure is optional', () => {
+    const s = survey({ buildingStructure: 'Unknown', typeOfStructure: '' });
     expect(submittedSurveySchema.safeParse(s).success).toBe(true);
     expect(submissionIssues(s)).toEqual([]);
   });

@@ -1,4 +1,5 @@
 import { UnprocessablePhotoError, compressImage } from './compress';
+import { MAX_BYTES } from './targets';
 
 /** What the server accepts for a photo (attachmentSchema). */
 export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -35,7 +36,8 @@ export async function compressPhoto(file: File): Promise<File> {
         waiting.set(id, { resolve, reject });
         w.postMessage({ id, file });
       });
-      if (blob.size < file.size || !(PHOTO_TYPES as readonly string[]).includes(file.type)) {
+      // Keep the original only when it is smaller, a photo type, and within the 450 KB cap (W14).
+      if (blob.size < file.size || file.size > MAX_BYTES || !(PHOTO_TYPES as readonly string[]).includes(file.type)) {
         return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg', lastModified: file.lastModified });
       }
       return file;

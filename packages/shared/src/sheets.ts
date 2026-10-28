@@ -29,7 +29,8 @@ const COMMON_HEADER = [
   'Region',
   'Area',
   'Responding ASM',
-  'Accompanying APM',
+  // v2 (W11): v1's "Accompanying APM", renamed in place; several names are joined with "; ".
+  'Accompanying Engineering Staff',
   'School Principal',
   'Power Supply',
   'Location Name',
@@ -128,7 +129,7 @@ function commonFields(s: SubmittedSurvey, submitter: Submitter, timestamp: strin
     Region: s.school.region,
     Area: s.school.area,
     'Responding ASM': s.asm,
-    'Accompanying APM': s.apm,
+    'Accompanying Engineering Staff': s.apm,
     'School Principal': s.principal,
     'Power Supply': s.powerSupply,
     'Structural Concern Observed': s.structuralConcern,

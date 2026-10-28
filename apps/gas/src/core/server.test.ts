@@ -4,12 +4,15 @@ import {
   RESPONSES_HEADER,
   RESPONSES_TAB,
   RUBRIC_VERSION,
+  TRANSIENT_ERRORS,
   UPLOAD_CHUNK_BYTES,
   base64Encode,
+  bytesToHex,
   scoreSurveyFor,
+  sha256,
   uuidv7,
 } from '@mqi/shared';
-import type { ApiResponse, AttachmentMeta, SurveyLocation, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
+import type { ApiResponse, AttachmentMeta, School, SurveyLocation, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../dev/server';
@@ -366,6 +369,22 @@ describe('files.upload (chunked, idempotent)', () => {
     expect(got.data).toBe(base64Encode(bytes));
   });
 
+  test('W14: a damaged chunk is refused as retryable and nothing reaches Drive; the good one then goes', () => {
+    const t = login('surveyor@tcf.test');
+    const item = makeSurvey();
+    ok(push(t, item));
+    const a = item.attachments[0]!;
+    const bytes = new Uint8Array(1000).map((_, i) => i % 251);
+    const sent = { attachmentId: a.id, chunkIndex: 0, chunkCount: 1, totalSize: bytes.length, data: base64Encode(bytes) };
+    const wrongSum = bytesToHex(sha256(new Uint8Array([1, 2, 3])));
+    const bad = call<UploadResult>('files.upload', { ...sent, sha256: wrongSum }, t);
+    expect(code(bad)).toBe('INTERNAL');
+    expect(TRANSIENT_ERRORS).toContain('INTERNAL');
+    expect(env.drive.createdFiles).toBe(0);
+    expect(ok(call<UploadResult>('files.upload', { ...sent, sha256: bytesToHex(sha256(bytes)) }, t)).done).toBe(true);
+    expect(env.drive.createdFiles).toBe(1);
+  });
+
   test('several chunks, in order; a repeat or gap is handled', () => {
     const t = login('surveyor@tcf.test');
     const size = UPLOAD_CHUNK_BYTES * 2 + 10;
@@ -414,11 +433,22 @@ describe('reads', () => {
 
   test('schools list skips inactive campuses; dashboard counts the new survey', () => {
     const r = login('reviewer@tcf.test');
-    expect(ok(call<{ schools: unknown[] }>('schools.list', {}, r)).schools).toHaveLength(4);
+    const schools = ok(call<{ schools: School[] }>('schools.list', {}, r)).schools;
+    expect(schools).toHaveLength(5);
+    // W10: campus details, and the e-compound name from the E-Compound Spreadsheet.
+    expect(schools.find((s) => s.schoolId === '947')).toMatchObject({
+      address: 'Gadap Town, Karachi',
+      latitude: '25.0120',
+      longitude: '67.1500',
+      eCompoundNo: 'S/1/10',
+      eCompoundName: 'Gadap Compound (S/1/10)',
+    });
+    // A sibling without its own E-Compound row gets the name through the shared eCompound No.
+    expect(schools.find((s) => s.schoolId === '948')?.eCompoundName).toBe('Gadap Compound (S/1/10)');
     ok(push(login('surveyor@tcf.test'), makeSurvey()));
     env.cache.clear();
     const d = ok(call<{ totalSchools: number; captured: number; pending: number }>('dashboard.get', {}, r));
-    expect(d).toMatchObject({ totalSchools: 4, captured: 1, pending: 3 });
+    expect(d).toMatchObject({ totalSchools: 5, captured: 1, pending: 4 });
   });
 
   test('export.rows pages through a tab', () => {

@@ -209,9 +209,15 @@ export class MemoryDrive implements DrivePort {
 }
 
 export class StaticSchools implements SchoolsPort {
-  constructor(public rows: string[][]) {}
+  constructor(
+    public rows: string[][],
+    public eCompoundRows: string[][] = [],
+  ) {}
   grid(): string[][] {
     return this.rows;
+  }
+  eCompoundGrid(): string[][] {
+    return this.eCompoundRows;
   }
 }
 
@@ -228,12 +234,18 @@ export interface MemoryEnv extends Env {
 }
 
 export const SAMPLE_SCHOOLS: string[][] = [
-  ['Region', 'Area', 'Campus', 'Campus ID', 'Unit Status'],
-  ['South West', 'Gadap West I', 'OGS Trust Campus', '947', 'Active'],
-  ['North', 'Sheikhupura', 'Zia & Faiza Bhutta Family Foundation Campus', '1306', 'Active'],
-  ['Lower Sindh', 'Hyderabad 1', 'Alfalah Campus', '499', 'Active'],
-  ['South West', 'Baldia Town 2', 'Fazalillahi Campus-I', '107', 'Active'],
-  ['Central', 'Lahore 3', 'Closed Campus', '2000', 'Closed'],
+  ['Region', 'Area', 'Town', 'City', 'Campus', 'Campus ID', 'Unit Status', 'Address', 'Latitude', 'Longitude', 'eCompound No'],
+  ['South West', 'Gadap West I', 'Gadap', 'Karachi', 'OGS Trust Campus', '947', 'Active', 'Gadap Town, Karachi', '25.0120', '67.1500', 'S/1/10'],
+  ['South West', 'Gadap West I', 'Gadap', 'Karachi', 'OGS Trust Campus II', '948', 'Active', 'Gadap Town, Karachi', '25.0125', '67.1504', 'S/1/10'],
+  ['North', 'Sheikhupura', '', 'Sheikhupura', 'Zia & Faiza Bhutta Family Foundation Campus', '1306', 'Active', '', '', '', ''],
+  ['Lower Sindh', 'Hyderabad 1', '', 'Hyderabad', 'Alfalah Campus', '499', 'Active', '', '', '', ''],
+  ['South West', 'Baldia Town 2', 'Baldia', 'Karachi', 'Fazalillahi Campus-I', '107', 'Active', '', '', '', ''],
+  ['Central', 'Lahore 3', '', 'Lahore', 'Closed Campus', '2000', 'Closed', '', '', '', ''],
+];
+
+export const SAMPLE_ECOMPOUNDS: string[][] = [
+  ['School ID', 'Campus ID', 'Campus Name', 'E-Compound', 'eCompoundNo'],
+  ['1001', '947', 'OGS Trust Campus', 'Gadap Compound (S/1/10)', 'S/1/10'],
 ];
 
 export function createMemoryEnv(opts: { now?: number; schools?: string[][] } = {}): MemoryEnv {
@@ -243,7 +255,7 @@ export function createMemoryEnv(opts: { now?: number; schools?: string[][] } = {
   return {
     system: new MemorySystemDb(),
     responses: new MemoryResponses(),
-    schools: new StaticSchools(opts.schools ?? SAMPLE_SCHOOLS),
+    schools: new StaticSchools(opts.schools ?? SAMPLE_SCHOOLS, opts.schools ? [] : SAMPLE_ECOMPOUNDS),
     cache: new MemoryCache(now),
     lock: new MemoryLock(),
     props: new MemoryProps(),

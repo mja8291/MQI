@@ -45,6 +45,8 @@ export interface ResponsesPort {
 /** The read-only school list. */
 export interface SchoolsPort {
   grid(): string[][];
+  /** E-Compound names (header row + rows); [] when unavailable — the school list never depends on it. */
+  eCompoundGrid(): string[][];
 }
 
 export interface CachePort {

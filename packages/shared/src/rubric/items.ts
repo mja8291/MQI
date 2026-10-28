@@ -1,5 +1,5 @@
-import type { Category, Condition, FloorLevel, LocationType, RubricGroup } from "../types";
-import { OK_UNSAFE, ROOF_ACCESS } from "./condition-overrides";
+import type { Category, Condition, FloorLevel, LocationType, RubricGroup, RubricItem } from "../types";
+import { OK_UNSAFE, ROOF_ACCESS, SOUNDNESS_GUIDANCE } from "./condition-overrides";
 
 /**
  * The survey rubric — 31 item groups (Safety 9 / Functionality 15 / Aesthetics 7),
@@ -80,6 +80,7 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
     weight: 15,
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM, LAB, FACADE],
     conditionOverride: OK_UNSAFE,
+    guidance: SOUNDNESS_GUIDANCE,
   }),
   worst({
     name: "Ceiling Condition i.e. cracks & seepage",
@@ -324,6 +325,19 @@ export function rubricGroupsForLocation(type: LocationType): RubricGroup[] {
 }
 
 /** True once every item group applicable to this location has a score — the same completeness rule the scoring page enforces, applied to a whole recorded location at once. */
+/** v2 (W13): a value whose picker label is "Unsafe" must be backed by a photo. */
+export function isUnsafe(item: Pick<RubricItem, "conditionOverride">, value: Condition | undefined): boolean {
+  return Boolean(value && item.conditionOverride?.some((o) => o.condition === value && o.label === "Unsafe"));
+}
+
+/** Items marked Unsafe at this location with no photo attached. */
+export function unsafeWithoutPhoto(
+  location: { type: LocationType; scores: Record<string, Condition>; photos: Record<string, readonly unknown[]> },
+  groups: readonly Pick<RubricItem, "name" | "conditionOverride">[] = rubricGroupsForLocation(location.type)
+): string[] {
+  return groups.filter((g) => isUnsafe(g, location.scores[g.name]) && !(location.photos[g.name]?.length)).map((g) => g.name);
+}
+
 export function isLocationComplete(location: { type: LocationType; scores: Record<string, Condition> }): boolean {
   return rubricGroupsForLocation(location.type).every((g) => Boolean(location.scores[g.name]));
 }

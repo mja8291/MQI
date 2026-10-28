@@ -3,14 +3,14 @@
  *
  * Phone cameras routinely produce 3-12MB photos at resolutions far beyond
  * what's useful for documenting a maintenance item. Round 3 Task 8/14 set a
- * concrete target — under 300KB per photo — which a single fixed quality
+ * concrete target — originally under 300KB; v2 aims for ≤ 400KB and caps at 450KB (W14) — which a single fixed quality
  * setting can't hit reliably across all photos (a plain wall and a
  * cluttered, detailed shot of the same pixel dimensions compress very
  * differently at the same quality level). So: resize first (the biggest
  * lever, cheapest on visible quality), then step quality down from a
  * reasonable starting point until under the target or a quality floor is
- * hit — a rare, unusually complex photo lands slightly over 300KB rather
- * than getting visibly destroyed to force it under.
+ * hit, then shrink the long edge (1600 → 800 px) so even a very detailed photo ends
+ * up under the cap.
  *
  * This matters twice over: less data to upload on the field connections
  * this app is used on (and to stay clear of Vercel's 4.5MB request-body
@@ -31,14 +31,11 @@
  * request-body limit.
  */
 
-const MAX_DIMENSION = 1600; // long edge, px — the biggest single lever on file size, costs the least visible quality
-const TARGET_BYTES = 300 * 1024;
-const QUALITY_STEPS = [0.8, 0.7, 0.6, 0.5]; // stop at the first that clears the target; 0.5 is the floor — never go below it
+import { MAX_BYTES, encodeWithinTarget } from "./targets";
 
-// Below the real 4.5MB Vercel request-body limit, not right up against it —
-// leaves headroom for multipart encoding overhead (small, but non-zero) and
-// any imprecision in the platform's own enforcement.
-const RAW_UPLOAD_CEILING = 4 * 1024 * 1024;
+// v2 (W14): size rules live in targets.ts (aim ≤ 400 KB, never above 450 KB). A photo that
+// cannot be decoded is kept as-is only when it is already within MAX_BYTES.
+const RAW_UPLOAD_CEILING = MAX_BYTES;
 
 export class UnprocessablePhotoError extends Error {}
 
@@ -99,23 +96,21 @@ export async function compressImage(file: File): Promise<File> {
   }
 
   try {
-    const scale = Math.min(1, MAX_DIMENSION / Math.max(decoded.width, decoded.height));
-    const width = Math.round(decoded.width * scale);
-    const height = Math.round(decoded.height * scale);
-
     const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-    ctx.drawImage(decoded.source, 0, 0, width, height);
-
-    let blob: Blob | null = null;
-    for (const quality of QUALITY_STEPS) {
-      blob = await toJpegBlob(canvas, quality);
-      if (blob && blob.size <= TARGET_BYTES) break;
+    if (!ctx) {
+      if (file.size <= MAX_BYTES) return file;
+      throw new UnprocessablePhotoError("This photo couldn't be processed. Try again or pick a different photo.");
     }
-    if (!blob || blob.size >= file.size) return file; // already smaller/optimized — keep the original
+    const blob = await encodeWithinTarget((longEdge, quality) => {
+      const scale = Math.min(1, longEdge / Math.max(decoded.width, decoded.height));
+      canvas.width = Math.round(decoded.width * scale);
+      canvas.height = Math.round(decoded.height * scale);
+      ctx.drawImage(decoded.source, 0, 0, canvas.width, canvas.height);
+      return toJpegBlob(canvas, quality);
+    });
+    // Keep the original only when it is already smaller and within the cap.
+    if (!blob || (blob.size >= file.size && file.size <= MAX_BYTES)) return file;
 
     const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
     return new File([blob], name, { type: "image/jpeg", lastModified: file.lastModified });

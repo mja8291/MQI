@@ -61,16 +61,28 @@ export default function FloorPage() {
       </p>
 
       <div className="grid grid-cols-2 gap-2.5 mb-5">
-        {FLOOR_LEVELS.map((floor) => (
-          <button
-            key={floor}
-            type="button"
-            onClick={() => chooseFloor(floor)}
-            className="rounded-2xl border border-border bg-card p-4 text-left min-h-14"
-          >
-            <span className="text-[14px] font-semibold text-ink">{floor}</span>
-          </button>
-        ))}
+        {FLOOR_LEVELS.map((floor) => {
+          // v2 (W16): each floor shows how many locations are recorded on it.
+          const onFloor = state.scoring.locations.filter((l) => l.floorLevel === floor).length;
+          return (
+            <button
+              key={floor}
+              type="button"
+              onClick={() => chooseFloor(floor)}
+              className="rounded-2xl border border-border bg-card p-4 text-left min-h-14 flex items-center justify-between gap-2"
+            >
+              <span className="text-[14px] font-semibold text-ink">{floor}</span>
+              {onFloor > 0 ? (
+                <span
+                  aria-label={`${onFloor} location${onFloor === 1 ? "" : "s"} recorded`}
+                  className="min-w-6 h-6 px-1.5 rounded-full bg-brand text-white text-[12px] font-bold flex items-center justify-center"
+                >
+                  {onFloor}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
       {totalLocations > 0 ? (

@@ -1,4 +1,4 @@
-import { PUSH_BATCH_MAX, TRANSIENT_ERRORS, UPLOAD_CHUNK_BYTES, base64Encode } from '@mqi/shared';
+import { PUSH_BATCH_MAX, TRANSIENT_ERRORS, UPLOAD_CHUNK_BYTES, base64Encode, bytesToHex, sha256 } from '@mqi/shared';
 import type { PullResult, PushResult, UploadResult } from '@mqi/shared';
 import { ApiCallError, api, isAuthError } from '@/lib/api';
 import { notifyAuthRequired } from '@/lib/auth/events';
@@ -9,7 +9,8 @@ import type { OutboxSurvey, SyncFailureKind } from './db';
  * The sync engine. Single-flight (a Web Lock, so only one tab syncs), safe to call from any
  * trigger. Push: surveys in outbox order, up to PUSH_BATCH_MAX a call; a permanent rejection
  * marks that survey failed and the queue moves on. Photos: queued once the server holds the
- * survey; chunked, resumable per chunk. Only LOCK_TIMEOUT, RATE_LIMITED and INTERNAL (and no
+ * survey; chunked, resumable per chunk, checksummed. Survey data always goes before any photo, and a
+ * stuck photo holds back only its own survey's photos (W15). Only LOCK_TIMEOUT, RATE_LIMITED and INTERNAL (and no
  * connection) retry, with backoff min(2^n × 5 s, 30 min) ± 20 %.
  */
 
@@ -121,7 +122,7 @@ async function uploadPhoto(attachmentId: string): Promise<UploadResult | null> {
     if (fresh.uploadedChunks.includes(i)) continue;
     const part = new Uint8Array(await fresh.blob.slice(i * UPLOAD_CHUNK_BYTES, (i + 1) * UPLOAD_CHUNK_BYTES).arrayBuffer());
     try {
-      last = await api<UploadResult>('files.upload', { attachmentId, chunkIndex: i, chunkCount: count, totalSize: p.size, data: base64Encode(part) });
+      last = await api<UploadResult>('files.upload', { attachmentId, chunkIndex: i, chunkCount: count, totalSize: p.size, data: base64Encode(part), sha256: bytesToHex(sha256(part)) });
     } catch (e) {
       // The server already has more (or fewer) chunks than we thought: adopt its list, retry from there.
       if (e instanceof ApiCallError && e.code === 'CONFLICT' && ++conflicts <= 3) {
@@ -159,10 +160,18 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
     } catch (e) {
       await noteTransient([entry.surveyId], e);
       if (isAuthError(e)) notifyAuthRequired();
-      if (isTransient(e) || isAuthError(e)) return false;
-      // Permanent: this survey's photos stop; the Queue shows it as failed with Retry.
-      await db.surveys.update(entry.surveyId, { status: 'failed', lastError: { kind: 'server', message: e instanceof Error ? e.message : 'Photo rejected' } });
+      // No connection or signed out: nothing else can go either, so stop the run.
+      if (kindOf(e) === 'offline' || isAuthError(e)) return false;
+      // v2 (W15): any other photo trouble stays with its own survey — it waits out its backoff
+      // (transient) or shows Retry (permanent) — and every other survey's photos carry on.
       blocked.add(entry.surveyId);
+      if (!isTransient(e)) {
+        const reason = e instanceof Error ? e.message : 'Photo rejected';
+        await db.surveys.update(entry.surveyId, {
+          status: 'failed',
+          lastError: { kind: 'server', message: `Survey data saved; a photo could not upload (${reason}). Tap Retry.` },
+        });
+      }
       notifyChanged();
     }
   }

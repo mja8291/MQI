@@ -34,8 +34,6 @@ import {
   SLAB_THICKNESS_LABEL,
   STRUCTURAL_CONCERN_OPTIONS,
   STRUCTURAL_CONCERN_QUESTION,
-  TYPE_OF_STRUCTURE_OPTIONS,
-  TYPE_OF_STRUCTURE_QUESTION,
   YES_NO_OPTIONS,
 } from "@/lib/data/content";
 import {
@@ -75,7 +73,6 @@ export default function ReviewPage() {
     setPowerSupply,
     setStructuralConcern,
     setBuildingStructure,
-    setTypeOfStructure,
     setCenterBeam,
     setDrillingCheck,
     setSiteChecks,
@@ -84,7 +81,8 @@ export default function ReviewPage() {
   const [powerSupply, setLocalPowerSupply] = useState<PowerSupply | "">(state.powerSupply);
   const [structuralConcern, setLocalStructuralConcern] = useState<StructuralConcern | "">(state.structuralConcern);
   const [buildingStructure, setLocalBuildingStructure] = useState<BuildingStructure | "">(state.buildingStructure);
-  const [typeOfStructure, setLocalTypeOfStructure] = useState<TypeOfStructure | "">(state.typeOfStructure);
+  // No longer asked (W17); an older draft's answer is still carried through.
+  const typeOfStructure: TypeOfStructure | "" = state.typeOfStructure;
   const [centerBeam, setLocalCenterBeam] = useState<CenterBeam | "">(state.centerBeam);
   // Spread over the empty shapes so a draft saved before a field existed
   // (e.g. slabAssessment) opens with it blank rather than undefined.
@@ -171,7 +169,6 @@ export default function ReviewPage() {
     Boolean(powerSupply) &&
     Boolean(structuralConcern) &&
     Boolean(buildingStructure) &&
-    Boolean(typeOfStructure) &&
     Boolean(centerBeam) &&
     isDrillingCheckComplete(drilling) &&
     isSiteChecksComplete(site, reviewPhotos) &&
@@ -198,7 +195,6 @@ export default function ReviewPage() {
       !powerSupply ||
       !structuralConcern ||
       !buildingStructure ||
-      !typeOfStructure ||
       !centerBeam ||
       !state.school ||
       !state.started
@@ -209,7 +205,6 @@ export default function ReviewPage() {
     setPowerSupply(powerSupply);
     setStructuralConcern(structuralConcern);
     setBuildingStructure(buildingStructure);
-    setTypeOfStructure(typeOfStructure);
     setCenterBeam(centerBeam);
     // Switching the answer back to "NO" after filling the details in must not
     // send them along — a check that wasn't done has no thickness to report.
@@ -299,9 +294,9 @@ export default function ReviewPage() {
 
       <div className="space-y-0.5 mb-4">
         <RecapRow k="School" v={state.school.name} />
-        <RecapRow k="Accompanying APM" v={state.apm || "—"} />
-        <RecapRow k="Responding ASM" v={state.asm || "—"} />
-        <RecapRow k="School Principal" v={state.principal || "—"} />
+        <RecapRow k="Engineering Staff" v={state.apm || "—"} />
+        <RecapRow k="ASM" v={state.asm || "—"} />
+        <RecapRow k="Principal" v={state.principal || "—"} />
         <RecapRow k="Locations recorded" v={String(state.scoring.locations.length)} />
         {elapsedSeconds !== null ? <RecapRow k="Time on assessment" v={formatDuration(elapsedSeconds)} /> : null}
       </div>
@@ -400,21 +395,7 @@ export default function ReviewPage() {
 
       <SectionLabel>Visual inspection</SectionLabel>
 
-      <Field label={TYPE_OF_STRUCTURE_QUESTION}>
-        <select
-          value={typeOfStructure}
-          onChange={(e) => setLocalTypeOfStructure(e.target.value as TypeOfStructure)}
-          className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
-        >
-          <option value="">Select type of structure</option>
-          {TYPE_OF_STRUCTURE_OPTIONS.map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      </Field>
-
+      {/* v2 (W17): "Type of Structure (visual inspection)" removed — it repeated the structural type question above. */}
       <Field label={CENTER_BEAM_QUESTION}>
         <select
           value={centerBeam}

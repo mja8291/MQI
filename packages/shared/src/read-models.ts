@@ -14,35 +14,90 @@ export type SheetRow = Record<string, string>;
 
 // ---- schools (v1 getSchools) ----
 
-export function parseSchools(grid: readonly (readonly unknown[])[]): School[] {
-  if (grid.length < 2) return [];
-  const header = grid[0]!.map((h) => String(h).trim().toLowerCase());
-  const colIndex = (...candidates: string[]) => {
+type Grid = readonly (readonly unknown[])[];
+
+function columns(header: readonly unknown[]) {
+  const names = header.map((h) => String(h).trim().toLowerCase());
+  return (...candidates: string[]) => {
     for (const c of candidates) {
-      const idx = header.indexOf(c);
+      const idx = names.indexOf(c);
       if (idx !== -1) return idx;
     }
     return -1;
   };
-  const regionCol = colIndex('region');
-  const areaCol = colIndex('area');
-  const nameCol = colIndex('campus', 'school', 'school name', 'campus name');
-  const idCol = colIndex('campus id', 'school id', 'schoolid');
-  const statusCol = colIndex('unit status', 'status');
-  if (regionCol === -1 || areaCol === -1 || nameCol === -1 || idCol === -1) return [];
+}
 
-  const seen = new Set<string>();
-  const schools: School[] = [];
+/** E-Compound Spreadsheet → name by Campus ID and by eCompound No (v2, Find school details). */
+function eCompoundNames(grid: Grid): { byCampus: Map<string, string>; byCode: Map<string, string> } {
+  const byCampus = new Map<string, string>();
+  const byCode = new Map<string, string>();
+  if (grid.length < 2) return { byCampus, byCode };
+  const col = columns(grid[0]!);
+  const campusCol = col('campus id');
+  const nameCol = col('e-compound', 'ecompound', 'e-compound name');
+  const codeCol = col('ecompoundno', 'ecompound no', 'e-compound no');
+  if (nameCol === -1) return { byCampus, byCode };
   for (const row of grid.slice(1)) {
-    const cell = (i: number) => String(row[i] ?? '').trim();
+    const cell = (i: number) => (i === -1 ? '' : String(row[i] ?? '').trim());
+    const name = cell(nameCol);
+    if (!name) continue;
+    if (cell(campusCol) && !byCampus.has(cell(campusCol))) byCampus.set(cell(campusCol), name);
+    if (cell(codeCol) && !byCode.has(cell(codeCol))) byCode.set(cell(codeCol), name);
+  }
+  return { byCampus, byCode };
+}
+
+/**
+ * v1 getSchools: active units, one entry per Campus ID. v2 adds the campus details Find school
+ * shows (location, coordinates, e-compound and its name from the optional E-Compound grid).
+ */
+export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
+  if (grid.length < 2) return [];
+  const col = columns(grid[0]!);
+  const regionCol = col('region');
+  const areaCol = col('area');
+  const nameCol = col('campus', 'school', 'school name', 'campus name');
+  const idCol = col('campus id', 'school id', 'schoolid');
+  const statusCol = col('unit status', 'status');
+  if (regionCol === -1 || areaCol === -1 || nameCol === -1 || idCol === -1) return [];
+  const townCol = col('town');
+  const cityCol = col('city');
+  const addressCol = col('address');
+  const latCol = col('latitude');
+  const lngCol = col('longitude');
+  const codeCol = col('ecompound no', 'ecompoundno', 'e-compound no');
+  const names = eCompoundNames(eCompoundGrid);
+
+  const byId = new Map<string, School>();
+  for (const row of grid.slice(1)) {
+    const cell = (i: number) => (i === -1 ? '' : String(row[i] ?? '').trim());
     if (statusCol !== -1 && cell(statusCol) && cell(statusCol).toLowerCase() !== 'active') continue;
     const schoolId = cell(idCol);
     const name = cell(nameCol);
-    if (!schoolId || !name || seen.has(schoolId)) continue;
-    seen.add(schoolId);
-    schools.push({ schoolId, name, region: cell(regionCol), area: cell(areaCol) });
+    if (!schoolId || !name) continue;
+    const details: Partial<School> = {
+      town: cell(townCol),
+      city: cell(cityCol),
+      address: cell(addressCol),
+      latitude: cell(latCol),
+      longitude: cell(lngCol),
+      eCompoundNo: cell(codeCol),
+    };
+    const existing = byId.get(schoolId);
+    if (existing) {
+      // A campus has one row per unit: fill any detail the first unit row left blank.
+      for (const [k, v] of Object.entries(details) as [keyof School, string][]) if (v && !existing[k]) existing[k] = v;
+      continue;
+    }
+    const school: School = { schoolId, name, region: cell(regionCol), area: cell(areaCol) };
+    for (const [k, v] of Object.entries(details) as [keyof School, string][]) if (v) school[k] = v;
+    byId.set(schoolId, school);
   }
-  return schools;
+  for (const school of byId.values()) {
+    const ecName = names.byCampus.get(school.schoolId) ?? (school.eCompoundNo ? names.byCode.get(school.eCompoundNo) : undefined);
+    if (ecName) school.eCompoundName = ecName;
+  }
+  return [...byId.values()];
 }
 
 // ---- dashboard (v1 getDashboardData / summarize) ----
@@ -163,7 +218,7 @@ function common(surveyId: string, first: SheetRow): Omit<FoundSurvey, 'rubricVer
     region: first['Region'] ?? '',
     area: first['Area'] ?? '',
     submittedAt: first['Timestamp'] ?? '',
-    apm: first['Accompanying APM'] ?? '',
+    apm: first['Accompanying Engineering Staff'] ?? first['Accompanying APM'] ?? '',
     asm: first['Responding ASM'] ?? '',
     principal: first['School Principal'] ?? '',
     powerSupply: first['Power Supply'] ?? '',

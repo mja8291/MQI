@@ -99,13 +99,14 @@ export async function buildSingleSurveyPdf(input: SingleSurveyPdfInput): Promise
   const rows: [string, string][] = [
     ["Campus", `${input.campusName} (${input.region} · ${input.area})`],
     ["Survey ID", input.surveyId],
-    ["Accompanying APM", input.apm || "—"],
-    ["Responding ASM", input.asm || "—"],
-    ["School Principal", input.principal || "—"],
+    ["Engineering Staff", input.apm || "—"],
+    ["ASM", input.asm || "—"],
+    ["Principal", input.principal || "—"],
     ["Power Supply", input.powerSupply || "—"],
     ["Structural concern observed", input.structuralConcern || "—"],
     ["Suggested structural type", input.buildingStructure || "—"],
-    ["Type of structure (visual)", input.typeOfStructure || "—"],
+    // Only older surveys answered this; v2 no longer asks it (W17).
+    ...(input.typeOfStructure ? ([["Type of structure (visual)", input.typeOfStructure]] as [string, string][]) : []),
     ["Center beam in classrooms", input.centerBeam || "—"],
     ["Drilling check done", input.drillingCheck.done || "—"],
     ["Drilling point marked", input.drillingCheck.pointMarked || "—"],

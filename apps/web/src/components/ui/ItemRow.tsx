@@ -2,6 +2,7 @@
 import { Info, StickyNote } from "lucide-react";
 import { useState } from "react";
 import type { Condition, PhotoAsset, RubricItem } from "@/lib/types";
+import { isUnsafe } from "@mqi/shared";
 import { ConditionPills } from "./ConditionPills";
 import { IconButton } from "./IconButton";
 import { ConditionInfoPanel } from "./ConditionInfoPanel";
@@ -37,6 +38,8 @@ export function ItemRow({
   const [infoOpen, setInfoOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(Boolean(note));
   const { compressing, error: photoError, handlePick } = usePhotoAttachHandler(onAddPhoto);
+  // v2 (W13): Unsafe needs a photo before the location can be saved.
+  const unsafeNeedsPhoto = isUnsafe(item, value) && photos.length === 0;
 
   return (
     <div className="py-2.5 border-b border-border">
@@ -69,7 +72,11 @@ export function ItemRow({
           </IconButton>
         </div>
       </div>
+      {item.guidance ? <p className="text-[11.5px] text-ink-soft leading-snug -mt-1 mb-2">{item.guidance}</p> : null}
       <ConditionPills value={value} onChange={onScoreChange} options={item.conditionOverride} hideNA={item.hideNA} />
+      {unsafeNeedsPhoto ? (
+        <div className="text-[11.5px] font-medium text-band-poor mt-1.5">Marked Unsafe — attach a photo of it to save this location.</div>
+      ) : null}
       {compressing ? <div className="text-[11px] text-ink-faint mt-1">Compressing photo…</div> : null}
       {photoError ? <div className="text-[11px] text-band-poor mt-1">{photoError}</div> : null}
       <PhotoThumbList photos={photos} onRemovePhoto={onRemovePhoto} />

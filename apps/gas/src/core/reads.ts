@@ -37,7 +37,8 @@ const SCHOOLS_TTL = 30 * 60;
 const DASHBOARD_TTL = 5 * 60;
 
 export function schools(ctx: Ctx): SchoolsResult {
-  return cached(ctx.env, 'schools', SCHOOLS_TTL, () => ({ schools: parseSchools(ctx.env.schools.grid()) }));
+  // 'schools.v2': the list now carries campus details; the key change drops lists cached before.
+  return cached(ctx.env, 'schools.v2', SCHOOLS_TTL, () => ({ schools: parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()) }));
 }
 
 export function dashboard(ctx: Ctx): DashboardData {

@@ -1,4 +1,5 @@
 
+import { isUnsafe } from "@mqi/shared";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ScreenShell } from "@/components/ui/ScreenShell";
@@ -78,7 +79,9 @@ export default function CategoryPage() {
   const categoryStatus = applicableCategories.map((wc) => {
     const items = rubricGroupsForLocationAndSection(type, wc);
     const answered = items.filter((i) => current!.scores[i.name]).length;
-    return { wc, items, answered, total: items.length, complete: answered === items.length };
+    // v2 (W13): an Unsafe item without a photo keeps its section incomplete.
+    const unsafeMissing = items.filter((i) => isUnsafe(i, current!.scores[i.name]) && !(current!.photos[i.name]?.length)).length;
+    return { wc, items, answered, total: items.length, unsafeMissing, complete: answered === items.length && unsafeMissing === 0 };
   });
   const incomplete = categoryStatus.filter((c) => !c.complete);
   const allComplete = incomplete.length === 0;
@@ -162,7 +165,7 @@ export default function CategoryPage() {
           total={total}
           open={openCategory === wc}
           onToggle={() => setOpenCategory((prev) => (prev === wc ? null : wc))}
-          pending={attemptedSave && answered < total}
+          pending={attemptedSave && !categoryStatus.find((c) => c.wc === wc)!.complete}
         >
           {items.map((item) => (
             <ItemRow
@@ -176,7 +179,7 @@ export default function CategoryPage() {
               onAddPhoto={(f) => handleAddPhoto(item.name, f)}
               onRemovePhoto={(id) => handleRemovePhoto(item.name, id)}
               onNoteChange={(v) => locCurrentSetNote(item.name, v)}
-              pending={attemptedSave && !current!.scores[item.name]}
+              pending={attemptedSave && (!current!.scores[item.name] || (isUnsafe(item, current!.scores[item.name]) && !(current!.photos[item.name]?.length)))}
             />
           ))}
         </AccordionSection>
@@ -188,9 +191,11 @@ export default function CategoryPage() {
         </Button>
         {attemptedSave && !allComplete ? (
           <p className="text-center text-[11.5px] text-band-poor mt-2.5">
-            {incomplete.length === 1
-              ? `"${incomplete[0]!.wc}" still has unscored items.`
-              : `${incomplete.length} categories still have unscored items.`}
+            {incomplete.some((c) => c.unsafeMissing > 0) && incomplete.every((c) => c.answered === c.total)
+              ? "Attach a photo to every item marked Unsafe."
+              : incomplete.length === 1
+                ? `"${incomplete[0]!.wc}" still has unscored items or an Unsafe item without a photo.`
+                : `${incomplete.length} categories still have unscored items or an Unsafe item without a photo.`}
           </p>
         ) : (
           <p className="text-center text-[11.5px] text-ink-faint mt-2.5">Score every category to continue.</p>

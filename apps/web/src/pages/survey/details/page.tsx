@@ -6,15 +6,25 @@ import { TopBar } from "@/components/ui/TopBar";
 import { Field, TextInput } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
+import { useAuth } from "@/lib/auth/client";
 import { useSurvey } from "@/lib/survey-context";
+import { joinStaff, splitStaff } from "@mqi/shared";
 
 /**
- * Respondent details, then into the survey (scoring location by location).
+ * Survey details, then into the survey (scoring location by location).
+ *
+ * v2 (W11): the person filling the survey is the first of the accompanying engineering staff,
+ * filled in from their account; more people can be added. ASM and Principal are recorded only
+ * when present.
  */
 export default function SurveyDetailsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const { state, hydrated, setRespondent, startSurvey } = useSurvey();
-  const [apm, setApm] = useState(state.apm);
+  const [staff, setStaff] = useState<string[]>(() => {
+    const saved = splitStaff(state.apm);
+    return saved.length ? saved : [user?.name ?? ""];
+  });
   const [asm, setAsm] = useState(state.asm);
   const [principal, setPrincipal] = useState(state.principal);
 
@@ -24,11 +34,15 @@ export default function SurveyDetailsPage() {
     if (!state.school) router.replace("/survey/find-school");
   }, [hydrated, state.school, router]);
 
-  const respondentComplete = Boolean(apm.trim() && asm.trim() && principal.trim());
+  const detailsComplete = staff.some((s) => s.trim());
+
+  function setStaffAt(i: number, value: string) {
+    setStaff((list) => list.map((s, j) => (j === i ? value : s)));
+  }
 
   function start() {
-    if (!respondentComplete) return;
-    setRespondent(asm, apm, principal);
+    if (!detailsComplete) return;
+    setRespondent(asm.trim(), joinStaff(staff), principal.trim());
     startSurvey();
     router.push("/survey/locations");
   }
@@ -43,22 +57,45 @@ export default function SurveyDetailsPage() {
         onBack={() => router.push("/survey/find-school")}
       />
 
-      <Field label="Accompanying APM *">
-        <TextInput placeholder="Assistant project manager" value={apm} onChange={(e) => setApm(e.target.value)} />
+      <Field label="Accompanying Engineering Staff *">
+        <div className="space-y-2">
+          {staff.map((name, i) => (
+            <div key={i} className="flex gap-2">
+              <TextInput
+                placeholder={i === 0 ? "Your name" : "Name of accompanying staff"}
+                value={name}
+                onChange={(e) => setStaffAt(i, e.target.value)}
+              />
+              {i > 0 ? (
+                <button
+                  type="button"
+                  aria-label={`Remove ${name || "this person"}`}
+                  onClick={() => setStaff((list) => list.filter((_, j) => j !== i))}
+                  className="shrink-0 min-w-11 rounded-[10px] border border-border text-ink-soft text-lg"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setStaff((list) => [...list, ""])}
+          className="mt-2 text-[13px] font-semibold text-brand-deep underline"
+        >
+          + Add accompanying staff
+        </button>
       </Field>
-      <Field label="Responding ASM *">
+      <Field label="ASM (if present)">
         <TextInput placeholder="Admin and support manager" value={asm} onChange={(e) => setAsm(e.target.value)} />
       </Field>
-      <Field label="School Principal *">
-        <TextInput
-          placeholder="School principal's name"
-          value={principal}
-          onChange={(e) => setPrincipal(e.target.value)}
-        />
+      <Field label="Principal (if present)">
+        <TextInput placeholder="School principal's name" value={principal} onChange={(e) => setPrincipal(e.target.value)} />
       </Field>
 
-      {!respondentComplete ? (
-        <p className="text-[11.5px] text-ink-faint -mt-2 mb-3">All three names are required to continue.</p>
+      {!detailsComplete ? (
+        <p className="text-[11.5px] text-ink-faint -mt-2 mb-3">Enter at least one engineering staff name to continue.</p>
       ) : null}
 
       <p className="text-[12.5px] text-ink-soft leading-snug">
@@ -67,7 +104,7 @@ export default function SurveyDetailsPage() {
       </p>
 
       <BottomBar>
-        <Button onClick={start} disabled={!respondentComplete}>
+        <Button onClick={start} disabled={!detailsComplete}>
           Start survey
         </Button>
       </BottomBar>

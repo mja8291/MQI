@@ -53,7 +53,8 @@ function v2WrittenRows(): SheetRow[] {
     loc('Roof 1', 'Roof', 'Roof', { 'Access to roof area /tanks': 'Very Poor', 'Roof Screeding/roof drainage': 'Good', 'Water Storage (Overhead Tank)': 'Poor', 'External Plumbing': 'Ok', 'Grill Gate': 'N/A', 'Solar Panels/Inverter/Batteries': 'Good', Plaster: 'Poor', Masonry: 'Ok' }),
     loc('KG A', 'Classroom', 'Ground', {
       'Concrete/Plaster Soundness': 'Good',
-      'Ceiling Condition i.e. cracks & seepage': 'Very Poor',
+      // OK, not Unsafe: an Unsafe answer needs a photo (W13) and this survey carries none.
+      'Ceiling Condition i.e. cracks & seepage': 'Good',
       'Wall/Column Condition i.e. cracks': 'Good',
       'Green board/Softboard/Cabinet': 'Ok',
       'Electrical Fixtures + Switch/Dimmer Sheet': 'Poor',
@@ -110,6 +111,8 @@ function v2WrittenRows(): SheetRow[] {
 const writtenRows = v2WrittenRows();
 const ALL_M2: SheetRow[] = [...productionRows, ...writtenRows];
 const surveyIds = [...new Set(ALL_M2.map((r) => r['Survey ID']!))];
+const asV1Row = (r: SheetRow): SheetRow =>
+  'Accompanying Engineering Staff' in r ? { ...r, 'Accompanying APM': r['Accompanying Engineering Staff']! } : r;
 const SCHOOLS = [
   { schoolId: '947', name: 'OGS Trust Campus', region: 'South West', area: 'Gadap West I' },
   { schoolId: '499', name: 'Alfalah Campus', region: 'Lower Sindh', area: 'Hyderabad 1' },
@@ -121,7 +124,8 @@ const SCHOOLS = [
 // ---- v1's read layer, replaced by the same rows ----
 
 vi.mock('../../../reference/src/lib/sheets/read', () => ({
-  readRowsByHeader: async (_id: string, tab: string) => (tab === 'Method 2 Responses' ? ALL_M2 : []),
+  // v1 knows the staff column by its old name (W11 renamed it in place).
+  readRowsByHeader: async (_id: string, tab: string) => (tab === 'Method 2 Responses' ? ALL_M2.map(asV1Row) : []),
 }));
 vi.mock('../../../reference/src/lib/sheets/client', () => ({ sheetsConfigured: () => true, getSheetsClient: async () => ({}) }));
 vi.mock('../../../reference/src/lib/sheets/schools', () => ({ getSchools: async () => SCHOOLS }));
@@ -138,6 +142,30 @@ function withoutMethodRow(v1: Record<string, unknown>): Record<string, unknown> 
     const row = Number(m[2]);
     if (row === 3) continue;
     out[row > 3 && row <= 7 ? `${m[1]}!R${row - 1}C${m[3]}` : key] = value;
+  }
+  return out;
+}
+
+/**
+ * The text a PDF draws, in order. Positions are left out: v2 drops a row v1 drew (W17), which
+ * moves everything below it, while every remaining string must match.
+ */
+async function pdfText(bytes: Uint8Array): Promise<string[]> {
+  return [...(await pdfContent(bytes)).matchAll(/\((.*?)\) Tj/g)].map((m) => m[1]!);
+}
+
+/** v1's PDF text with v2's deliberate changes applied: D15 (no "Method 2 · "), W11 labels, W17 row. */
+function v1TextAsV2(text: string[]): string[] {
+  const label: Record<string, string> = { 'Accompanying APM': 'Engineering Staff', 'Responding ASM': 'ASM', 'School Principal': 'Principal' };
+  const out: string[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const t = text[i]!;
+    // "—" is 0x97 in the PDF's WinAnsi text.
+    if (t === 'Type of structure (visual)' && text[i + 1] === '\u0097') {
+      i++;
+      continue;
+    }
+    out.push(label[t] ?? t.replace(/^Method 2 \u00b7 /, ''));
   }
   return out;
 }
@@ -198,7 +226,7 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
     expect(cells(v2Workbook(workbookInput(v2Found)))).toEqual(withoutMethodRow(cells(v1)));
   });
 
-  test.each(surveyIds.map((id) => [id]))('PDF for %s: draws exactly what v1 draws (less the Method label)', async (id) => {
+  test.each(surveyIds.map((id) => [id]))('PDF for %s: draws the same text as v1 (less D15/W11/W17 changes)', async (id) => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-28T06:00:00.000Z'));
     const { findSurvey } = await import('../../../reference/src/lib/export/find-survey');
@@ -241,9 +269,9 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
     const v2Found = foundSurveyFromRows(id, ALL_M2.filter((r) => r['Survey ID'] === id))!;
     const v2 = await v2Pdf(pdfInput(v2Found));
     vi.useRealTimers();
-    const v1Content = await pdfContent(v1);
-    expect(v1Content).toContain('(Method 2 \u00b7 ');
-    expect(await pdfContent(v2)).toEqual(v1Content.replace('(Method 2 \u00b7 ', '('));
+    const v1Text = await pdfText(v1);
+    expect(v1Text.some((t) => t.startsWith('Method 2 \u00b7 '))).toBe(true);
+    expect(await pdfText(v2)).toEqual(v1TextAsV2(v1Text));
   });
 
   test('dashboard figures match v1', async () => {

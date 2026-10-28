@@ -52,9 +52,12 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   // --- offline from here on ---
   await context.setOffline(true);
   await page.getByPlaceholder('Start typing a campus name').fill('OGS');
-  await page.getByRole('button', { name: /OGS Trust Campus/ }).click();
+  await page.getByRole('button', { name: /^OGS Trust Campus South West/ }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByPlaceholder('Assistant project manager').fill('APM One');
+  // W11: the surveyor's own name is filled in as the first engineering staff member.
+  await expect(page.getByPlaceholder('Your name')).toHaveValue('Dev Surveyor');
+  await page.getByRole('button', { name: '+ Add accompanying staff' }).click();
+  await page.getByPlaceholder('Name of accompanying staff').fill('APM Two');
   await page.getByPlaceholder('Admin and support manager').fill('ASM One');
   await page.getByPlaceholder("School principal's name").fill('Principal One');
   await page.getByRole('button', { name: /Start survey/ }).click();
@@ -93,14 +96,14 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   const s = reopened.locator('select');
   await s.nth(0).selectOption('Solar');
   await s.nth(1).selectOption('NO');
-  await s.nth(2).selectOption('RCC');
-  await s.nth(3).selectOption('RCC (Frame)');
-  await s.nth(4).selectOption('YES');
-  await s.nth(5).selectOption('Ladder');
-  await s.nth(6).selectOption('Provided');
-  await s.nth(7).selectOption('No');
-  await s.nth(8).selectOption('Yes');
-  await s.nth(9).selectOption('NO');
+  await s.nth(2).selectOption('Unknown'); // W17: new option; the repeated type-of-structure question is gone
+  await s.nth(3).selectOption('YES');
+  await s.nth(4).selectOption('Ladder');
+  await s.nth(5).selectOption('Provided');
+  await s.nth(6).selectOption('No');
+  await s.nth(7).selectOption('Yes');
+  await s.nth(8).selectOption('NO');
+  await expect(s).toHaveCount(9);
   await reopened.locator('input[type=file][capture]').first().setInputFiles(PHOTO);
   await reopened.locator('input[type=checkbox]').last().check();
   await reopened.getByRole('button', { name: 'Submit survey' }).click();
@@ -120,6 +123,7 @@ test('offline survey with photos survives reload and kill, then syncs exactly on
   expect(new Set(rows.map((r) => r['Survey ID'])).size).toBe(1);
   expect(rows.map((r) => r['Location Name']).sort()).toEqual(['Exterior Facade 1', 'Roof 1']);
   expect(rows.every((r) => r['Submitter Email'] === 'surveyor@tcf.test' && r['Source App'] === 'v2')).toBe(true);
+  expect(rows.every((r) => r['Accompanying Engineering Staff'] === 'Dev Surveyor; APM Two' && r['Suggested Structural Type'] === 'Unknown')).toBe(true);
   const photoRows = after.attachments.slice(before.attachments.length).filter((r) => r['Photo URL']);
   expect(photoRows).toHaveLength(2);
 

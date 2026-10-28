@@ -72,6 +72,7 @@ export const BUILDING_STRUCTURE_OPTIONS: BuildingStructure[] = [
   "Precast",
   "Hybrid (RCC+Precast)",
   "Hybrid (Load-Bearing+RCC)",
+  "Unknown",
 ];
 
 interface RatingDefinition {

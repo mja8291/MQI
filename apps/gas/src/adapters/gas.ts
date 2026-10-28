@@ -126,11 +126,30 @@ class Responses implements ResponsesPort {
   }
 }
 
+/** The department's E-Compound Spreadsheet (read only); override with ECOMPOUND_SPREADSHEET_ID. */
+const DEFAULT_ECOMPOUND_SPREADSHEET_ID = '1F3e0-nGWeDeSUnlZq6Thqa-wSE9LlXnNFrqlUwMrcfM';
+
 const schools: SchoolsPort = {
   grid() {
     const ss = SpreadsheetApp.openById(requireProp(PROP.SCHOOLS_SPREADSHEET_ID));
     const s = ss.getSheetByName(props.get(PROP.SCHOOLS_SHEET_TAB) || 'Schools (All Units)');
     return s ? s.getDataRange().getDisplayValues() : [];
+  },
+  eCompoundGrid() {
+    // Only the three columns Find school needs (the sheet has ~90); any failure → no names.
+    try {
+      const s = SpreadsheetApp.openById(props.get(PROP.ECOMPOUND_SPREADSHEET_ID) || DEFAULT_ECOMPOUND_SPREADSHEET_ID).getSheets()[0];
+      if (!s || s.getLastRow() < 2) return [];
+      const header = s.getRange(1, 1, 1, s.getLastColumn()).getDisplayValues()[0]!.map((h) => h.trim().toLowerCase());
+      const wanted = ['campus id', 'e-compound', 'ecompoundno'].map((n) => header.indexOf(n));
+      if (wanted[1] === -1) return [];
+      const n = s.getLastRow();
+      const cols = wanted.map((i) => (i === -1 ? Array.from({ length: n }, () => ['']) : s.getRange(1, i + 1, n, 1).getDisplayValues()));
+      return Array.from({ length: n }, (_, r) => cols.map((c) => c[r]![0] ?? ''));
+    } catch (e) {
+      console.warn('E-Compound Spreadsheet unavailable: ' + String(e));
+      return [];
+    }
   },
 };
 

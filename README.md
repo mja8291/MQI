@@ -79,6 +79,7 @@ Set these in the Apps Script editor (Project Settings → Script Properties) **b
 | `ENV_NAME` | yes | `staging` or `production` |
 | `SCHOOLS_SPREADSHEET_ID` | yes | v1's school list spreadsheet, read only (`Schools_Standardized`, `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q`) |
 | `SCHOOLS_SHEET_TAB` | no | Default `Schools (All Units)` |
+| `ECOMPOUND_SPREADSHEET_ID` | no | E-Compound Spreadsheet for campus e-compound names on Find school (read only). Default `1F3e0-nGWeDeSUnlZq6Thqa-wSE9LlXnNFrqlUwMrcfM`; if unreadable, the school list still loads without names |
 | `RESPONSES_SPREADSHEET_ID` | production | v2's responses spreadsheet (`MQI Spreadsheet`, `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o`) |
 | `SOURCE_RESPONSES_SPREADSHEET_ID` | staging | The same production responses ID; `setup()` copies it into `02 Staging` and sets `RESPONSES_SPREADSHEET_ID` to the copy |
 | `ADMIN_EMAIL`, `ADMIN_NAME` | yes | First administrator; `setup()` prints a one-time temporary password to the execution log |

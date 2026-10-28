@@ -1,4 +1,4 @@
-import { ATTACHMENTS_HEADER, ATTACHMENTS_TAB, UPLOAD_CHUNK_BYTES, base64Decode, base64Encode, can, fileGetPayload, photoLocation, photoRow, uploadPayload } from '@mqi/shared';
+import { ATTACHMENTS_HEADER, ATTACHMENTS_TAB, UPLOAD_CHUNK_BYTES, base64Decode, base64Encode, bytesToHex, can, fileGetPayload, photoLocation, photoRow, uploadPayload } from '@mqi/shared';
 import type { AttachmentMeta, FileGetResult, UploadResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
@@ -71,9 +71,17 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
   const bytes = base64Decode(p.data);
   const isLast = p.chunkIndex === p.chunkCount - 1;
   const expected = isLast ? p.totalSize - p.chunkIndex * UPLOAD_CHUNK_BYTES : UPLOAD_CHUNK_BYTES;
-  if (bytes.length !== expected) {
+  // A short or damaged chunk is a transport fault: release the claim and answer with a
+  // retryable error, so the phone sends it again (v2, W14). Nothing reaches Drive.
+  const damaged =
+    bytes.length !== expected
+      ? `has ${bytes.length} bytes, expected ${expected}`
+      : p.sha256 && bytesToHex(ctx.env.crypto.sha256(bytes)) !== p.sha256
+        ? 'does not match its checksum'
+        : '';
+  if (damaged) {
     withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').update(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
-    fail('VALIDATION', `Chunk ${p.chunkIndex} has ${bytes.length} bytes, expected ${expected}.`);
+    fail('INTERNAL', `Photo chunk ${p.chunkIndex} ${damaged}; it will be sent again.`);
   }
 
   const survey = Table.of(ctx.env, 'SURVEYS', 'surveyId').get(f.surveyId ?? '');

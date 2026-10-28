@@ -126,6 +126,8 @@ export const uploadPayload = z.object({
   chunkCount: z.number().int().min(1).max(10),
   totalSize: z.number().int().min(1).max(15 * 1024 * 1024),
   data: z.string().max(Math.ceil((UPLOAD_CHUNK_BYTES * 4) / 3) + 8),
+  /** v2 (W14): SHA-256 (hex) of this chunk's bytes; a mismatch is resent, never stored. */
+  sha256: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 });
 export interface UploadResult {
   /** Chunks the server holds for this attachment, so a retry resends only what is missing. */

@@ -13,12 +13,15 @@ Record for every check: phone model, Android/Chrome version, pass/fail, and a no
 ## 1. Airplane mode, start to finish
 
 - [ ] Airplane mode **on** before starting. Find school says **Offline — showing the last saved campus list** after a moment. Find school by search, then by Region → Area → School.
-- [ ] Enter the three names, then start. The timer runs.
+- [ ] Search a campus by name: Region, Area and School fill in by themselves, and the card below shows its e-compound name, location, coordinates (tap → map) and other campuses in the same e-compound. Change Region → Area and School clear.
+- [ ] Survey details: your name is already under **Accompanying Engineering Staff**; add a second person; leave ASM and Principal empty → **Start survey** still works. The timer runs.
 - [ ] Record at least one location of every type: Classroom (with section), Classroom "Library" (no section), Toilet, Lab, Other Room, Corridor & Stairs, Exterior Facade, External Development, Roof.
-- [ ] Attach photos with both **Take photo** and **Choose from gallery**. Each shows a name and size under 300 KB within a few seconds, and the screen never freezes.
+- [ ] Attach photos with both **Take photo** and **Choose from gallery**. Each shows a name and a size between about 25 KB and 450 KB within a few seconds, and the screen never freezes.
 - [ ] Leave a location half-scored → the app asks to discard or finish.
+- [ ] Mark **Concrete/Plaster Soundness** Unsafe (its hammer-tapping instruction shows under it) → the location will not save until a photo is attached to it.
+- [ ] The Floor level screen shows a count on each floor that has locations.
 - [ ] Pause → Resume. Save draft. The Review screen's live score updates.
-- [ ] Review: answer every question. "Roof clean = No" refuses to submit until a photo is attached. Drilling YES needs positive thicknesses.
+- [ ] Review: answer every question. There is no "Type of Structure (visual inspection)" question; the structural type question offers **Unknown**. "Roof clean = No" refuses to submit until a photo is attached. Drilling YES needs positive thicknesses.
 - [ ] Download the **draft** Excel and PDF from Review while still offline. Both open.
 - [ ] Submit → **Saved offline**. The Queue badge shows 1, and the survey appears under **Waiting to sync** as "Waiting for a connection".
 - [ ] Airplane mode **off** → within a minute, with no taps, the Queue empties. The staging sheet has one row per location, **once**, with `Source App = v2` and your name and email in Submitted By and Submitter Email. One `MQI Survey Attachments` row per photo has a Drive link that opens for the department account.
@@ -28,6 +31,7 @@ Record for every check: phone model, Android/Chrome version, pass/fail, and a no
 - [ ] Use Chrome DevTools remote debugging with "Slow 3G", or go to a known weak spot. Submit a survey with 10+ photos.
 - [ ] The Done screen moves from **Sending…** to **Survey submitted**. Photos continue in the background, and the Queue says "On the server · uploading photos" until done.
 - [ ] Toggle airplane mode on and off a few times while photos upload. In the end each photo appears **once** in Drive and once in the attachments tab.
+- [ ] While photos are still uploading, the survey's rows are already in the sheet (data goes first), and a second survey submitted meanwhile also reaches the sheet without waiting for the first one's photos.
 
 ## 3. Kill and restore
 

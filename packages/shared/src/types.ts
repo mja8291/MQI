@@ -16,7 +16,8 @@ export type BuildingStructure =
   | "RCC"
   | "Precast"
   | "Hybrid (RCC+Precast)"
-  | "Hybrid (Load-Bearing+RCC)";
+  | "Hybrid (Load-Bearing+RCC)"
+  | "Unknown";
 
 export type CenterBeam = "YES" | "NO" | "N/A";
 
@@ -127,6 +128,8 @@ export interface RubricItem {
    * narrower, relabeled set of buttons. N/A remains selectable regardless.
    */
   conditionOverride?: { condition: Exclude<Condition, "N/A">; label: string }[];
+  /** v2 (W12): an instruction shown under the item name, e.g. how to test it on site. */
+  guidance?: string;
   /** Drops N/A from the picker entirely — for an item where "not applicable" never makes sense (e.g. "Access to roof area /tanks": you're standing at the roof access, so it's either there or it isn't). */
   hideNA?: boolean;
 }
@@ -187,6 +190,16 @@ export interface School {
   name: string;
   region: string;
   area: string;
+  /** v2 campus details for Find school (school list only; never written to the response tabs). */
+  town?: string;
+  city?: string;
+  address?: string;
+  latitude?: string;
+  longitude?: string;
+  /** eCompound No from Schools_Standardized, e.g. "GP/13/16"; campuses sharing it are siblings. */
+  eCompoundNo?: string;
+  /** Name from the E-Compound Spreadsheet, e.g. "102 RB Budha Chak (N/124/12)". */
+  eCompoundName?: string;
 }
 
 export interface RespondentDetails {
