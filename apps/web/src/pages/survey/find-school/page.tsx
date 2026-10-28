@@ -16,6 +16,9 @@ export default function FindSchoolPage() {
   const router = useRouter();
   const { state, setSchool } = useSurvey();
   const [schools, setSchools] = useState<School[]>([]);
+  // v2 (parity-notes W9): the saved list shows at once; the note says "Updating" while the
+  // fresh list loads (Apps Script takes seconds) and "Offline" only once that load has failed.
+  const [listState, setListState] = useState<"loading" | "fresh" | "failed">("loading");
   const [usingCache, setUsingCache] = useState(false);
   const [query, setQuery] = useState("");
   const [region, setRegion] = useState("");
@@ -24,8 +27,10 @@ export default function FindSchoolPage() {
 
   useEffect(() => {
     // Show the last-known list immediately (works offline), then refresh from the network.
+    let fresh = false;
     getCachedSchools().then((cached) => {
-      if (cached) {
+      // The network can answer first; never replace a fresh list with the saved one.
+      if (cached && !fresh) {
         setSchools(cached);
         setUsingCache(true);
       }
@@ -35,13 +40,16 @@ export default function FindSchoolPage() {
     // overwritten with an empty list.
     api<SchoolsResult>("schools.list")
       .then((data) => {
+        fresh = true;
         const list = data.schools ?? [];
         setSchools(list);
         setUsingCache(false);
+        setListState("fresh");
         if (list.length > 0) cacheSchools(list);
       })
       .catch((e: unknown) => {
         // Whatever we already loaded from cache (if any) stands.
+        setListState("failed");
         if (isAuthError(e)) notifyAuthRequired();
       });
   }, []);
@@ -79,7 +87,9 @@ export default function FindSchoolPage() {
 
       {usingCache ? (
         <p className="text-[11px] text-ink-faint bg-surface rounded-lg px-2.5 py-2 mb-3">
-          Offline — showing the last saved campus list.
+          {listState === "failed"
+            ? "Offline — showing the last saved campus list."
+            : "Updating the campus list… you can search the saved one now."}
         </p>
       ) : null}
 
