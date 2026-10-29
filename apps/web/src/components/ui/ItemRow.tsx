@@ -10,7 +10,6 @@ import { PhotoAttachButtons, PhotoThumbList, usePhotoAttachHandler } from "./Pho
 
 interface ItemRowProps {
   item: RubricItem;
-  worstCase?: boolean;
   value: Condition | undefined;
   /** Multiple photos per item are allowed — this is the item's full list, not just the latest one. Each uploads to Drive individually on attach; see PhotoAsset. */
   photos: PhotoAsset[];
@@ -28,7 +27,6 @@ interface ItemRowProps {
 
 export function ItemRow({
   item,
-  worstCase,
   value,
   photos,
   note,
@@ -67,10 +65,8 @@ export function ItemRow({
           ) : null}
         </span>
       </div>
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="text-[10.5px] text-ink-faint whitespace-nowrap">
-          {item.weight}%{worstCase ? " · worst-case" : ""}
-        </span>
+      {/* v2 (W38): no weight / worst-case text under the name. */}
+      <div className="flex items-center justify-end gap-2 mb-2">
         <div className="flex items-center gap-1.5 shrink-0">
           <IconButton active={infoOpen} aria-label="Rating guidance" onClick={() => setInfoOpen((v) => !v)}>
             <Info size={16} />

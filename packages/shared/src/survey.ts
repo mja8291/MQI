@@ -48,11 +48,15 @@ export const locationSchema = z.object({
 
 export const drillingCheckSchema = z.object({
   done: blankOr(['YES', 'NO']),
-  pointMarked: blankOr(['Ok', 'Unsafe']),
+  pointMarked: blankOr(['YES', 'NO', 'Ok', 'Unsafe']),
   slabAssessment: blankOr(['Ok', 'Unsafe']).optional(),
   slabThicknessMm: text(20),
   screedThicknessMm: text(20),
   holeRepaired: blankOr(['YES', 'NO']),
+  extraHoles: z
+    .array(z.object({ slabThicknessMm: text(20), screedThicknessMm: text(20), slabAssessment: blankOr(['Ok', 'Unsafe']) }))
+    .max(20)
+    .optional(),
 }) satisfies z.ZodType<DrillingCheck>;
 
 export const siteChecksSchema = z.object({
@@ -148,6 +152,10 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
   if (s.drillingCheck.done === 'YES') {
     need(positive(s.drillingCheck.slabThicknessMm), 'drillingCheck.slabThicknessMm', 'Slab thickness must be a positive number.');
     need(positive(s.drillingCheck.screedThicknessMm), 'drillingCheck.screedThicknessMm', 'Screeding thickness must be a positive number.');
+    (s.drillingCheck.extraHoles ?? []).forEach((h, i) => {
+      need(positive(h.slabThicknessMm) && positive(h.screedThicknessMm), `drillingCheck.extraHoles.${i}`, `Drill hole ${i + 2}: both thicknesses must be positive numbers.`);
+      need(Boolean(h.slabAssessment), `drillingCheck.extraHoles.${i}`, `Drill hole ${i + 2}: choose the slab thickness assessment.`);
+    });
   }
   need(isSiteChecksComplete(s.siteChecks, s.reviewPhotos), 'siteChecks', 'Answer every roof and drainage question; "No" needs a photo.');
   if (s.siteChecks.riskFactors.includes('Any other')) {

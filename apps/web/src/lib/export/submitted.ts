@@ -48,6 +48,7 @@ export function pdfInput(found: FoundSurvey): SingleSurveyPdfInput {
     typeOfStructure: found.typeOfStructure,
     centerBeam: found.centerBeam,
     drillingCheck: found.drillingCheck,
+    additionalDrillHoles: found.additionalDrillHoles,
     siteChecks: found.siteChecks,
     complaints: found.complaints,
     overall: found.overall,

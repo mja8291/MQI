@@ -1,4 +1,4 @@
-import { RUBRIC_VERSION, itemsCovered } from "@mqi/shared";
+import { RUBRIC_VERSION, drillHolesText, itemsCovered } from "@mqi/shared";
 
 import { buildSingleSurveyWorkbook } from "./single-survey-workbook";
 import { buildSingleSurveyPdf } from "./single-survey-pdf";
@@ -136,6 +136,7 @@ export async function buildDraftPdfBlob({
     typeOfStructure,
     centerBeam,
     drillingCheck,
+    additionalDrillHoles: drillHolesText(drillingCheck.extraHoles),
     siteChecks,
     complaints,
     overall: result.overall,

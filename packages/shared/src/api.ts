@@ -175,6 +175,8 @@ export interface FoundSurvey {
   timeTakenSeconds: number | null;
   /** v2 (W22): blank (null) for surveys written before the column existed. */
   itemsCoveredPercent: number | null;
+  /** v2 (W36): "Hole 2: …; Hole 3: …" as written; blank when none. */
+  additionalDrillHoles: string;
   conditions: Record<string, string>;
   aggregatedScores?: Record<string, number>;
   items: RubricItem[];

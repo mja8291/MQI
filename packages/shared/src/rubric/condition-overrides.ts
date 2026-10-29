@@ -15,7 +15,11 @@ export const OK_UNSAFE: NonNullable<RubricItem["conditionOverride"]> = [
 
 /** v2 (W12): shown under every soundness item. */
 export const SOUNDNESS_GUIDANCE =
-  "Tap with a hammer and listen for a hollow sound (it shows lamination). Mark Unsafe if a hollow sound is heard.";
+  "Tap with a hammer and listen for a hollow sound (to detect delamination effect). Mark Unsafe if a hollow sound is heard.";
+
+/** v2 (W37): shown under Wall/Column Condition. */
+export const WALL_COLUMN_GUIDANCE =
+  "Consider minor surface cracks (one sided, crazing, shrinkage, hairline cracks) in plaster item rating.";
 
 export const ROOF_ACCESS: NonNullable<RubricItem["conditionOverride"]> = [
   { condition: "Good", label: "Roof Access Available" },

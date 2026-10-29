@@ -2,6 +2,7 @@ import { CRITICAL_ITEMS, ratingBand } from './scoring';
 import { RUBRIC_GROUPS, unsafePartsText } from './rubric/items';
 import { itemsCovered } from './rubric/versions';
 import type { AttachmentMeta, SubmittedSurvey } from './survey';
+import { drillHolesText } from './types';
 
 /**
  * Port of v1 src/lib/sheets/responses.ts: same header names, same values. The responses tab is
@@ -77,6 +78,8 @@ const TRAILING_HEADER = [
   'Items Covered (%)',
   // v2 (W24): levels confirmed for the campus, e.g. "External, Ground, First, Roof".
   'Applicable Levels',
+  // v2 (W36): drill holes after the first, e.g. "Hole 2: slab 120 mm, screed 40 mm, Ok".
+  'Additional Drill Holes',
 ];
 
 export const RESPONSES_HEADER = [
@@ -148,6 +151,7 @@ function commonFields(s: SubmittedSurvey, submitter: Submitter, timestamp: strin
     'Roof Screeding Thickness (mm)': d.done === 'YES' ? d.screedThicknessMm : '',
     'Drilled Hole Repaired (Grout/Epoxy)': d.done === 'YES' ? d.holeRepaired : '',
     'Slab Thickness Assessment': d.done === 'YES' ? (d.slabAssessment ?? '') : '',
+    'Additional Drill Holes': d.done === 'YES' ? drillHolesText(d.extraHoles) : '',
     'Roof Access Type': site.roofAccessType,
     'Overflow Disposal System': site.overflowDisposal,
     'Roof Clean of Dirt and Vegetation': site.roofClean,

@@ -194,7 +194,6 @@ export default function CategoryPage() {
             <ItemRow
               key={item.name}
               item={item}
-              worstCase={item.aggregation === "worst"}
               value={current!.scores[item.name]}
               photos={current!.photos[item.name] ?? []}
               note={current!.notes[item.name]}

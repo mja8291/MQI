@@ -41,7 +41,10 @@ export const CENTER_BEAM_OPTIONS: CenterBeam[] = ["YES", "NO", "Somewhere presen
 // the sheet's own). Recorded only, never scored.
 export const DRILLING_DONE_QUESTION = "Was a drilling check of slab and roof screeding thickness carried out?";
 export const DRILLING_POINT_QUESTION = "Drilling point marked on slab by APM (clear of beams, electrical point etc.)";
-export const DRILLING_POINT_OPTIONS = ["Ok", "Unsafe"] as const;
+/** v2 (W35): YES / NO. */
+export const DRILLING_POINT_OPTIONS = ["YES", "NO"] as const;
+/** Slab thickness assessment keeps Ok / Unsafe. */
+export const SLAB_ASSESSMENT_OPTIONS = ["Ok", "Unsafe"] as const;
 export const SLAB_THICKNESS_LABEL = "Slab thickness recorded (mm)";
 export const SCREED_THICKNESS_LABEL = "Roof screeding thickness recorded (mm)";
 export const DRILLING_REPAIR_QUESTION = "Was the drilled hole repaired with grout/epoxy?";

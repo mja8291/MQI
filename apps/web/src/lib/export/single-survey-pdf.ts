@@ -26,6 +26,8 @@ export interface SingleSurveyPdfInput {
   centerBeam: string;
   /** Blank fields (a survey from before this check existed) all render as "—". */
   drillingCheck: DrillingCheck;
+  /** v2 (W36): "Hole 2: …; Hole 3: …"; omitted when there are none. */
+  additionalDrillHoles?: string;
   siteChecks: SiteChecks;
   complaints: string;
   overall: number | null;
@@ -117,6 +119,7 @@ export async function buildSingleSurveyPdf(input: SingleSurveyPdfInput): Promise
     ["Slab thickness assessment", input.drillingCheck.slabAssessment || "—"],
     ["Roof screeding thickness", input.drillingCheck.screedThicknessMm ? `${input.drillingCheck.screedThicknessMm} mm` : "—"],
     ["Hole repaired (grout/epoxy)", input.drillingCheck.holeRepaired || "—"],
+    ...(input.additionalDrillHoles ? ([["Additional drill holes", input.additionalDrillHoles]] as [string, string][]) : []),
     ["Roof access (type)", input.siteChecks.roofAccessType || "—"],
     ["Overflow disposal system", input.siteChecks.overflowDisposal || "—"],
     ["Roof clean (dirt/vegetation)", input.siteChecks.roofClean || "—"],

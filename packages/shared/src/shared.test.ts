@@ -247,6 +247,28 @@ describe('submission rules (Appendix C)', () => {
     expect(submissionIssues(survey({ drillingCheck: blankDrilling, locations: [room as SubmittedSurvey['locations'][number]] })).map((i) => i.path)).not.toContain('drillingCheck');
   });
 
+  test('W35/W36: drilling point YES/NO; additional drill holes are checked and written', () => {
+    const drill = { done: 'YES', pointMarked: 'YES', slabAssessment: 'Ok', slabThicknessMm: '125', screedThicknessMm: '50', holeRepaired: 'YES' } as const;
+    const holes = [
+      { slabThicknessMm: '120', screedThicknessMm: '40', slabAssessment: 'Ok' },
+      { slabThicknessMm: '95', screedThicknessMm: '35', slabAssessment: 'Unsafe' },
+    ] as const;
+    const s = survey({ drillingCheck: { ...drill, extraHoles: [...holes] } });
+    expect(submittedSurveySchema.safeParse(s).success).toBe(true);
+    expect(submissionIssues(s)).toEqual([]);
+    const row = responseRows(s, { name: 'S', email: 's@tcf.test' }, 'x')[0]!;
+    expect(row['Drilling Point Marked']).toBe('YES');
+    expect(row['Additional Drill Holes']).toBe('Hole 2: slab 120 mm, screed 40 mm, Ok; Hole 3: slab 95 mm, screed 35 mm, Unsafe');
+    const half = survey({ drillingCheck: { ...drill, extraHoles: [{ slabThicknessMm: '120', screedThicknessMm: '', slabAssessment: '' }] } });
+    expect(submissionIssues(half).map((i) => i.message)).toEqual([
+      'Complete the drilling check (thicknesses must be positive numbers).',
+      'Drill hole 2: both thicknesses must be positive numbers.',
+      'Drill hole 2: choose the slab thickness assessment.',
+    ]);
+    // Older surveys answered Ok / Unsafe; they stay valid.
+    expect(submittedSurveySchema.safeParse(survey({ drillingCheck: { ...drill, pointMarked: 'Ok' } })).success).toBe(true);
+  });
+
   test('W20: center beam accepts the partial answer; the oath names the signed-in staff member', () => {
     expect(submittedSurveySchema.safeParse(survey({ centerBeam: 'Somewhere present, somewhere absent' })).success).toBe(true);
     expect(oathText('Ali Khan')).toContain('I am Ali Khan, staff of Engineering Department of TCF');

@@ -239,6 +239,7 @@ function common(surveyId: string, first: SheetRow): Omit<FoundSurvey, 'rubricVer
     endTime: first['End Time'] || first['Timestamp'] || '',
     timeTakenSeconds: num(first['Time Taken (seconds)']),
     itemsCoveredPercent: num(first['Items Covered (%)']),
+    additionalDrillHoles: first['Additional Drill Holes'] ?? '',
   };
 }
 

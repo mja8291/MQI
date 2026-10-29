@@ -1,5 +1,5 @@
 import type { Category, Condition, FloorLevel, LocationType, RubricGroup, RubricItem } from "../types";
-import { OK_UNSAFE, ROOF_ACCESS, SOUNDNESS_GUIDANCE } from "./condition-overrides";
+import { OK_UNSAFE, ROOF_ACCESS, SOUNDNESS_GUIDANCE, WALL_COLUMN_GUIDANCE } from "./condition-overrides";
 
 /**
  * The survey rubric — 31 item groups (Safety 9 / Functionality 15 / Aesthetics 7),
@@ -96,6 +96,7 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM, LAB, FACADE],
     conditionOverride: OK_UNSAFE,
     unsafeParts: ["Column", "Wall"],
+    guidance: WALL_COLUMN_GUIDANCE,
   }),
   worst({
     name: "Roof Screeding/roof drainage",

@@ -33,12 +33,29 @@ export type TypeOfStructure = "RCC (Frame)" | "Load-bearing" | "Hybrid" | "N/A";
  */
 export interface DrillingCheck {
   done: "YES" | "NO" | "";
-  pointMarked: "Ok" | "Unsafe" | "";
+  /** v2 (W35): YES / NO; older surveys answered Ok / Unsafe. */
+  pointMarked: "YES" | "NO" | "Ok" | "Unsafe" | "";
   /** The slide's "Slab thickness recorded" Ok / Unsafe — whether the measured thickness is acceptable. Absent on a draft saved before it existed. */
   slabAssessment?: "Ok" | "Unsafe" | "";
   slabThicknessMm: string;
   screedThicknessMm: string;
   holeRepaired: "YES" | "NO" | "";
+  /** v2 (W36): holes drilled after the first one, each with its own readings. */
+  extraHoles?: DrillHole[];
+}
+
+/** One additional drill hole and its readings (v2, W36). */
+export interface DrillHole {
+  slabThicknessMm: string;
+  screedThicknessMm: string;
+  slabAssessment: "Ok" | "Unsafe" | "";
+}
+
+/** "Hole 2: slab 120 mm, screed 40 mm, Ok; Hole 3: …" — the sheet text for additional holes. */
+export function drillHolesText(holes: readonly DrillHole[] | undefined): string {
+  return (holes ?? [])
+    .map((h, i) => `Hole ${i + 2}: slab ${h.slabThicknessMm.trim()} mm, screed ${h.screedThicknessMm.trim()} mm${h.slabAssessment ? `, ${h.slabAssessment}` : ""}`)
+    .join("; ");
 }
 
 export function emptyDrillingCheck(): DrillingCheck {
@@ -62,7 +79,9 @@ export function isDrillingCheckComplete(c: DrillingCheck): boolean {
     Boolean(c.slabAssessment) &&
     Boolean(c.holeRepaired) &&
     positive(c.slabThicknessMm) &&
-    positive(c.screedThicknessMm)
+    positive(c.screedThicknessMm) &&
+    // W36: every additional hole needs both readings and its assessment.
+    (c.extraHoles ?? []).every((h) => positive(h.slabThicknessMm) && positive(h.screedThicknessMm) && Boolean(h.slabAssessment))
   );
 }
 
