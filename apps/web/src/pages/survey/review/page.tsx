@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ScreenShell } from "@/components/ui/ScreenShell";
 import { TopBar } from "@/components/ui/TopBar";
@@ -87,6 +87,23 @@ export default function ReviewPage() {
   const hasRoof = state.scoring.locations.some((l) => l.type === "Roof");
   const [site, setSite] = useState<SiteChecks>({ ...emptySiteChecks(), ...state.siteChecks });
   const [complaints, setLocalComplaints] = useState(state.complaints);
+  // v2 (W39): every answer here goes into the survey as it changes, so autosave keeps it
+  // (a reload or kill on this page no longer loses Review answers). Setters via a ref: their
+  // identity changes with every state change, and re-running on that would loop.
+  // Only changed values are written: opening Review must not count as activity (that would
+  // resume a paused timer).
+  const persistRef = useRef({ state, setPowerSupply, setStructuralConcern, setBuildingStructure, setCenterBeam, setSiteChecks, setComplaints });
+  persistRef.current = { state, setPowerSupply, setStructuralConcern, setBuildingStructure, setCenterBeam, setSiteChecks, setComplaints };
+  useEffect(() => {
+    const p = persistRef.current;
+    const st = p.state;
+    if (powerSupply && powerSupply !== st.powerSupply) p.setPowerSupply(powerSupply);
+    if (structuralConcern && structuralConcern !== st.structuralConcern) p.setStructuralConcern(structuralConcern);
+    if (buildingStructure && buildingStructure !== st.buildingStructure) p.setBuildingStructure(buildingStructure);
+    if (centerBeam && centerBeam !== st.centerBeam) p.setCenterBeam(centerBeam);
+    if (JSON.stringify(site) !== JSON.stringify({ ...emptySiteChecks(), ...st.siteChecks })) p.setSiteChecks(site);
+    if (complaints !== st.complaints) p.setComplaints(complaints);
+  }, [powerSupply, structuralConcern, buildingStructure, centerBeam, site, complaints]);
   const [oath, setOath] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

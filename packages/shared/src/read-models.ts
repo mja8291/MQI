@@ -271,7 +271,15 @@ export function foundSurveyFromRows(surveyId: string, rows: readonly SheetRow[])
     conditions: {},
     aggregatedScores: aggregateLocations(locations, groups),
     items: groups,
-    locations: locations.map((l) => ({ floorLevel: l.floorLevel, type: l.type, name: l.name, scores: l.scores })),
+    locations: locations.map((l, i) => ({
+      floorLevel: l.floorLevel,
+      type: l.type,
+      name: l.name,
+      scores: l.scores,
+      columnCrackOver3mm: rows[i]?.['Column Crack > 3 mm'] ?? '',
+      schmidtAvailable: rows[i]?.['Schmidt Hammer Available'] ?? '',
+      schmidtReading: rows[i]?.['Schmidt Hammer Reading'] ?? '',
+    })),
   };
 }
 

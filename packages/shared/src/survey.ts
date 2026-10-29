@@ -11,6 +11,7 @@ import {
   isSiteChecksComplete,
 } from './types';
 import type { Condition, DrillingCheck, FloorLevel, LocationType, SiteChecks } from './types';
+import { columnCheckIssues } from './types';
 
 /**
  * The one MQI v2 entity the phone writes: a survey, plus its attachments (photo
@@ -44,6 +45,9 @@ export const locationSchema = z.object({
   photos: z.record(z.string().max(120), z.array(ID).max(20)),
   notes: z.record(z.string().max(120), text(2000)),
   unsafeParts: z.record(z.string().max(120), z.array(z.string().max(40)).max(4)).optional(),
+  columnCheck: z
+    .object({ crackOver3mm: blankOr(['YES', 'NO']), hammerAvailable: blankOr(['YES', 'NO']), reading: text(20) })
+    .optional(),
 });
 
 export const drillingCheckSchema = z.object({
@@ -170,6 +174,7 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
     need(!names.has(loc.name), `locations.${i}.name`, `Two locations are both named "${loc.name}".`);
     names.add(loc.name);
     need(isLocationComplete(loc), `locations.${i}`, `Score every item at ${loc.name}.`);
+    for (const message of columnCheckIssues(loc)) need(false, `locations.${i}.columnCheck`, `${loc.name}: ${message}`);
     for (const item of unsafeWithoutPhoto(loc, groups))
       need(false, `locations.${i}.photos`, `Attach a photo of "${item}" at ${loc.name}: it is marked Unsafe.`);
     for (const item of Object.keys(loc.scores)) need(groupNames.has(item), `locations.${i}.scores`, `Unknown item "${item}" at ${loc.name}.`);

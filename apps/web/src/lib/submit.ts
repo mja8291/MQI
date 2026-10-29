@@ -1,4 +1,4 @@
-import { RUBRIC_VERSION, submissionIssues, submittedSurveySchema } from '@mqi/shared';
+import { RUBRIC_VERSION, columnCheckApplies, submissionIssues, submittedSurveySchema } from '@mqi/shared';
 import type { AttachmentMeta, RuleIssue, ScoreResult, SubmittedSurvey } from '@mqi/shared';
 import { getPhoto } from './offline/db';
 import type { SurveyState } from './survey-context';
@@ -51,6 +51,8 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
       photos,
       notes: loc.notes,
       ...(loc.unsafeParts && Object.keys(loc.unsafeParts).length ? { unsafeParts: loc.unsafeParts } : {}),
+      // W41: the follow-up travels only while Column Unsafe is selected.
+      ...(loc.columnCheck && columnCheckApplies(loc) ? { columnCheck: loc.columnCheck } : {}),
     });
   }
   const reviewPhotos: Record<string, string[]> = {};

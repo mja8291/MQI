@@ -1,3 +1,4 @@
+import type { ColumnCheck } from "@mqi/shared";
 /**
  * v1's `@/lib/types`, now backed by @mqi/shared. Only the photo shapes differ: on the phone a
  * photo is an attachment id whose bytes sit in IndexedDB (lib/offline/db.ts), compressed in a
@@ -27,4 +28,6 @@ export interface SurveyLocation {
   notes: Record<string, string>;
   /** v2 (W21): parts marked unsafe for items with unsafeParts (Wall/Column). */
   unsafeParts?: Record<string, string[]>;
+  /** v2 (W41): Column Unsafe follow-up (crack > 3 mm, Schmidt Hammer). */
+  columnCheck?: ColumnCheck;
 }

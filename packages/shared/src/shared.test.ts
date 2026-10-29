@@ -26,6 +26,12 @@ import {
   splitStaff,
   toCell,
   uuidv7,
+  COLUMN_ITEM,
+  SCHMIDT_PHOTO,
+  columnCheckApplies,
+  columnCheckIssues,
+  columnCheckLine,
+  emptyColumnCheck,
 } from './index';
 import type { SurveyLocation, SubmittedSurvey } from './index';
 
@@ -219,12 +225,39 @@ describe('submission rules (Appendix C)', () => {
     const parts = { ...room, scores: { ...room.scores, 'Wall/Column Condition i.e. cracks': 'Very Poor' as const }, unsafeParts: { 'Wall/Column Condition i.e. cracks': ['Column', 'Wall'] } };
     const withParts = survey({ locations: [roof, parts as SubmittedSurvey['locations'][number]] });
     expect(submittedSurveySchema.safeParse(withParts).success).toBe(true);
-    expect(submissionIssues(withParts).map((i) => i.message)).toEqual(['Attach a photo of "Wall/Column Condition i.e. cracks" at KG A: it is marked Unsafe.']);
+    expect(submissionIssues(withParts).map((i) => i.message)).toEqual([
+      'KG A: Answer whether the column crack is wider than 3 mm.',
+      'Attach a photo of "Wall/Column Condition i.e. cracks" at KG A: it is marked Unsafe.',
+    ]);
     const row = responseRows(withParts, { name: 'S', email: 's@tcf.test' }, '2026-10-28T05:00:00.000Z')[1]!;
     expect(row['Wall/Column Condition i.e. cracks']).toBe('Column Unsafe, Wall Unsafe');
     expect(cellCondition('Column Unsafe, Wall Unsafe')).toBe('Very Poor');
     expect(cellCondition('Wall Unsafe')).toBe('Very Poor');
     expect(cellCondition('Good')).toBe('Good');
+  });
+
+  test('W41: Column Unsafe asks crack > 3 mm, then Schmidt Hammer reading and photo, and writes them to the row', () => {
+    const s = survey();
+    const roof = s.locations[0]!;
+    const room = { ...roof, id: 'KG', type: 'Classroom' as const, floorLevel: 'Ground' as const, name: 'KG A', scores: Object.fromEntries(rubricGroupsForLocation('Classroom').map((g) => [g.name, 'Good'])) };
+    const photo = { fileId: 'f1', mime: 'image/jpeg', bytes: 1000 };
+    const base = { ...room, unsafeParts: { [COLUMN_ITEM]: ['Wall'] } };
+    expect(columnCheckApplies(base)).toBe(false);
+    expect(columnCheckIssues(base)).toEqual([]);
+    const col = { ...room, unsafeParts: { [COLUMN_ITEM]: ['Column'] } };
+    const check = (c: Partial<ReturnType<typeof emptyColumnCheck>>, photos: Record<string, unknown[]> = {}) =>
+      columnCheckIssues({ ...col, columnCheck: { ...emptyColumnCheck(), ...c }, photos });
+    expect(check({})).toEqual(['Answer whether the column crack is wider than 3 mm.']);
+    expect(check({ crackOver3mm: 'NO' })).toEqual([]);
+    expect(check({ crackOver3mm: 'YES' })).toEqual(['Answer whether a Schmidt Hammer is available.']);
+    expect(check({ crackOver3mm: 'YES', hammerAvailable: 'NO' })).toEqual([]);
+    expect(check({ crackOver3mm: 'YES', hammerAvailable: 'YES', reading: '-1' })).toHaveLength(2);
+    expect(check({ crackOver3mm: 'YES', hammerAvailable: 'YES', reading: '32' }, { [SCHMIDT_PHOTO]: [photo] })).toEqual([]);
+    const done = { ...col, columnCheck: { crackOver3mm: 'YES' as const, hammerAvailable: 'YES' as const, reading: ' 32 ' } };
+    const row = responseRows(survey({ locations: [roof, done as SubmittedSurvey['locations'][number]] }), { name: 'S', email: 's@tcf.test' }, 'x')[1]!;
+    expect([row['Column Crack > 3 mm'], row['Schmidt Hammer Available'], row['Schmidt Hammer Reading']]).toEqual(['YES', 'YES', '32']);
+    expect(NUMERIC_COLUMNS.has('Schmidt Hammer Reading')).toBe(true);
+    expect(columnCheckLine('KG A', 'NO', '', '')).toBe('KG A: crack up to 3 mm');
   });
 
   test('W22: items covered = groups scored (not N/A) at least once / all groups', () => {

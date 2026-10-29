@@ -1,3 +1,4 @@
+import { columnCheckLine } from '@mqi/shared';
 import type { ExportRowsResult, FoundSurvey } from '@mqi/shared';
 import { api } from '@/lib/api';
 import type { SingleSurveyExportInput } from './single-survey-workbook';
@@ -49,6 +50,10 @@ export function pdfInput(found: FoundSurvey): SingleSurveyPdfInput {
     centerBeam: found.centerBeam,
     drillingCheck: found.drillingCheck,
     additionalDrillHoles: found.additionalDrillHoles,
+    columnChecks: (found.locations ?? [])
+      .map((l) => columnCheckLine(l.name, l.columnCrackOver3mm ?? "", l.schmidtAvailable ?? "", l.schmidtReading ?? ""))
+      .filter(Boolean)
+      .join("; "),
     siteChecks: found.siteChecks,
     complaints: found.complaints,
     overall: found.overall,

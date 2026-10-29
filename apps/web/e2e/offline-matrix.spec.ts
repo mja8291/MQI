@@ -76,6 +76,15 @@ test('1. cold start with no signal: every screen works, then the survey syncs ex
   await wall.locator('input[type=file][capture]').setInputFiles(PHOTO);
   await expect(wall.getByText(/Marked Unsafe/)).toHaveCount(0);
 
+  // W41: Column Unsafe → crack > 3 mm → Schmidt Hammer available → reading + photo, all required.
+  await p.getByRole('button', { name: 'Save Selection and Return' }).click();
+  await expect(p.getByText('Answer whether the column crack is wider than 3 mm.').last()).toBeVisible();
+  await p.getByLabel('Is the crack width more than 3 mm?').selectOption('YES');
+  await p.getByLabel('Is a Schmidt Hammer available?').selectOption('YES');
+  await p.getByLabel('Schmidt Hammer reading').fill('32');
+  await p.locator('#photo_camera_Schmidt_Hammer_Test').setInputFiles(PHOTO);
+  await expect(p.getByText(/KB · tap to view/)).toHaveCount(2); // wall + Schmidt on this page
+
   // Reload in the middle of scoring (offline): the location comes back intact.
   await p.waitForTimeout(2500);
   await p.reload();
@@ -131,11 +140,14 @@ test('1. cold start with no signal: every screen works, then the survey syncs ex
 
   // Signal back: it goes by itself, exactly once.
   await context.setOffline(false);
-  await expect.poll(async () => photoRowsOf(await devState(), id).length, { timeout: 60_000 }).toBe(2);
+  await expect.poll(async () => photoRowsOf(await devState(), id).length, { timeout: 60_000 }).toBe(3);
   const after = await devState();
   expect(rowsOf(after, id)).toHaveLength(2);
   expect(rowsOf(after, id).find((r) => r['Location Name'] === 'Girls Toilet')?.['Wall/Column Condition i.e. cracks']).toBe('Column Unsafe, Wall Unsafe');
-  expect(after.files).toBe(before.files + 2);
+  expect(after.files).toBe(before.files + 3);
+  const toilet = rowsOf(after, id).find((r) => r['Location Name'] === 'Girls Toilet')!;
+  expect([toilet['Column Crack > 3 mm'], toilet['Schmidt Hammer Available'], String(toilet['Schmidt Hammer Reading'])]).toEqual(['YES', 'YES', '32']);
+  expect(photoRowsOf(after, id).map((r) => r['Item Name'])).toContain('Schmidt Hammer Test');
   await p.reload();
   await p.getByRole('tab', { name: /Sync Pending/ }).click();
   await expect(p.getByText('Nothing waiting to sync')).toBeVisible({ timeout: 30_000 });

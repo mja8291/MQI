@@ -1,4 +1,4 @@
-import { RUBRIC_VERSION, drillHolesText, itemsCovered } from "@mqi/shared";
+import { RUBRIC_VERSION, columnCheckApplies, columnCheckLine, drillHolesText, itemsCovered } from "@mqi/shared";
 
 import { buildSingleSurveyWorkbook } from "./single-survey-workbook";
 import { buildSingleSurveyPdf } from "./single-survey-pdf";
@@ -137,6 +137,11 @@ export async function buildDraftPdfBlob({
     centerBeam,
     drillingCheck,
     additionalDrillHoles: drillHolesText(drillingCheck.extraHoles),
+    columnChecks: state.scoring.locations
+      .filter((l) => columnCheckApplies(l) && l.columnCheck)
+      .map((l) => columnCheckLine(l.name, l.columnCheck!.crackOver3mm, l.columnCheck!.hammerAvailable, l.columnCheck!.reading))
+      .filter(Boolean)
+      .join("; "),
     siteChecks,
     complaints,
     overall: result.overall,

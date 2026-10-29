@@ -211,6 +211,54 @@ export interface SurveyLocation {
   notes: Record<string, string>;
   /** v2 (W21): which parts were marked unsafe, for items with RubricItem.unsafeParts (e.g. ["Column", "Wall"]). */
   unsafeParts?: Record<string, string[]>;
+  /** v2 (W41): follow-up when a column is marked unsafe. */
+  columnCheck?: ColumnCheck;
+}
+
+/**
+ * v2 (W41): asked when Wall/Column is marked "Column Unsafe": a crack wider than 3 mm calls for a
+ * Schmidt Hammer test on the exposed concrete; if a hammer is available, its reading and a photo
+ * of the hammer showing it.
+ */
+export interface ColumnCheck {
+  crackOver3mm: "YES" | "NO" | "";
+  hammerAvailable: "YES" | "NO" | "";
+  /** Rebound number as typed. */
+  reading: string;
+}
+
+export const COLUMN_ITEM = "Wall/Column Condition i.e. cracks";
+/** Photo key (in the location's photos) for the Schmidt Hammer test photo. */
+export const SCHMIDT_PHOTO = "Schmidt Hammer Test";
+
+export function emptyColumnCheck(): ColumnCheck {
+  return { crackOver3mm: "", hammerAvailable: "", reading: "" };
+}
+
+/** True when this location has Column Unsafe, i.e. the follow-up applies. */
+export function columnCheckApplies(loc: { unsafeParts?: Record<string, string[]> }): boolean {
+  return Boolean(loc.unsafeParts?.[COLUMN_ITEM]?.includes("Column"));
+}
+
+/** What is still missing in the follow-up (empty = complete or not applicable). */
+export function columnCheckIssues(loc: {
+  unsafeParts?: Record<string, string[]>;
+  columnCheck?: ColumnCheck;
+  photos: Record<string, readonly unknown[]>;
+}): string[] {
+  if (!columnCheckApplies(loc)) return [];
+  const c = loc.columnCheck ?? emptyColumnCheck();
+  const issues: string[] = [];
+  if (!c.crackOver3mm) issues.push("Answer whether the column crack is wider than 3 mm.");
+  else if (c.crackOver3mm === "YES") {
+    if (!c.hammerAvailable) issues.push("Answer whether a Schmidt Hammer is available.");
+    else if (c.hammerAvailable === "YES") {
+      const n = Number(c.reading);
+      if (!c.reading.trim() || !Number.isFinite(n) || n <= 0) issues.push("Enter the Schmidt Hammer reading (a positive number).");
+      if (!loc.photos[SCHMIDT_PHOTO]?.length) issues.push("Attach a photo of the Schmidt Hammer test with the reading visible.");
+    }
+  }
+  return issues;
 }
 
 export interface School {
@@ -273,4 +321,12 @@ export interface SurveySubmission {
   scores: Record<string, Condition>;
   locations?: SurveyLocation[];
   attachments: { itemName: string; locationName: string; photoUrl?: string; note?: string }[];
+}
+
+/** v2 (W41): one location's Column Unsafe follow-up as text, e.g. "KG A: crack > 3 mm, Schmidt Hammer 32". */
+export function columnCheckLine(name: string, crackOver3mm: string, hammerAvailable: string, reading: string): string {
+  if (!crackOver3mm) return "";
+  if (crackOver3mm !== "YES") return `${name}: crack up to 3 mm`;
+  if (hammerAvailable === "YES") return `${name}: crack > 3 mm, Schmidt Hammer ${reading.trim()}`;
+  return `${name}: crack > 3 mm, no Schmidt Hammer available`;
 }

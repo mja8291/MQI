@@ -1,9 +1,10 @@
 
-import { emptyDrillingCheck, isDrillingCheckComplete, isUnsafe } from "@mqi/shared";
+import { COLUMN_ITEM, SCHMIDT_PHOTO, columnCheckApplies, columnCheckIssues, emptyDrillingCheck, isDrillingCheckComplete, isUnsafe } from "@mqi/shared";
+import { ColumnCheckFields } from "@/components/survey/ColumnCheckFields";
 import { DrillingCheckFields } from "@/components/survey/DrillingCheckFields";
 import { getSiblingExternal } from "@/lib/sibling-external";
 import type { SiblingExternal } from "@/lib/sibling-external";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ScreenShell } from "@/components/ui/ScreenShell";
 import { TopBar } from "@/components/ui/TopBar";
@@ -45,6 +46,7 @@ export default function CategoryPage() {
     locCurrentSetNote,
     locFinalizeCurrent,
     locCurrentSetUnsafeParts,
+    locCurrentSetColumnCheck,
     setDrillingCheck,
     locDiscardCurrent,
   } = useSurvey();
@@ -101,7 +103,9 @@ export default function CategoryPage() {
   const isRoof = type === "Roof";
   const drilling = { ...emptyDrillingCheck(), ...state.drillingCheck };
   const drillingDone = !isRoof || isDrillingCheckComplete(drilling);
-  const allComplete = incomplete.length === 0 && drillingDone;
+  // v2 (W41): Column Unsafe follow-up (crack > 3 mm → Schmidt Hammer) must be answered too.
+  const columnIssues = columnCheckIssues(current);
+  const allComplete = incomplete.length === 0 && drillingDone && columnIssues.length === 0;
 
   function targetRoute() {
     const floorLevel = current!.floorLevel;
@@ -191,6 +195,7 @@ export default function CategoryPage() {
           pending={attemptedSave && !categoryStatus.find((c) => c.wc === wc)!.complete}
         >
           {items.map((item) => (
+            <Fragment key={item.name}>
             <ItemRow
               key={item.name}
               item={item}
@@ -205,6 +210,17 @@ export default function CategoryPage() {
               onNoteChange={(v) => locCurrentSetNote(item.name, v)}
               pending={attemptedSave && (!current!.scores[item.name] || (isUnsafe(item, current!.scores[item.name]) && !(current!.photos[item.name]?.length)))}
             />
+            {item.name === COLUMN_ITEM && columnCheckApplies(current!) ? (
+              <ColumnCheckFields
+                value={current!.columnCheck}
+                photos={current!.photos[SCHMIDT_PHOTO] ?? []}
+                onChange={locCurrentSetColumnCheck}
+                onAddPhoto={(f) => handleAddPhoto(SCHMIDT_PHOTO, f)}
+                onRemovePhoto={(id) => handleRemovePhoto(SCHMIDT_PHOTO, id)}
+                highlight={attemptedSave && columnIssues.length > 0}
+              />
+            ) : null}
+            </Fragment>
           ))}
         </AccordionSection>
       ))}
@@ -222,7 +238,9 @@ export default function CategoryPage() {
         </Button>
         {attemptedSave && !allComplete ? (
           <p className="text-center text-[11.5px] text-band-poor mt-2.5">
-            {incomplete.length === 0 && !drillingDone
+            {incomplete.length === 0 && columnIssues.length > 0
+              ? columnIssues[0]
+              : incomplete.length === 0 && !drillingDone
               ? "Complete Drilling & observation (thicknesses must be positive numbers)."
               : incomplete.some((c) => c.unsafeMissing > 0) && incomplete.every((c) => c.answered === c.total)
               ? "Attach a photo to every item marked Unsafe."

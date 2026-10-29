@@ -181,7 +181,16 @@ export interface FoundSurvey {
   aggregatedScores?: Record<string, number>;
   items: RubricItem[];
   /** Location rows as written (floor, type, name, conditions). */
-  locations?: { floorLevel: string; type: string; name: string; scores: Record<string, string> }[];
+  locations?: {
+    floorLevel: string;
+    type: string;
+    name: string;
+    scores: Record<string, string>;
+    /** v2 (W41): Column Unsafe follow-up as written; blank when not asked. */
+    columnCrackOver3mm?: string;
+    schmidtAvailable?: string;
+    schmidtReading?: string;
+  }[];
 }
 
 export const exportRowsPayload = z.object({

@@ -2,7 +2,7 @@ import { CRITICAL_ITEMS, ratingBand } from './scoring';
 import { RUBRIC_GROUPS, unsafePartsText } from './rubric/items';
 import { itemsCovered } from './rubric/versions';
 import type { AttachmentMeta, SubmittedSurvey } from './survey';
-import { drillHolesText } from './types';
+import { columnCheckApplies, drillHolesText } from './types';
 
 /**
  * Port of v1 src/lib/sheets/responses.ts: same header names, same values. The responses tab is
@@ -80,6 +80,10 @@ const TRAILING_HEADER = [
   'Applicable Levels',
   // v2 (W36): drill holes after the first, e.g. "Hole 2: slab 120 mm, screed 40 mm, Ok".
   'Additional Drill Holes',
+  // v2 (W41): Column Unsafe follow-up, per location row.
+  'Column Crack > 3 mm',
+  'Schmidt Hammer Available',
+  'Schmidt Hammer Reading',
 ];
 
 export const RESPONSES_HEADER = [
@@ -97,6 +101,7 @@ export const ATTACHMENTS_HEADER = ['Survey ID', 'Item Name', 'Location Name', 'P
 /** Columns v1 wrote as numeric strings (so USER_ENTERED stored numbers). */
 export const NUMERIC_COLUMNS: ReadonlySet<string> = new Set([
   'Items Covered (%)',
+  'Schmidt Hammer Reading',
   'Overall Score',
   'Functionality Score',
   'Safety Score',
@@ -195,6 +200,12 @@ export function responseRows(s: SubmittedSurvey, submitter: Submitter, timestamp
       'Classroom Grade': loc.classroomGrade ?? '',
       'Classroom Section': loc.classroomSection ?? '',
     };
+    if (columnCheckApplies(loc) && loc.columnCheck) {
+      const c = loc.columnCheck;
+      fields['Column Crack > 3 mm'] = c.crackOver3mm;
+      fields['Schmidt Hammer Available'] = c.crackOver3mm === 'YES' ? c.hammerAvailable : '';
+      fields['Schmidt Hammer Reading'] = c.crackOver3mm === 'YES' && c.hammerAvailable === 'YES' ? c.reading.trim() : '';
+    }
     for (const [itemName, condition] of Object.entries(loc.scores)) {
       const parts = loc.unsafeParts?.[itemName];
       fields[itemName] = parts?.length ? unsafePartsText(parts) : condition;

@@ -22,8 +22,10 @@ import { saveDraft, saveDraftOnUnload } from "@/lib/draft";
 // debounce timer is still waiting when the call comes in. That's what the
 // visibilitychange/pagehide flush is for: the moment the tab is backgrounded
 // or unloaded, whatever's pending is written immediately, best-effort.
-const AUTOSAVE_DEBOUNCE_MS = 2000;
-const AUTOSAVE_MAX_WAIT_MS = 12000;
+// v2 (W39): every change is saved (overwriting the draft) within about half a second; a steady
+// stream of changes (typing) still saves at least every 2 s.
+const AUTOSAVE_DEBOUNCE_MS = 400;
+const AUTOSAVE_MAX_WAIT_MS = 2000;
 
 function computeElapsed(startTime: string, pausedAt: string | null, pausedSeconds: number): number {
   const startMs = new Date(startTime).getTime();
@@ -207,7 +209,7 @@ export function SurveyTimerBar() {
   return (
     <div className="w-full max-w-md mx-auto px-5 pt-[max(0.75rem,env(safe-area-inset-top))]">
       <div
-        className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[12.5px] ${
+        className={`flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 rounded-xl border px-3 py-2 text-[12.5px] ${
           paused ? "border-band-average bg-band-average-tint text-band-average" : "border-border bg-card text-ink-soft"
         }`}
       >
@@ -218,7 +220,7 @@ export function SurveyTimerBar() {
             {formatElapsedMinutes(seconds)}
           </span>
         </span>
-        <span className="flex items-center gap-1.5 shrink-0">
+        <span className="flex items-center gap-1.5 shrink-0 ml-auto">
           <button
             type="button"
             onClick={handleSaveDraft}
@@ -236,14 +238,15 @@ export function SurveyTimerBar() {
             {paused ? <Play size={13} /> : <Pause size={13} />}
             {paused ? "Resume" : "Pause"}
           </button>
+          {/* v2 (W40): a clear, labelled exit — saves the draft, then opens Incomplete. */}
           <button
             type="button"
             onClick={() => void handleSaveAndExit()}
-            aria-label="Save and exit to the queue"
-            title="Save and exit to the queue"
-            className="inline-flex items-center justify-center rounded-lg border border-border bg-white px-2 py-1.5 text-ink-soft"
+            aria-label="Save and exit to Incomplete surveys"
+            className="inline-flex items-center gap-1 rounded-lg border border-brand bg-brand px-2.5 py-1.5 font-semibold text-white"
           >
             <LogOut size={13} />
+            Save &amp; exit
           </button>
         </span>
       </div>

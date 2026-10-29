@@ -28,6 +28,8 @@ export interface SingleSurveyPdfInput {
   drillingCheck: DrillingCheck;
   /** v2 (W36): "Hole 2: …; Hole 3: …"; omitted when there are none. */
   additionalDrillHoles?: string;
+  /** v2 (W41): Column Unsafe follow-ups, "KG A: crack > 3 mm, Schmidt Hammer 32; …". */
+  columnChecks?: string;
   siteChecks: SiteChecks;
   complaints: string;
   overall: number | null;
@@ -120,6 +122,7 @@ export async function buildSingleSurveyPdf(input: SingleSurveyPdfInput): Promise
     ["Roof screeding thickness", input.drillingCheck.screedThicknessMm ? `${input.drillingCheck.screedThicknessMm} mm` : "—"],
     ["Hole repaired (grout/epoxy)", input.drillingCheck.holeRepaired || "—"],
     ...(input.additionalDrillHoles ? ([["Additional drill holes", input.additionalDrillHoles]] as [string, string][]) : []),
+    ...(input.columnChecks ? ([["Column checks", input.columnChecks]] as [string, string][]) : []),
     ["Roof access (type)", input.siteChecks.roofAccessType || "—"],
     ["Overflow disposal system", input.siteChecks.overflowDisposal || "—"],
     ["Roof clean (dirt/vegetation)", input.siteChecks.roofClean || "—"],
