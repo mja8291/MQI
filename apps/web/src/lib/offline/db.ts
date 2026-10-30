@@ -108,14 +108,36 @@ export async function getCachedSchools(): Promise<School[] | null> {
 
 // ---- drafts ----
 
+/**
+ * Writes the draft unless the survey is already queued, checked in the same transaction as the
+ * write: queueSurvey also writes surveys + drafts, so the two can't interleave, and an autosave
+ * that started before Submit can never land after it and bring the survey back as a draft.
+ */
 export async function saveDraft(draft: SurveyDraft): Promise<void> {
-  await db.drafts.put(draft);
+  await db.transaction('rw', db.drafts, db.surveys, async () => {
+    if (await db.surveys.get(draft.surveyId)) return;
+    await db.drafts.put(draft);
+  });
 }
+
+/**
+ * A draft whose survey is already queued is left over from a save that raced Submit (the
+ * close-time save can't check first). The queued survey is the finished one: drop the draft.
+ */
+async function withoutQueued(drafts: SurveyDraft[]): Promise<SurveyDraft[]> {
+  if (!drafts.length) return drafts;
+  const queued = new Set((await db.surveys.bulkGet(drafts.map((d) => d.surveyId))).filter(Boolean).map((s) => s!.id));
+  if (!queued.size) return drafts;
+  await db.drafts.bulkDelete([...queued]);
+  return drafts.filter((d) => !queued.has(d.surveyId));
+}
+
 export async function getDrafts(): Promise<SurveyDraft[]> {
-  return db.drafts.orderBy('savedAt').reverse().toArray();
+  return withoutQueued(await db.drafts.orderBy('savedAt').reverse().toArray());
 }
 export async function getDraft(surveyId: string): Promise<SurveyDraft | null> {
-  return (await db.drafts.get(surveyId)) ?? null;
+  const d = await db.drafts.get(surveyId);
+  return d ? ((await withoutQueued([d]))[0] ?? null) : null;
 }
 /** Discarding a draft also drops its photos (none of them can have been uploaded). */
 export async function deleteDraft(surveyId: string): Promise<void> {

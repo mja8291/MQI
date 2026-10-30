@@ -56,7 +56,7 @@ import { ReviewPhotoField } from "@/components/survey/ReviewPhotoField";
 import { buildSubmission, checkSubmission, countUnresolvedPhotos } from "@/lib/submit";
 import { queueSurvey } from "@/lib/offline/db";
 import { scheduleSync } from "@/lib/offline/sync";
-import { discardSubmittedDraft } from "@/lib/draft";
+import { cancelSubmitting, discardSubmittedDraft, markSubmitting } from "@/lib/draft";
 import { formatDuration } from "@/lib/format-duration";
 import { buildDraftExcelBlob, buildDraftPdfBlob, downloadBlob, draftExportFilenameBase } from "@/lib/export/draft-export";
 import { FileSpreadsheet, FileText } from "lucide-react";
@@ -262,9 +262,11 @@ export default function ReviewPage() {
       setSubmitting(false);
       return;
     }
+    markSubmitting(submission.survey.id);
     try {
       await queueSurvey(submission.survey, submission.attachments);
     } catch {
+      cancelSubmitting(submission.survey.id);
       setError("Couldn't save the survey on this phone. Free some storage and try again — nothing has been lost.");
       setSubmitting(false);
       return;

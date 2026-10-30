@@ -7,7 +7,7 @@ import type { MemoryEnv } from '../../../../gas/src/adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../../../../gas/src/dev/server';
 import { handleRequest } from '../../../../gas/src/core/router';
 import { AUTH_REQUIRED_EVENT } from '../auth/events';
-import { db, enforcePhotoBudget, putPhoto, queueSurvey, retrySurvey, saveDraft, setMeta } from './db';
+import { db, enforcePhotoBudget, getDraft, getDrafts, putPhoto, queueSurvey, retrySurvey, saveDraft, setMeta } from './db';
 import { backoffMs, flushPendingSubmissions } from './sync';
 
 let env: MemoryEnv;
@@ -121,6 +121,19 @@ describe('submit is local and atomic', () => {
     expect(await db.surveys.count()).toBe(1);
     expect(await db.outbox.count()).toBe(1);
     expect((await db.surveys.get(s.id))!.status).toBe('pending');
+  });
+
+  test('a draft save that lands after Submit never brings the survey back as a draft', async () => {
+    offline = true;
+    const s = await makeQueued();
+    const draft = { surveyId: s.id, savedAt: new Date().toISOString(), schoolName: 'X', state: {} as never };
+    await saveDraft(draft); // an autosave finishing after the survey was queued
+    expect(await db.drafts.count()).toBe(0);
+    await db.drafts.put(draft); // the close-time save, which writes without checking
+    expect(await getDrafts()).toEqual([]);
+    expect(await getDraft(s.id)).toBeNull();
+    expect(await db.drafts.count()).toBe(0);
+    expect(await db.surveys.count()).toBe(1);
   });
 });
 

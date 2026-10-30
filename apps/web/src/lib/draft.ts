@@ -32,6 +32,18 @@ function settlePhotos(photos: Record<string, PhotoAsset[]>): Record<string, Phot
  */
 const submittedSurveyIds = new Set<string>();
 
+/**
+ * Call just before the survey is written to the send queue: from here on neither autosave nor the
+ * close-time save writes this survey's draft, even if the phone kills the app mid-submit.
+ * cancelSubmitting undoes it when queuing fails, so the draft keeps saving.
+ */
+export function markSubmitting(surveyId: string): void {
+  submittedSurveyIds.add(surveyId);
+}
+export function cancelSubmitting(surveyId: string): void {
+  submittedSurveyIds.delete(surveyId);
+}
+
 /** Call once a survey is accepted (sent, or queued): deletes its draft and keeps autosave from ever recreating it. */
 export async function discardSubmittedDraft(surveyId: string): Promise<void> {
   submittedSurveyIds.add(surveyId);
