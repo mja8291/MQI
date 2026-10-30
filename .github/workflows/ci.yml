@@ -22,5 +22,5 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
         working-directory: apps/web
-      - run: npm run e2e
+      - run: npm run e2e -- --repeat-each=3 --retries=0
         working-directory: apps/web
