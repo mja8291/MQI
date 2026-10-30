@@ -51,11 +51,16 @@ export function findRows(env: Env, tab: string, column: string, values: Readonly
 export function rowsAt(env: Env, tab: string, rowNumbers: readonly number[]): SheetRow[] {
   const header = env.responses.header(tab);
   if (!header || !rowNumbers.length) return [];
-  const min = Math.min(...rowNumbers);
-  const max = Math.max(...rowNumbers);
-  const block = env.responses.readRows(tab, min, max - min + 1);
-  const wanted = new Set(rowNumbers);
-  return block.filter((_, i) => wanted.has(min + i)).map((r) => toRow(header, r));
+  // One read per contiguous run, so a school's surveys a year apart don't pull every row between.
+  const sorted = [...new Set(rowNumbers)].sort((a, b) => a - b);
+  const out: SheetRow[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j]! + 1) j++;
+    for (const r of env.responses.readRows(tab, sorted[i]!, sorted[j]! - sorted[i]! + 1)) out.push(toRow(header, r));
+    i = j + 1;
+  }
+  return out;
 }
 
 export function toRow(header: readonly string[], cells: readonly string[]): SheetRow {
@@ -64,9 +69,20 @@ export function toRow(header: readonly string[], cells: readonly string[]): Shee
   return o;
 }
 
-export function allRows(env: Env, tab: string): SheetRow[] {
+/**
+ * Every data row, but only the named columns (one column read each): what the dashboard needs
+ * without loading all ~90 columns of every location row.
+ */
+export function columnRows(env: Env, tab: string, columns: readonly string[]): SheetRow[] {
   const header = env.responses.header(tab);
   const last = env.responses.lastRow(tab);
   if (!header || last < 2) return [];
-  return env.responses.readRows(tab, 2, last - 1).map((r) => toRow(header, r)).filter((r) => Object.values(r).some((v) => v !== ''));
+  const cols = columns.map((name) => ({ name, values: colIndex(header, name) < 0 ? [] : env.responses.readColumn(tab, colIndex(header, name) + 1, 2, last - 1) }));
+  const rows: SheetRow[] = [];
+  for (let i = 0; i < last - 1; i++) {
+    const o: SheetRow = {};
+    for (const c of cols) o[c.name] = c.values[i] ?? '';
+    if (Object.values(o).some((v) => v !== '')) rows.push(o);
+  }
+  return rows;
 }

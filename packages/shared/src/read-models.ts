@@ -109,6 +109,21 @@ function num(v: string | undefined): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
+/** The only columns buildDashboard reads, so the server can fetch these instead of whole rows. */
+export const DASHBOARD_COLUMNS: readonly string[] = [
+  'Survey ID',
+  'School ID',
+  'Campus Name',
+  'Region',
+  'Area',
+  'Timestamp',
+  'Overall Score',
+  'Rating Band',
+  'Major Score',
+  'Minor Score',
+  ...CRITICAL_ITEMS.map(criticalColumn),
+];
+
 function rowToCaptured(r: SheetRow): CapturedSchool | null {
   const overallRaw = r['Overall Score'];
   const overall = overallRaw ? Number(overallRaw) : NaN;

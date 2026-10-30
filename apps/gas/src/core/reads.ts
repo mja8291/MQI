@@ -1,9 +1,9 @@
-import { RESPONSES_TAB, cellCondition, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import { RESPONSES_TAB, cellCondition, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
 import type { DashboardData, ExportRowsResult, FoundSurvey, SchoolsResult, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import type { Env } from './ports';
-import { allRows, findRows, rowsAt } from './responses';
+import { columnRows, findRows, rowsAt } from './responses';
 
 /** CacheService holds at most 100 KB per value: big JSON is split into ≤ 90 KB shards. */
 const SHARD = 90_000;
@@ -43,7 +43,7 @@ export function schools(ctx: Ctx): SchoolsResult {
 
 export function dashboard(ctx: Ctx): DashboardData {
   return cached(ctx.env, 'dashboard', DASHBOARD_TTL, () =>
-    buildDashboard(schools(ctx).schools.length, allRows(ctx.env, RESPONSES_TAB)),
+    buildDashboard(schools(ctx).schools.length, columnRows(ctx.env, RESPONSES_TAB, DASHBOARD_COLUMNS)),
   );
 }
 

@@ -32,6 +32,7 @@ import {
   columnCheckIssues,
   columnCheckLine,
   emptyColumnCheck,
+  sheetOrder,
 } from './index';
 import type { SurveyLocation, SubmittedSurvey } from './index';
 
@@ -229,7 +230,7 @@ describe('submission rules (Appendix C)', () => {
       'KG A: Answer whether the column crack is wider than 3 mm.',
       'Attach a photo of "Wall/Column Condition i.e. cracks" at KG A: it is marked Unsafe.',
     ]);
-    const row = responseRows(withParts, { name: 'S', email: 's@tcf.test' }, '2026-10-28T05:00:00.000Z')[1]!;
+    const row = responseRows(withParts, { name: 'S', email: 's@tcf.test' }, '2026-10-28T05:00:00.000Z').find((r) => r['Location Name'] === 'KG A')!;
     expect(row['Wall/Column Condition i.e. cracks']).toBe('Column Unsafe, Wall Unsafe');
     expect(cellCondition('Column Unsafe, Wall Unsafe')).toBe('Very Poor');
     expect(cellCondition('Wall Unsafe')).toBe('Very Poor');
@@ -254,10 +255,16 @@ describe('submission rules (Appendix C)', () => {
     expect(check({ crackOver3mm: 'YES', hammerAvailable: 'YES', reading: '-1' })).toHaveLength(2);
     expect(check({ crackOver3mm: 'YES', hammerAvailable: 'YES', reading: '32' }, { [SCHMIDT_PHOTO]: [photo] })).toEqual([]);
     const done = { ...col, columnCheck: { crackOver3mm: 'YES' as const, hammerAvailable: 'YES' as const, reading: ' 32 ' } };
-    const row = responseRows(survey({ locations: [roof, done as SubmittedSurvey['locations'][number]] }), { name: 'S', email: 's@tcf.test' }, 'x')[1]!;
+    const row = responseRows(survey({ locations: [roof, done as SubmittedSurvey['locations'][number]] }), { name: 'S', email: 's@tcf.test' }, 'x').find((r) => r['Location Name'] === 'KG A')!;
     expect([row['Column Crack > 3 mm'], row['Schmidt Hammer Available'], row['Schmidt Hammer Reading']]).toEqual(['YES', 'YES', '32']);
     expect(NUMERIC_COLUMNS.has('Schmidt Hammer Reading')).toBe(true);
     expect(columnCheckLine('KG A', 'NO', '', '')).toBe('KG A: crack up to 3 mm');
+  });
+
+  test('sheet order: floor, then location type, then name with numbers in order', () => {
+    const l = (floorLevel: string, type: string, name: string) => ({ floorLevel, type, name });
+    const recorded = [l('Roof', 'Roof', 'Roof'), l('Ground', 'Toilet', 'Girls Toilet'), l('First', 'Classroom', 'Class 10'), l('Ground', 'Classroom', 'Class 10'), l('Ground', 'Classroom', 'Class 2'), l('External', 'External Development', 'External Development')];
+    expect(sheetOrder(recorded).map((x) => `${x.floorLevel} ${x.name}`)).toEqual(['External External Development', 'Ground Class 2', 'Ground Class 10', 'Ground Girls Toilet', 'First Class 10', 'Roof Roof']);
   });
 
   test('W22: items covered = groups scored (not N/A) at least once / all groups', () => {

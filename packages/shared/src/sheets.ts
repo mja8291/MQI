@@ -1,5 +1,5 @@
 import { CRITICAL_ITEMS, ratingBand } from './scoring';
-import { RUBRIC_GROUPS, unsafePartsText } from './rubric/items';
+import { FLOOR_LEVELS, LOCATION_TYPES, RUBRIC_GROUPS, unsafePartsText } from './rubric/items';
 import { itemsCovered } from './rubric/versions';
 import type { AttachmentMeta, SubmittedSurvey } from './survey';
 import { columnCheckApplies, drillHolesText } from './types';
@@ -191,8 +191,25 @@ function commonFields(s: SubmittedSurvey, submitter: Submitter, timestamp: strin
 }
 
 /** One row per location (v1 responses.ts), header name → value. */
+/**
+ * v2: a survey's locations in sheet order: by floor (External, Ground … Roof), then location type
+ * (rubric order), then name ("Class 2" before "Class 10"). Stable, so equal names keep recorded order.
+ */
+export function sheetOrder<L extends { floorLevel: string; type: string; name: string }>(locations: readonly L[]): L[] {
+  const rank = (list: readonly string[], v: string) => {
+    const i = list.indexOf(v);
+    return i === -1 ? list.length : i;
+  };
+  return [...locations].sort(
+    (a, b) =>
+      rank(FLOOR_LEVELS, a.floorLevel) - rank(FLOOR_LEVELS, b.floorLevel) ||
+      rank(LOCATION_TYPES, a.type) - rank(LOCATION_TYPES, b.type) ||
+      a.name.localeCompare(b.name, 'en', { numeric: true, sensitivity: 'base' }),
+  );
+}
+
 export function responseRows(s: SubmittedSurvey, submitter: Submitter, timestamp: string): Record<string, string>[] {
-  return s.locations.map((loc) => {
+  return sheetOrder(s.locations).map((loc) => {
     const fields: Record<string, string> = {
       ...commonFields(s, submitter, timestamp, loc.name),
       'Floor Level': loc.floorLevel,
@@ -217,7 +234,7 @@ export function responseRows(s: SubmittedSurvey, submitter: Submitter, timestamp
 /** Note-only attachment rows, written with the survey (v1 wrote notes in the same batch). */
 export function noteRows(s: SubmittedSurvey): Record<string, string>[] {
   const rows: Record<string, string>[] = [];
-  for (const loc of s.locations) {
+  for (const loc of sheetOrder(s.locations)) {
     for (const [itemName, note] of Object.entries(loc.notes)) {
       if (note.trim()) rows.push({ 'Survey ID': s.id, 'Item Name': itemName, 'Location Name': loc.name, 'Photo URL': '', Note: note });
     }

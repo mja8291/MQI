@@ -172,7 +172,7 @@ test('2. flaky connection: dropped requests and lost answers never duplicate or 
   await faults({ fail: 2, dropAfterWrite: 1, actions: ['files.upload'] });
   await page.goto('/?tab=sync');
   for (let i = 0; i < 6 && photoRowsOf(await devState(), id).length === 0; i++) {
-    await page.getByRole('button', { name: /Sync now/ }).click().catch(() => undefined);
+    await page.getByRole('button', { name: /Sync now/ }).click({ timeout: 5000 }).catch(() => undefined); // the button goes away once everything has synced
     await page.waitForTimeout(3000);
   }
   await expect.poll(async () => photoRowsOf(await devState(), id).length, { timeout: 90_000 }).toBe(1);
