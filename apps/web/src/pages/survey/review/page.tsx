@@ -227,7 +227,7 @@ export default function ReviewPage() {
     // send them along — a check that wasn't done has no thickness to report.
     const drillingCheck: DrillingCheck =
       drilling.done === "YES"
-        ? { ...drilling, slabThicknessMm: drilling.slabThicknessMm.trim(), screedThicknessMm: drilling.screedThicknessMm.trim() }
+        ? { ...drilling, ...(drilling.totalDepthMm !== undefined ? { totalDepthMm: drilling.totalDepthMm.trim() } : {}), slabThicknessMm: drilling.slabThicknessMm.trim(), screedThicknessMm: drilling.screedThicknessMm.trim() }
         : { ...emptyDrillingCheck(), done: "NO" };
     setDrillingCheck(drillingCheck);
     // The "Any other" text only travels with "Any other" ticked.

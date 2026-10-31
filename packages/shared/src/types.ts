@@ -37,6 +37,8 @@ export interface DrillingCheck {
   pointMarked: "YES" | "NO" | "Ok" | "Unsafe" | "";
   /** The slide's "Slab thickness recorded" Ok / Unsafe — whether the measured thickness is acceptable. Absent on a draft saved before it existed. */
   slabAssessment?: "Ok" | "Unsafe" | "";
+  /** v2 (W45): the first reading, total depth of slab + roof screed/waterproofing. Absent on surveys from before it existed. */
+  totalDepthMm?: string;
   slabThicknessMm: string;
   screedThicknessMm: string;
   holeRepaired: "YES" | "NO" | "";
@@ -46,6 +48,8 @@ export interface DrillingCheck {
 
 /** One additional drill hole and its readings (v2, W36). */
 export interface DrillHole {
+  /** v2 (W45): total depth of slab + roof screed/waterproofing. */
+  totalDepthMm?: string;
   slabThicknessMm: string;
   screedThicknessMm: string;
   slabAssessment: "Ok" | "Unsafe" | "";
@@ -54,7 +58,7 @@ export interface DrillHole {
 /** "Hole 2: slab 120 mm, screed 40 mm, Ok; Hole 3: …" — the sheet text for additional holes. */
 export function drillHolesText(holes: readonly DrillHole[] | undefined): string {
   return (holes ?? [])
-    .map((h, i) => `Hole ${i + 2}: slab ${h.slabThicknessMm.trim()} mm, screed ${h.screedThicknessMm.trim()} mm${h.slabAssessment ? `, ${h.slabAssessment}` : ""}`)
+    .map((h, i) => `Hole ${i + 2}: ${h.totalDepthMm?.trim() ? `total depth ${h.totalDepthMm.trim()} mm, ` : ""}slab ${h.slabThicknessMm.trim()} mm, screed ${h.screedThicknessMm.trim()} mm${h.slabAssessment ? `, ${h.slabAssessment}` : ""}`)
     .join("; ");
 }
 
@@ -63,10 +67,21 @@ export function emptyDrillingCheck(): DrillingCheck {
     done: "",
     pointMarked: "",
     slabAssessment: "",
+    totalDepthMm: "",
     slabThicknessMm: "",
     screedThicknessMm: "",
     holeRepaired: "",
   };
+}
+
+/** v2 (W45): a screed this thick or more marks "Roof Screeding/roof drainage" Unsafe (the surveyor can change it back). */
+export const SCREED_UNSAFE_MM = 110;
+export const SCREED_ITEM = "Roof Screeding/roof drainage";
+
+/** The thickest screed reading across every drill hole, or 0 when none is a number. */
+export function maxScreedMm(c: DrillingCheck): number {
+  const values = [c.screedThicknessMm, ...(c.extraHoles ?? []).map((h) => h.screedThicknessMm)].map(Number).filter((n) => Number.isFinite(n));
+  return values.length ? Math.max(0, ...values) : 0;
 }
 
 /** True when the check is answered: "NO", or "YES" with every detail filled in and both thicknesses positive numbers. */
@@ -80,8 +95,12 @@ export function isDrillingCheckComplete(c: DrillingCheck): boolean {
     Boolean(c.holeRepaired) &&
     positive(c.slabThicknessMm) &&
     positive(c.screedThicknessMm) &&
+    // W45: total depth is required wherever the field exists (surveys sent by older app versions don't have it).
+    (c.totalDepthMm === undefined || positive(c.totalDepthMm)) &&
     // W36: every additional hole needs both readings and its assessment.
-    (c.extraHoles ?? []).every((h) => positive(h.slabThicknessMm) && positive(h.screedThicknessMm) && Boolean(h.slabAssessment))
+    (c.extraHoles ?? []).every(
+      (h) => positive(h.slabThicknessMm) && positive(h.screedThicknessMm) && Boolean(h.slabAssessment) && (h.totalDepthMm === undefined || positive(h.totalDepthMm)),
+    )
   );
 }
 
@@ -154,6 +173,8 @@ export interface RubricItem {
   unsafeParts?: string[];
   /** v2 (W20): name shown on screen when it differs from the column name, e.g. "Window Shades (Chajja)". */
   label?: string;
+  /** v2 (W44): name shown on screen for particular location types; the column stays the same. */
+  locationLabels?: Partial<Record<LocationType, string>>;
   /** v2 (W12): an instruction shown under the item name, e.g. how to test it on site. */
   guidance?: string;
   /** Drops N/A from the picker entirely — for an item where "not applicable" never makes sense (e.g. "Access to roof area /tanks": you're standing at the roof access, so it's either there or it isn't). */
@@ -165,6 +186,11 @@ export interface RubricGroup extends RubricItem {
   aggregation: "worst" | "average";
   /** Which location types this item group is scored at. */
   locations: LocationType[];
+}
+
+/** The item name shown on screen at this location type (W44), else its label or name. */
+export function itemLabel(item: Pick<RubricItem, "name" | "label" | "locationLabels">, type?: LocationType): string {
+  return (type && item.locationLabels?.[type]) || item.label || item.name;
 }
 
 export type LocationType =

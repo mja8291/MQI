@@ -54,11 +54,12 @@ export const drillingCheckSchema = z.object({
   done: blankOr(['YES', 'NO']),
   pointMarked: blankOr(['YES', 'NO', 'Ok', 'Unsafe']),
   slabAssessment: blankOr(['Ok', 'Unsafe']).optional(),
+  totalDepthMm: text(20).optional(),
   slabThicknessMm: text(20),
   screedThicknessMm: text(20),
   holeRepaired: blankOr(['YES', 'NO']),
   extraHoles: z
-    .array(z.object({ slabThicknessMm: text(20), screedThicknessMm: text(20), slabAssessment: blankOr(['Ok', 'Unsafe']) }))
+    .array(z.object({ totalDepthMm: text(20).optional(), slabThicknessMm: text(20), screedThicknessMm: text(20), slabAssessment: blankOr(['Ok', 'Unsafe']) }))
     .max(20)
     .optional(),
 }) satisfies z.ZodType<DrillingCheck>;
@@ -154,10 +155,13 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
   const hasRoof = s.locations.some((l) => l.type === 'Roof');
   if (hasRoof || s.drillingCheck.done) need(isDrillingCheckComplete(s.drillingCheck), 'drillingCheck', 'Complete the drilling check (thicknesses must be positive numbers).');
   if (s.drillingCheck.done === 'YES') {
+    if (s.drillingCheck.totalDepthMm !== undefined)
+      need(positive(s.drillingCheck.totalDepthMm), 'drillingCheck.totalDepthMm', 'Total depth (slab + screed) must be a positive number.');
     need(positive(s.drillingCheck.slabThicknessMm), 'drillingCheck.slabThicknessMm', 'Slab thickness must be a positive number.');
     need(positive(s.drillingCheck.screedThicknessMm), 'drillingCheck.screedThicknessMm', 'Screeding thickness must be a positive number.');
     (s.drillingCheck.extraHoles ?? []).forEach((h, i) => {
       need(positive(h.slabThicknessMm) && positive(h.screedThicknessMm), `drillingCheck.extraHoles.${i}`, `Drill hole ${i + 2}: both thicknesses must be positive numbers.`);
+      if (h.totalDepthMm !== undefined) need(positive(h.totalDepthMm), `drillingCheck.extraHoles.${i}`, `Drill hole ${i + 2}: total depth must be a positive number.`);
       need(Boolean(h.slabAssessment), `drillingCheck.extraHoles.${i}`, `Drill hole ${i + 2}: choose the slab thickness assessment.`);
     });
   }

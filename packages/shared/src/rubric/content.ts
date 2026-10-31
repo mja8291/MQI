@@ -45,6 +45,10 @@ export const DRILLING_POINT_QUESTION = "Drilling point marked on slab by APM (cl
 export const DRILLING_POINT_OPTIONS = ["YES", "NO"] as const;
 /** Slab thickness assessment keeps Ok / Unsafe. */
 export const SLAB_ASSESSMENT_OPTIONS = ["Ok", "Unsafe"] as const;
+/** v2 (W45): the first reading of each drill hole. */
+export const TOTAL_DEPTH_LABEL = "Total depth of slab + roof screed/waterproofing (mm)";
+export const TOTAL_DEPTH_GUIDANCE = "If the total depth is more than 260 mm, remove the roof screed and inspect it.";
+export const SCREED_UNSAFE_NOTE = "110 mm or more: Roof Screeding/roof drainage is marked Unsafe. Change it if that's not right.";
 export const SLAB_THICKNESS_LABEL = "Slab thickness recorded (mm)";
 export const SCREED_THICKNESS_LABEL = "Roof screeding thickness recorded (mm)";
 export const DRILLING_REPAIR_QUESTION = "Was the drilled hole repaired with grout/epoxy?";

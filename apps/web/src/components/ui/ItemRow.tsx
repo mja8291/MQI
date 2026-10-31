@@ -23,6 +23,8 @@ interface ItemRowProps {
   onNoteChange: (value: string) => void;
   /** Set after a blocked save/return attempt, for items still unscored — shows a red asterisk so the user can see exactly what's left. */
   pending?: boolean;
+  /** v2 (W44): the name for this location type (itemLabel); defaults to the item's label or name. */
+  label?: string;
 }
 
 export function ItemRow({
@@ -37,6 +39,7 @@ export function ItemRow({
   onRemovePhoto,
   onNoteChange,
   pending,
+  label,
 }: ItemRowProps) {
   const [infoOpen, setInfoOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(Boolean(note));
@@ -50,7 +53,7 @@ export function ItemRow({
           four buttons beside the name pushed the last one off screen and squeezed long names. */}
       <div className="mb-1">
         <span className="text-[13.5px] font-medium text-ink">
-          {item.label ?? item.name}
+          {label ?? item.label ?? item.name}
           {pending ? (
             // A badge, not a bare trailing character — several item names
             // already end in "*" (the Minor/principal-maintained marker), so

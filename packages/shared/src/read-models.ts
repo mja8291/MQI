@@ -208,6 +208,7 @@ function drillingCheckFromRow(row: SheetRow): DrillingCheck {
     done: (row['Drilling Check Done'] ?? '') as DrillingCheck['done'],
     pointMarked: (row['Drilling Point Marked'] ?? '') as DrillingCheck['pointMarked'],
     slabAssessment: (row['Slab Thickness Assessment'] ?? '') as DrillingCheck['slabAssessment'],
+    totalDepthMm: row['Total Depth (mm)'] ?? '',
     slabThicknessMm: row['Slab Thickness (mm)'] ?? '',
     screedThicknessMm: row['Roof Screeding Thickness (mm)'] ?? '',
     holeRepaired: (row['Drilled Hole Repaired (Grout/Epoxy)'] ?? '') as DrillingCheck['holeRepaired'],

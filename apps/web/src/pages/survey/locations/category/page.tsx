@@ -1,5 +1,18 @@
 
-import { COLUMN_ITEM, SCHMIDT_PHOTO, columnCheckApplies, columnCheckIssues, emptyDrillingCheck, isDrillingCheckComplete, isUnsafe } from "@mqi/shared";
+import {
+  COLUMN_ITEM,
+  SCHMIDT_PHOTO,
+  SCREED_ITEM,
+  SCREED_UNSAFE_MM,
+  columnCheckApplies,
+  columnCheckIssues,
+  emptyDrillingCheck,
+  isDrillingCheckComplete,
+  isUnsafe,
+  itemLabel,
+  maxScreedMm,
+} from "@mqi/shared";
+import type { DrillingCheck } from "@mqi/shared";
 import { ColumnCheckFields } from "@/components/survey/ColumnCheckFields";
 import { DrillingCheckFields } from "@/components/survey/DrillingCheckFields";
 import { getSiblingExternal } from "@/lib/sibling-external";
@@ -103,6 +116,12 @@ export default function CategoryPage() {
   const isRoof = type === "Roof";
   const drilling = { ...emptyDrillingCheck(), ...state.drillingCheck };
   const drillingDone = !isRoof || isDrillingCheckComplete(drilling);
+  // W45: a screed reading reaching 110 mm marks Roof Screeding Unsafe once; the surveyor can change it back.
+  const changeDrilling = (next: DrillingCheck) => {
+    setDrillingCheck(next);
+    if (maxScreedMm(next) >= SCREED_UNSAFE_MM && maxScreedMm(drilling) < SCREED_UNSAFE_MM && current.scores[SCREED_ITEM] !== "Very Poor")
+      locCurrentSetScore(SCREED_ITEM, "Very Poor");
+  };
   // v2 (W41): Column Unsafe follow-up (crack > 3 mm → Schmidt Hammer) must be answered too.
   const columnIssues = columnCheckIssues(current);
   const allComplete = incomplete.length === 0 && drillingDone && columnIssues.length === 0;
@@ -199,6 +218,7 @@ export default function CategoryPage() {
             <ItemRow
               key={item.name}
               item={item}
+              label={itemLabel(item, type)}
               value={current!.scores[item.name]}
               photos={current!.photos[item.name] ?? []}
               note={current!.notes[item.name]}
@@ -228,7 +248,7 @@ export default function CategoryPage() {
       {isRoof ? (
         <div className={`rounded-2xl border bg-card px-4 pt-4 pb-1 mb-3 ${attemptedSave && !drillingDone ? "border-band-poor" : "border-border"}`}>
           <div className="text-[15px] font-semibold text-ink mb-3">Drilling &amp; observation</div>
-          <DrillingCheckFields drilling={drilling} onChange={setDrillingCheck} />
+          <DrillingCheckFields drilling={drilling} onChange={changeDrilling} />
         </div>
       ) : null}
 

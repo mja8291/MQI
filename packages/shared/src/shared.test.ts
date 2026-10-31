@@ -33,6 +33,11 @@ import {
   columnCheckLine,
   emptyColumnCheck,
   sheetOrder,
+  itemLabel,
+  isDrillingCheckComplete,
+  maxScreedMm,
+  SCREED_ITEM,
+  SCREED_UNSAFE_MM,
 } from './index';
 import type { SurveyLocation, SubmittedSurvey } from './index';
 
@@ -285,6 +290,36 @@ describe('submission rules (Appendix C)', () => {
     expect(submissionIssues(survey({ drillingCheck: blankDrilling })).map((i) => i.path)).toContain('drillingCheck');
     const room = { ...s.locations[0]!, id: 'KG', type: 'Classroom' as const, floorLevel: 'Ground' as const, name: 'KG A', scores: Object.fromEntries(rubricGroupsForLocation('Classroom').map((g) => [g.name, 'Good'])) };
     expect(submissionIssues(survey({ drillingCheck: blankDrilling, locations: [room as SubmittedSurvey['locations'][number]] })).map((i) => i.path)).not.toContain('drillingCheck');
+  });
+
+  test('W44: Solar Panels on the Roof, Inverter/Batteries in Corridor & Stairs; the column keeps the full name', () => {
+    const solar = RUBRIC_GROUPS.find((g) => g.name === 'Solar Panels/Inverter/Batteries')!;
+    expect(itemLabel(solar, 'Roof')).toBe('Solar Panels');
+    expect(itemLabel(solar, 'Corridor & Stairs')).toBe('Inverter/Batteries');
+    expect(itemLabel(solar)).toBe('Solar Panels/Inverter/Batteries');
+    expect(RESPONSES_HEADER).toContain('Solar Panels/Inverter/Batteries');
+    expect(itemLabel(RUBRIC_GROUPS.find((g) => g.name === 'Window Shades')!, 'Exterior Facade')).toBe('Window Shades (Chajja)');
+  });
+
+  test('W45: total depth is the first reading, required when present, and written; screed of 110 mm or more is flagged', () => {
+    const drill = { done: 'YES', pointMarked: 'YES', slabAssessment: 'Ok', totalDepthMm: '300', slabThicknessMm: '150', screedThicknessMm: '120', holeRepaired: 'YES' } as const;
+    const holes = [{ totalDepthMm: '250', slabThicknessMm: '150', screedThicknessMm: '90', slabAssessment: 'Ok' }] as const;
+    const s = survey({ drillingCheck: { ...drill, extraHoles: [...holes] } });
+    expect(submittedSurveySchema.safeParse(s).success).toBe(true);
+    expect(submissionIssues(s)).toEqual([]);
+    const row = responseRows(s, { name: 'S', email: 's@tcf.test' }, 'x')[0]!;
+    expect(row['Total Depth (mm)']).toBe('300');
+    expect(row['Additional Drill Holes']).toBe('Hole 2: total depth 250 mm, slab 150 mm, screed 90 mm, Ok');
+    expect(NUMERIC_COLUMNS.has('Total Depth (mm)')).toBe(true);
+    expect(submissionIssues(survey({ drillingCheck: { ...drill, totalDepthMm: '' } })).map((i) => i.message)).toContain('Total depth (slab + screed) must be a positive number.');
+    expect(isDrillingCheckComplete({ ...drill, extraHoles: [{ ...holes[0], totalDepthMm: '' }] })).toBe(false);
+    // Surveys from app versions before W45 have no total depth and stay valid.
+    const { totalDepthMm: _omit, ...older } = drill;
+    expect(submissionIssues(survey({ drillingCheck: older }))).toEqual([]);
+    expect(maxScreedMm({ ...drill, extraHoles: [...holes] })).toBe(120);
+    expect(maxScreedMm({ ...drill, screedThicknessMm: '' })).toBe(0);
+    expect(SCREED_UNSAFE_MM).toBe(110);
+    expect(SCREED_ITEM).toBe(RUBRIC_GROUPS.find((g) => g.name === SCREED_ITEM)!.name);
   });
 
   test('W35/W36: drilling point YES/NO; additional drill holes are checked and written', () => {

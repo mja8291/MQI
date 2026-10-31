@@ -80,6 +80,8 @@ const TRAILING_HEADER = [
   'Applicable Levels',
   // v2 (W36): drill holes after the first, e.g. "Hole 2: slab 120 mm, screed 40 mm, Ok".
   'Additional Drill Holes',
+  // v2 (W45): first reading of the first hole (later holes: in Additional Drill Holes).
+  'Total Depth (mm)',
   // v2 (W41): Column Unsafe follow-up, per location row.
   'Column Crack > 3 mm',
   'Schmidt Hammer Available',
@@ -101,6 +103,7 @@ export const ATTACHMENTS_HEADER = ['Survey ID', 'Item Name', 'Location Name', 'P
 /** Columns v1 wrote as numeric strings (so USER_ENTERED stored numbers). */
 export const NUMERIC_COLUMNS: ReadonlySet<string> = new Set([
   'Items Covered (%)',
+  'Total Depth (mm)',
   'Schmidt Hammer Reading',
   'Overall Score',
   'Functionality Score',
@@ -152,6 +155,7 @@ function commonFields(s: SubmittedSurvey, submitter: Submitter, timestamp: strin
     'Center Beam in Classrooms': s.centerBeam,
     'Drilling Check Done': d.done,
     'Drilling Point Marked': d.done === 'YES' ? d.pointMarked : '',
+    'Total Depth (mm)': d.done === 'YES' ? (d.totalDepthMm ?? '') : '',
     'Slab Thickness (mm)': d.done === 'YES' ? d.slabThicknessMm : '',
     'Roof Screeding Thickness (mm)': d.done === 'YES' ? d.screedThicknessMm : '',
     'Drilled Hole Repaired (Grout/Epoxy)': d.done === 'YES' ? d.holeRepaired : '',

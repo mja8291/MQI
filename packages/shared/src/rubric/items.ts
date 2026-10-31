@@ -218,6 +218,8 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
     category: "Functionality",
     weight: 5,
     locations: [CORRIDOR, ROOF],
+    // W44: panels are on the roof, inverter and batteries in the corridor/stairs.
+    locationLabels: { [ROOF]: "Solar Panels", [CORRIDOR]: "Inverter/Batteries" },
   }),
 
   // Aesthetics — 30% of overall, 7 groups

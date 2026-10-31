@@ -117,6 +117,7 @@ export async function buildSingleSurveyPdf(input: SingleSurveyPdfInput): Promise
     ["Center beam in classrooms", input.centerBeam || "—"],
     ["Drilling check done", input.drillingCheck.done || "—"],
     ["Drilling point marked", input.drillingCheck.pointMarked || "—"],
+    ...(input.drillingCheck.totalDepthMm ? ([["Total depth (slab + screed)", `${input.drillingCheck.totalDepthMm} mm`]] as [string, string][]) : []),
     ["Slab thickness", input.drillingCheck.slabThicknessMm ? `${input.drillingCheck.slabThicknessMm} mm` : "—"],
     ["Slab thickness assessment", input.drillingCheck.slabAssessment || "—"],
     ["Roof screeding thickness", input.drillingCheck.screedThicknessMm ? `${input.drillingCheck.screedThicknessMm} mm` : "—"],
