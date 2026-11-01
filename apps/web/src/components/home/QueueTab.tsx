@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CloudOff, FileClock, Loader2, RefreshCw, X, KeyRound } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { deleteDraft, discardSurvey, retrySurvey, type QueuedSubmission, type SurveyDraft } from "@/lib/offline/db";
+import { discardDraft, discardSurvey, retrySurvey, type QueuedSubmission, type SurveyDraft } from "@/lib/offline/db";
 import { DRAFTS_CHANGED_EVENT } from "@/lib/draft";
 import { flushPendingSubmissions, LAST_SYNC_KEY } from "@/lib/offline/sync";
 
@@ -80,7 +80,7 @@ export function QueueTab({ drafts: allDrafts, pending: allPending, syncing, load
 
   async function confirmDiscard() {
     if (!discarding) return;
-    await deleteDraft(discarding.surveyId);
+    await discardDraft(discarding.surveyId);
     setDiscarding(null);
     window.dispatchEvent(new Event(DRAFTS_CHANGED_EVENT));
   }

@@ -139,12 +139,28 @@ export async function getDraft(surveyId: string): Promise<SurveyDraft | null> {
   const d = await db.drafts.get(surveyId);
   return d ? ((await withoutQueued([d]))[0] ?? null) : null;
 }
-/** Discarding a draft also drops its photos (none of them can have been uploaded). */
+/**
+ * Removes the saved draft record only. The survey's photos stay on the phone: this runs when a
+ * draft is resumed (it becomes live app state again) or once the survey is queued, and both still
+ * need the photo bytes. Deleting them here made a resumed survey lose every photo (W46).
+ */
 export async function deleteDraft(surveyId: string): Promise<void> {
+  await db.drafts.delete(surveyId);
+}
+
+/** The user discards a draft: the draft and its photos go (none of them can have been uploaded). */
+export async function discardDraft(surveyId: string): Promise<void> {
   await db.transaction('rw', db.drafts, db.photos, db.surveys, async () => {
     await db.drafts.delete(surveyId);
     if (!(await db.surveys.get(surveyId))) await db.photos.where('surveyId').equals(surveyId).delete();
   });
+}
+
+/** Ids among these whose photo bytes are no longer on the phone. */
+export async function missingPhotoIds(ids: readonly string[]): Promise<string[]> {
+  if (!ids.length) return [];
+  const found = await db.photos.bulkGet([...ids]);
+  return ids.filter((_, i) => !found[i]);
 }
 
 // ---- photos ----

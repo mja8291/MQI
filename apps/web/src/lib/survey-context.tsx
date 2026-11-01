@@ -1,6 +1,6 @@
 
 import { createContext, useContext, useEffect, useMemo, useReducer, useState } from "react";
-import { getDraft } from "./offline/db";
+import { getDraft, missingPhotoIds } from "./offline/db";
 import { emptyDrillingCheck, emptySiteChecks, type DrillingCheck, type SiteChecks } from "./types";
 import type {
   Condition,
@@ -51,6 +51,8 @@ export interface SurveyState {
   siteChecks: SiteChecks;
   /** Photos attached to last-page questions (see SITE_PHOTO_* in types.ts), keyed by question text. Same lifecycle as every other photo — each uploads to Drive individually on attach. */
   reviewPhotos: Record<string, PhotoAsset[]>;
+  /** W46: photos found missing from the phone and taken out of the survey, so the user is asked to retake them. */
+  lostPhotos?: number;
   complaints: string;
   scoring: {
     locations: SurveyLocation[];
@@ -169,6 +171,16 @@ function removePhoto(photos: Record<string, PhotoAsset[]>, name: string, id: str
   return { ...photos, [name]: (photos[name] ?? []).filter((p) => p.id !== id) };
 }
 
+/** Every photo id the survey refers to (locations, the open location and last-page questions). */
+export function allPhotoIds(state: Pick<SurveyState, "reviewPhotos" | "scoring">): string[] {
+  const lists = [
+    state.reviewPhotos,
+    ...state.scoring.locations.map((l) => l.photos),
+    ...(state.scoring.current ? [state.scoring.current.photos] : []),
+  ];
+  return lists.flatMap((p) => Object.values(p ?? {}).flatMap((v) => v.map((x) => x.id)));
+}
+
 function emptyCurrentLocation(floorLevel: FloorLevel): CurrentLocation {
   return { floorLevel, type: null, name: "", scores: {}, photos: {}, notes: {} };
 }
@@ -203,6 +215,7 @@ type Action =
   | { type: "LOC_DISCARD_CURRENT" }
   | { type: "LOC_RESUME_LOCATION"; id: string }
   | { type: "LOAD_DRAFT"; state: SurveyState }
+  | { type: "PRUNE_PHOTOS"; ids: string[] }
   | { type: "DISCARD_PROGRESS" }
   | { type: "PAUSE_TIMER" }
   | { type: "RESUME_TIMER" }
@@ -223,6 +236,7 @@ const TIMER_EXEMPT_ACTIONS = new Set<Action["type"]>([
   "START_SURVEY",
   "SET_LAST_SURVEY_ID",
   "LOAD_DRAFT",
+  "PRUNE_PHOTOS",
   "DISCARD_PROGRESS",
   "PAUSE_TIMER",
   "RESUME_TIMER",
@@ -435,6 +449,20 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       // structuralConcern) resumes with that field defaulted instead of
       // undefined — every field a draft does carry still wins.
       return { ...initialState(), ...action.state };
+    case "PRUNE_PHOTOS": {
+      const gone = new Set(action.ids);
+      const prune = (photos: Record<string, PhotoAsset[]>) =>
+        Object.fromEntries(Object.entries(photos).map(([k, v]) => [k, v.filter((p) => !gone.has(p.id))] as const).filter(([, v]) => v.length));
+      return {
+        ...state,
+        reviewPhotos: prune(state.reviewPhotos),
+        scoring: {
+          locations: state.scoring.locations.map((l) => ({ ...l, photos: prune(l.photos) })),
+          current: state.scoring.current ? { ...state.scoring.current, photos: prune(state.scoring.current.photos) } : null,
+        },
+        lostPhotos: (state.lostPhotos ?? 0) + action.ids.length,
+      };
+    }
     case "PAUSE_TIMER":
       // No-op if the timer isn't running yet, or is already paused — avoids
       // clobbering an earlier pausedAt (which would lose the time already
@@ -507,6 +535,7 @@ interface SurveyContextValue {
   locDiscardCurrent: () => void;
   locResumeLocation: (id: string) => void;
   loadDraft: (state: SurveyState) => void;
+  prunePhotos: (ids: string[]) => void;
   discardProgress: () => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
@@ -528,6 +557,26 @@ const SurveyContext = createContext<SurveyContextValue | null>(null);
 export function SurveyProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
   const [hydrated, setHydrated] = useState(false);
+  // Bumped on every draft load so the photo check below runs again even for the same survey.
+  const [loads, setLoads] = useState(0);
+
+  // W46: a survey loaded from a draft may reference photos whose bytes are no longer on the phone
+  // (an earlier version deleted them when a draft was resumed). Take them out of the survey so
+  // the form shows those items as needing a photo instead of failing at Submit.
+  useEffect(() => {
+    if (!hydrated || !state.surveyId) return;
+    let cancelled = false;
+    void missingPhotoIds(allPhotoIds(state))
+      .then((ids) => {
+        if (!cancelled && ids.length) dispatch({ type: "PRUNE_PHOTOS", ids });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // Only on load: photos added later are written to the phone before they enter the state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, state.surveyId, loads]);
 
   // Attempt the auto-resume described on ACTIVE_SURVEY_STORAGE_KEY, once,
   // on mount. Runs even when there's no pointer (nothing to resume) — the
@@ -558,7 +607,10 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
     getDraft(id)
       .then((draft) => {
         if (cancelled) return;
-        if (draft) dispatch({ type: "LOAD_DRAFT", state: draft.state });
+        if (draft) {
+          dispatch({ type: "LOAD_DRAFT", state: draft.state });
+          setLoads((n) => n + 1);
+        }
       })
       .catch(() => {
         // IndexedDB unavailable, or something malformed — fall through to
@@ -627,7 +679,11 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
       locFinalizeCurrent: () => dispatch({ type: "LOC_FINALIZE_CURRENT" }),
       locDiscardCurrent: () => dispatch({ type: "LOC_DISCARD_CURRENT" }),
       locResumeLocation: (id) => dispatch({ type: "LOC_RESUME_LOCATION", id }),
-      loadDraft: (draftState) => dispatch({ type: "LOAD_DRAFT", state: draftState }),
+      loadDraft: (draftState) => {
+        dispatch({ type: "LOAD_DRAFT", state: draftState });
+        setLoads((n) => n + 1);
+      },
+      prunePhotos: (ids) => dispatch({ type: "PRUNE_PHOTOS", ids }),
       discardProgress: () => dispatch({ type: "DISCARD_PROGRESS" }),
       pauseTimer: () => dispatch({ type: "PAUSE_TIMER" }),
       resumeTimer: () => dispatch({ type: "RESUME_TIMER" }),

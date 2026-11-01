@@ -74,6 +74,7 @@ export default function ReviewPage() {
     setDrillingCheck,
     setSiteChecks,
     setComplaints,
+    prunePhotos,
   } = useSurvey();
   const [powerSupply, setLocalPowerSupply] = useState<PowerSupply | "">(state.powerSupply);
   const [structuralConcern, setLocalStructuralConcern] = useState<StructuralConcern | "">(state.structuralConcern);
@@ -256,6 +257,14 @@ export default function ReviewPage() {
       },
       result
     );
+    // W46: photos whose bytes are no longer on the phone come out of the survey, and the user retakes them.
+    if (submission.lostPhotoIds.length) {
+      prunePhotos(submission.lostPhotoIds);
+      const n = submission.lostPhotoIds.length;
+      setError(`${n === 1 ? "1 photo is" : `${n} photos are`} no longer on this phone. Open the locations again and retake the photos the form asks for, then submit.`);
+      setSubmitting(false);
+      return;
+    }
     const issues = checkSubmission(submission);
     if (issues.length) {
       setError(issues[0]!.message);
@@ -562,6 +571,12 @@ export default function ReviewPage() {
         <p className="text-xs text-ink-faint mt-3">
           {photosUploading === 1 ? "1 photo is" : `${photosUploading} photos are`} still uploading — this finishes on its
           own, no need to wait on this screen.
+        </p>
+      ) : null}
+      {state.lostPhotos ? (
+        <p role="alert" className="text-xs text-band-poor mt-3">
+          {state.lostPhotos === 1 ? "1 photo was" : `${state.lostPhotos} photos were`} lost from this phone when the survey was reopened. Retake the
+          photos the form asks for (Unsafe items need one); everything else you scored is kept.
         </p>
       ) : null}
       {error ? <p className="text-xs text-band-poor mt-3">{error}</p> : null}

@@ -12,6 +12,8 @@ import type { PhotoAsset } from './types';
 export interface Submission {
   survey: SubmittedSurvey;
   attachments: AttachmentMeta[];
+  /** W46: photos in the survey whose bytes are no longer on the phone (left out of the submission). */
+  lostPhotoIds: string[];
 }
 
 type SubmitState = SurveyState & { reviewPhotos: Record<string, PhotoAsset[]> };
@@ -25,9 +27,13 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
   const timeTakenSeconds = state.startTime ? Math.max(0, Math.round((endMs - Date.parse(state.startTime)) / 1000) - pausedSeconds) : null;
 
   const attachments: AttachmentMeta[] = [];
+  const lostPhotoIds: string[] = [];
   const addAttachment = async (p: PhotoAsset, itemName: string, locationName: string, location?: AttachmentMeta['location']) => {
     const stored = await getPhoto(p.id);
-    if (!stored) return false; // the bytes are gone (should not happen): leave the photo out rather than block the survey
+    if (!stored) {
+      lostPhotoIds.push(p.id); // the bytes are gone: the review page asks for the photo again
+      return false;
+    }
     attachments.push({ id: p.id, surveyId: state.surveyId!, itemName, locationName, location, mimeType: stored.mimeType as AttachmentMeta['mimeType'], size: stored.size });
     return true;
   };
@@ -97,7 +103,7 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
     createdAt: state.startTime ?? endTime,
     updatedAt: endTime,
   };
-  return { survey, attachments };
+  return { survey, attachments, lostPhotoIds };
 }
 
 /** The same schema and rules the server applies, so a survey is never queued only to be rejected. */
