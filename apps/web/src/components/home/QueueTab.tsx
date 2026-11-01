@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CloudOff, FileClock, Loader2, RefreshCw, X, KeyRound } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { SavePhotosButton } from "@/components/survey/SavePhotosButton";
+import { queuedPhotoCopies } from "@/lib/photos-to-phone";
 import { discardDraft, discardSurvey, retrySurvey, type QueuedSubmission, type SurveyDraft } from "@/lib/offline/db";
 import { DRAFTS_CHANGED_EVENT } from "@/lib/draft";
 import { flushPendingSubmissions, LAST_SYNC_KEY } from "@/lib/offline/sync";
@@ -178,6 +180,8 @@ export function QueueTab({ drafts: allDrafts, pending: allPending, syncing, load
                         ? ` · tried ${relativeTime(p.lastAttemptAt)}`
                         : ""}
                     </div>
+                    {/* W50: photos still waiting to upload can be copied to the phone meanwhile. */}
+                    {photos > 0 ? <SavePhotosButton className="mt-2" label="Save photos to phone" copies={() => queuedPhotoCopies(p.id)} /> : null}
                   </div>
                   {status.needsSignIn ? (
                     <Link href="/signin" className="shrink-0 text-xs font-semibold text-brand-deep underline pt-1">

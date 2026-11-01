@@ -5,6 +5,9 @@ import { UnprocessablePhotoError } from "@/lib/image/compress";
 import { compressPhoto } from "@/lib/image/compress-photo";
 import type { PhotoAsset } from "@/lib/types";
 import { getPhoto } from "@/lib/offline/db";
+import { draftPhotoCopies } from "@/lib/photos-to-phone";
+import { useSurveyStateOptional } from "@/lib/survey-context";
+import { SavePhotosButton } from "@/components/survey/SavePhotosButton";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { IconButton } from "./IconButton";
 
@@ -172,6 +175,7 @@ function PhotoThumb({ photo, onOpen }: { photo: PhotoAsset; onOpen: () => void }
 function PhotoViewer({ photo, onClose, onDelete }: { photo: PhotoAsset; onClose: () => void; onDelete: () => void }) {
   const url = usePhotoUrl(photo.id);
   const [confirming, setConfirming] = useState(false);
+  const survey = useSurveyStateOptional();
   return (
     <div role="dialog" aria-label={photo.name} className="fixed inset-0 z-50 flex flex-col bg-black">
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
@@ -185,7 +189,16 @@ function PhotoViewer({ photo, onClose, onDelete }: { photo: PhotoAsset; onClose:
       <div className="flex-1 min-h-0 flex items-center justify-center px-3">
         {url ? <img src={url} alt={photo.name} className="max-h-full max-w-full object-contain" /> : <span className="text-white/70 text-sm">Loading…</span>}
       </div>
-      <div className="px-4 py-4">
+      <div className="px-4 py-4 space-y-3">
+        {/* W50: a copy in the phone's Downloads folder, named after the campus, location and item. */}
+        <SavePhotosButton
+          label="Save to phone"
+          className="w-full [&>button]:w-full [&>button]:justify-center [&>button]:min-h-11 [&>span]:text-white/80"
+          copies={() => {
+            const found = survey ? draftPhotoCopies(survey).find((c) => c.id === photo.id) : undefined;
+            return [found ?? { id: photo.id, campus: survey?.school?.name ?? "Survey", date: new Date().toISOString().slice(0, 10), location: "", item: photo.name.replace(/.[^.]+$/, "") }];
+          }}
+        />
         <button
           type="button"
           onClick={() => setConfirming(true)}

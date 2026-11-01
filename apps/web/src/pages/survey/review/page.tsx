@@ -60,6 +60,8 @@ import { cancelSubmitting, discardSubmittedDraft, markSubmitting } from "@/lib/d
 import { formatDuration } from "@/lib/format-duration";
 import { buildDraftExcelBlob, buildDraftPdfBlob, downloadBlob, draftExportFilenameBase } from "@/lib/export/draft-export";
 import { FileSpreadsheet, FileText } from "lucide-react";
+import { SavePhotosButton } from "@/components/survey/SavePhotosButton";
+import { draftPhotoCopies } from "@/lib/photos-to-phone";
 
 export default function ReviewPage() {
   const { user } = useAuth();
@@ -581,6 +583,19 @@ export default function ReviewPage() {
         </p>
       ) : null}
       {error ? <p className="text-xs text-band-poor mt-3">{error}</p> : null}
+
+      {/* W50: a copy of this survey's photos on the phone, before they have uploaded. */}
+      {draftPhotoCopies(state).length > 0 ? (
+        <div className="mt-4 rounded-xl border border-border bg-card px-3.5 py-3">
+          <p className="text-[12px] leading-snug text-ink-soft mb-2">
+            Photos taken in the app are not in the phone&apos;s gallery until you save a copy. Copies go to Downloads, which the gallery shows.
+          </p>
+          <SavePhotosButton
+            label={draftPhotoCopies(state).length === 1 ? "Save the photo to phone" : `Save all ${draftPhotoCopies(state).length} photos to phone`}
+            copies={() => draftPhotoCopies(state)}
+          />
+        </div>
+      ) : null}
 
       <BottomBar>
         <p className="text-[11px] text-ink-faint mb-1.5">

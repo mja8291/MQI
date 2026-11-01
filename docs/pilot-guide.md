@@ -24,6 +24,7 @@ Do at least **two complete surveys** each, and try these on purpose:
 - Photos taken with the app's camera button are kept **only inside the app**, not in the phone's gallery, until the survey has synced. If the app's data is lost before then, those photos cannot be recovered.
 - Never use **Clear data / Clear storage** for Chrome or the MQI app, and don't uninstall the app, while anything is listed under **Incomplete** or **Sync Pending**.
 - Open MQI from its **installed app icon**, not a Chrome tab. If Home says storage isn't protected or is almost full, fix that before going to a site.
+- Want your own copy? Tap **Save to phone** on a photo, **Save all photos to phone** on the Review page, or **Save photos to phone** under Sync Pending. Copies go to **Downloads** and show in the gallery (Chrome may ask once to allow several downloads).
 - Sync as soon as you have a connection, and wait until Sync Pending says **Nothing waiting to sync** before closing the app.
 
 ## 3. How to report

@@ -705,6 +705,11 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
   return <SurveyContext.Provider value={value}>{children}</SurveyContext.Provider>;
 }
 
+/** The survey in progress, or null outside the survey screens (W50: names saved photos). */
+export function useSurveyStateOptional(): SurveyState | null {
+  return useContext(SurveyContext)?.state ?? null;
+}
+
 export function useSurvey() {
   const ctx = useContext(SurveyContext);
   if (!ctx) throw new Error("useSurvey must be used within SurveyProvider");
