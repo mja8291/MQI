@@ -118,15 +118,24 @@ async function pushSurveys(force: boolean): Promise<boolean> {
   return true;
 }
 
-async function uploadPhoto(attachmentId: string): Promise<UploadResult | null> {
+/**
+ * Sends one photo; 'missing' when its bytes are no longer on the phone (W48). Full-size bytes are
+ * only ever evicted after the server confirmed the photo, so an evicted photo is already done.
+ */
+async function uploadPhoto(attachmentId: string): Promise<UploadResult | 'missing'> {
   const p = await db.photos.get(attachmentId);
-  if (!p || p.evicted) return null;
+  if (!p) return 'missing';
+  if (p.uploaded || p.evicted) return { received: [], done: true, url: p.url ?? '' };
   const count = Math.max(1, Math.ceil(p.size / UPLOAD_CHUNK_BYTES));
   let last: UploadResult | null = null;
   let conflicts = 0;
   for (let i = 0; i < count; i++) {
-    const fresh = (await db.photos.get(attachmentId))!;
-    if (fresh.uploadedChunks.includes(i)) continue;
+    const fresh = await db.photos.get(attachmentId);
+    if (!fresh) return 'missing';
+    // W48: the last chunk is always sent when nothing else was this run. A run cut off after the
+    // server stored every chunk otherwise sends nothing and never learns the photo is done; the
+    // server answers a repeated chunk from its ledger.
+    if (fresh.uploadedChunks.includes(i) && !(i === count - 1 && last === null)) continue;
     const part = new Uint8Array(await fresh.blob.slice(i * UPLOAD_CHUNK_BYTES, (i + 1) * UPLOAD_CHUNK_BYTES).arrayBuffer());
     try {
       last = await api<UploadResult>('files.upload', { attachmentId, chunkIndex: i, chunkCount: count, totalSize: p.size, data: base64Encode(part), sha256: bytesToHex(sha256(part)) });
@@ -144,6 +153,7 @@ async function uploadPhoto(attachmentId: string): Promise<UploadResult | null> {
     await db.photos.update(attachmentId, { uploadedChunks: last.received });
     if (last.done) break;
   }
+  if (!last) throw new Error('No chunk of the photo was sent'); // unreachable: the last chunk always goes
   return last;
 }
 
@@ -183,8 +193,24 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
       try {
         const r = await uploadPhoto(entry.attachmentId!);
         const now = new Date().toISOString();
+        if (r === 'missing') {
+          // W48: the photo's bytes are gone from this phone. Its entry can never succeed; the survey
+          // is shown as failed with the reason instead of being counted as synced without it. The
+          // server keeps the photo listed as expected (Files state "pending").
+          await db.transaction('rw', db.outbox, db.surveys, async () => {
+            await db.outbox.delete(entry.seq!);
+            await db.surveys.update(entry.surveyId, {
+              status: 'failed',
+              lastAttemptAt: now,
+              lastError: { kind: 'server', message: 'A photo is no longer on this phone, so it could not be sent. The survey answers were sent; tell the QA/QC team which photo is missing.' },
+            });
+          });
+          notifyChanged();
+          continue;
+        }
+        if (!r.done) throw new Error('The photo upload did not finish'); // retried with backoff
         await db.transaction('rw', db.photos, db.outbox, db.surveys, async () => {
-          if (r?.done) await db.photos.update(entry.attachmentId!, { uploaded: true, url: r.url });
+          await db.photos.update(entry.attachmentId!, { uploaded: true, url: r.url });
           await db.outbox.delete(entry.seq!);
           const left = await db.outbox.where('surveyId').equals(entry.surveyId).count();
           if (left === 0) await db.surveys.update(entry.surveyId, { status: 'synced', syncedAt: now, lastError: undefined, attempts: 0 });

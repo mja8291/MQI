@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { uuidv7 } from '@mqi/shared';
-import { putPhoto, removePhoto as removeStoredPhoto } from './offline/db';
+import { getPhoto, putPhoto, removePhoto as removeStoredPhoto } from './offline/db';
 import type { PhotoAsset } from './types';
 
 const rnd = (n: number) => crypto.getRandomValues(new Uint8Array(n));
@@ -30,6 +30,16 @@ export function usePhotoUploadHandlers({ surveyId, addPhoto, removePhoto }: UseP
       if (!surveyId) throw new Error('No survey in progress');
       const id = uuidv7(rnd);
       await putPhoto({ id, surveyId, blob: file, mimeType: file.type, size: file.size });
+      // W48: read it back before it counts as attached, so a storage write that failed silently
+      // shows as an error now rather than as a missing photo at Submit.
+      const stored = await getPhoto(id);
+      if (!stored || stored.size !== file.size || stored.blob.size !== file.size) {
+        await removeStoredPhoto(id).catch(() => undefined);
+        throw new Error('The photo could not be saved on this phone');
+      }
+      // W48: ask again for storage the browser will not clear under pressure (granted by Chrome's
+      // heuristics; installed apps usually get it). Cheap and idempotent.
+      void navigator.storage?.persist?.().catch(() => false);
       addPhoto(itemName, { id, name: file.name, size: file.size, status: 'saved' });
     },
     [surveyId, addPhoto],

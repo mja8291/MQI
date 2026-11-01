@@ -191,6 +191,29 @@ describe('sync engine', () => {
     expect((await db.surveys.get(bad.id))!.status).toBe('pending');
   });
 
+  test('W48: a photo no longer on the phone fails the survey visibly; it is never counted as synced', async () => {
+    const s = await makeQueued({ photoBytes: 5000 });
+    await db.photos.clear();
+    await flushPendingSubmissions();
+    const after = (await db.surveys.get(s.id))!;
+    expect(after.status).toBe('failed');
+    expect(after.lastError?.message).toMatch(/no longer on this phone/);
+    expect(rows(s.id)).toHaveLength(1); // the answers were sent
+    expect(photoRows(s.id)).toHaveLength(0);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  test('W48: every chunk already sent but the answer lost: the next run still finishes the photo', async () => {
+    const s = await makeQueued({ photoBytes: 5000 });
+    const [photo] = await db.photos.toArray();
+    await db.photos.update(photo!.id, { uploadedChunks: [0] }); // recorded as sent, never confirmed
+    await flushPendingSubmissions();
+    expect((await db.surveys.get(s.id))!.status).toBe('synced');
+    expect(env.drive.createdFiles).toBe(1);
+    expect(photoRows(s.id)).toHaveLength(1);
+    expect((await db.photos.get(photo!.id))!.uploaded).toBe(true);
+  });
+
   test('a big photo resumes from the last chunk after an interruption', async () => {
     const size = UPLOAD_CHUNK_BYTES * 2 + 123;
     const s = await makeQueued({ photoBytes: size });
