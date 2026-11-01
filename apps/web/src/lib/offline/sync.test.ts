@@ -123,6 +123,18 @@ describe('submit is local and atomic', () => {
     expect((await db.surveys.get(s.id))!.status).toBe('pending');
   });
 
+  test('a photo removed from the form keeps its bytes until Submit, which drops only unused photos', async () => {
+    offline = true;
+    const id = uuidv7(rnd);
+    const jpeg = new Blob([new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3])], { type: 'image/jpeg' });
+    await putPhoto({ id: 'kept', surveyId: id, blob: jpeg, mimeType: 'image/jpeg', size: 6 });
+    await putPhoto({ id: 'removed', surveyId: id, blob: jpeg, mimeType: 'image/jpeg', size: 6 });
+    await putPhoto({ id: 'other-survey', surveyId: uuidv7(rnd), blob: jpeg, mimeType: 'image/jpeg', size: 6 });
+    const s = await makeQueued();
+    await queueSurvey({ ...s, id }, [{ id: 'kept', surveyId: id, itemName: 'Plaster', locationName: 'Roof 1', mimeType: 'image/jpeg', size: 6 }]);
+    expect((await db.photos.toArray()).map((p) => p.id).sort()).toEqual(['kept', 'other-survey']);
+  });
+
   test('a draft save that lands after Submit never brings the survey back as a draft', async () => {
     offline = true;
     const s = await makeQueued();

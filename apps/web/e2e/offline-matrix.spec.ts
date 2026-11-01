@@ -75,6 +75,10 @@ test('1. cold start with no signal: every screen works, then the survey syncs ex
   await expect(wall.getByText(/Marked Unsafe/)).toBeVisible();
   await wall.locator('input[type=file][capture]').setInputFiles(PHOTO);
   await expect(wall.getByText(/Marked Unsafe/)).toHaveCount(0);
+  // W49: the × next to a photo asks first; Cancel keeps the photo.
+  await wall.getByRole('button', { name: /^Remove / }).click();
+  await p.getByRole('button', { name: 'Cancel' }).click();
+  await expect(wall.getByText(/KB · tap to view/)).toHaveCount(1);
 
   // W41: Column Unsafe → crack > 3 mm → Schmidt Hammer available → reading + photo, all required.
   await p.getByRole('button', { name: 'Save Selection and Return' }).click();

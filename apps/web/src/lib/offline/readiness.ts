@@ -27,13 +27,27 @@ export interface OfflineReadiness {
   app: boolean;
   /** Campuses saved on the phone. */
   schools: number;
+  /**
+   * W49: whether the browser has made this app's storage persistent (it is then not cleared
+   * automatically when the phone runs low on space); null where the browser can't say.
+   */
+  persisted: boolean | null;
+  /** Space the app can still use, in MB; null where the browser can't say. */
+  freeMb: number | null;
 }
+
+/** Below this, photos may fail to save: warn on Home. */
+export const LOW_SPACE_MB = 200;
 
 async function check(): Promise<OfflineReadiness> {
   const app = typeof navigator !== "undefined" && "serviceWorker" in navigator
     ? Boolean((await navigator.serviceWorker.getRegistration())?.active)
     : false;
-  return { app, schools: (await getCachedSchools())?.length ?? 0 };
+  const storage = typeof navigator !== "undefined" ? navigator.storage : undefined;
+  const persisted = storage?.persisted ? await storage.persisted().catch(() => null) : null;
+  const estimate = storage?.estimate ? await storage.estimate().catch(() => null) : null;
+  const freeMb = estimate?.quota != null ? Math.max(0, Math.floor((estimate.quota - (estimate.usage ?? 0)) / (1024 * 1024))) : null;
+  return { app, schools: (await getCachedSchools())?.length ?? 0, persisted, freeMb };
 }
 
 export function useOfflineReadiness(): OfflineReadiness | null {

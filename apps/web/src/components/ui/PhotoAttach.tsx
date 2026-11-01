@@ -216,6 +216,8 @@ function PhotoViewer({ photo, onClose, onDelete }: { photo: PhotoAsset; onClose:
  */
 export function PhotoThumbList({ photos, onRemovePhoto }: PhotoThumbListProps) {
   const [viewing, setViewing] = useState<PhotoAsset | null>(null);
+  // W49: the × sits next to the photo name; one stray tap must not lose a photo taken on site.
+  const [removing, setRemoving] = useState<PhotoAsset | null>(null);
   if (photos.length === 0) return null;
   return (
     <div className="mt-2 space-y-1.5">
@@ -228,7 +230,7 @@ export function PhotoThumbList({ photos, onRemovePhoto }: PhotoThumbListProps) {
           </button>
           <button
             type="button"
-            onClick={() => onRemovePhoto(p.id)}
+            onClick={() => setRemoving(p)}
             aria-label={`Remove ${p.name}`}
             className="shrink-0 min-h-11 min-w-11 flex items-center justify-center text-band-poor"
           >
@@ -236,6 +238,17 @@ export function PhotoThumbList({ photos, onRemovePhoto }: PhotoThumbListProps) {
           </button>
         </div>
       ))}
+      <ConfirmDialog
+        open={removing !== null}
+        title="Delete this photo?"
+        message="It will be removed from this item. This cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (removing) onRemovePhoto(removing.id);
+          setRemoving(null);
+        }}
+        onCancel={() => setRemoving(null)}
+      />
       {viewing ? (
         <PhotoViewer
           photo={viewing}

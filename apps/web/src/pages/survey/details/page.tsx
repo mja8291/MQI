@@ -44,6 +44,9 @@ export default function SurveyDetailsPage() {
     if (!detailsComplete) return;
     setRespondent(asm.trim(), joinStaff(staff), principal.trim());
     startSurvey();
+    // W49: the survey's answers and photos are about to live only on this phone — ask the browser
+    // to keep this app's storage through low-space clean-ups (a tap, as browsers prefer).
+    void navigator.storage?.persist?.().catch(() => false);
     router.push("/survey/levels");
   }
 

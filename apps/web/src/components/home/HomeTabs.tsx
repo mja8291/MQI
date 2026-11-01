@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/lib/auth/client";
 import { can } from "@mqi/shared";
 import { QueueTab } from "./QueueTab";
-import { useOfflineReadiness } from "@/lib/offline/readiness";
+import { LOW_SPACE_MB, useOfflineReadiness } from "@/lib/offline/readiness";
 import { useQueue } from "./useQueue";
 
 type Tab = "start" | "incomplete" | "sync";
@@ -181,6 +181,17 @@ function OfflineReadyLine() {
       {ready
         ? `✓ Ready to work offline (${r.schools.toLocaleString()} campuses saved on this phone)`
         : "Preparing offline use… stay connected for a moment before going to a site with no signal."}
+      {/* W49: the two storage conditions that can cost unsent photos. */}
+      {r.freeMb !== null && r.freeMb < LOW_SPACE_MB ? (
+        <span className="block mt-1 text-band-poor">
+          Phone storage is almost full ({r.freeMb} MB left for the app). Free some space so photos can be saved.
+        </span>
+      ) : null}
+      {r.persisted === false ? (
+        <span className="block mt-1 text-ink-soft">
+          Open MQI from its installed app icon, and never clear Chrome's site data while surveys are under Incomplete or Sync Pending.
+        </span>
+      ) : null}
     </p>
   );
 }

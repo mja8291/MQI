@@ -45,10 +45,12 @@ export function usePhotoUploadHandlers({ surveyId, addPhoto, removePhoto }: UseP
     [surveyId, addPhoto],
   );
 
+  // W49: only the form forgets the photo. Its bytes stay until the survey is queued (queueSurvey
+  // drops photos the submission doesn't use) or discarded, so a draft saved a moment earlier can
+  // never point at a photo that is already gone.
   const handleRemovePhoto = useCallback(
     (itemName: string, id: string) => {
       removePhoto(itemName, id);
-      void removeStoredPhoto(id);
     },
     [removePhoto],
   );

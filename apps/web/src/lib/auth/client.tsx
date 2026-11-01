@@ -126,6 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const r = await rawCall<WhoAmI>('auth.login', { email, password });
         if (!r.ok) return r.error.message;
         await accept(r.data);
+        // W49: protected storage for the surveys this phone will hold (see survey details' start).
+        void navigator.storage?.persist?.().catch(() => false);
         // Anything queued while signed out can go now (FR-AUTH-9).
         void flushPendingSubmissions();
         return null;

@@ -197,11 +197,14 @@ export async function enforcePhotoBudget(budget = PHOTO_CACHE_BUDGET_BYTES): Pro
 
 export async function queueSurvey(survey: SubmittedSurvey, attachments: AttachmentMeta[]): Promise<void> {
   const now = new Date().toISOString();
-  await db.transaction('rw', db.surveys, db.outbox, db.drafts, async () => {
+  await db.transaction('rw', [db.surveys, db.outbox, db.drafts, db.photos], async () => {
     if (await db.surveys.get(survey.id)) return; // a double tap must not queue twice
     await db.surveys.put({ id: survey.id, status: 'pending', createdAt: now, survey, attachments, attempts: 0, nextAttemptAt: 0 });
     await db.outbox.add({ kind: 'survey', surveyId: survey.id, createdAt: now });
     await db.drafts.delete(survey.id);
+    // W49: photos removed from the form were kept until now; the ones the submission doesn't use go.
+    const used = new Set(attachments.map((a) => a.id));
+    await db.photos.where('surveyId').equals(survey.id).filter((p) => !used.has(p.id)).delete();
   });
 }
 
