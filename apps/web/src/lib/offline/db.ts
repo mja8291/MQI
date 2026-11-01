@@ -19,6 +19,9 @@ export interface SurveyDraft {
   savedAt: string;
   schoolName: string;
   state: SurveyState;
+  /** W51: the app session that wrote it and its running count there (see saveDraft). */
+  writer?: string;
+  seq?: number;
 }
 
 /** A finished survey waiting for (or past) the server. */
@@ -116,6 +119,12 @@ export async function getCachedSchools(): Promise<School[] | null> {
 export async function saveDraft(draft: SurveyDraft): Promise<void> {
   await db.transaction('rw', db.drafts, db.surveys, async () => {
     if (await db.surveys.get(draft.surveyId)) return;
+    // W51: never overwrite a later copy written by this same app session. A save started a moment
+    // before the app closed could otherwise land after the close-time save and bring back an older
+    // survey (the robustness suite lost a just-saved location this way). A copy from an earlier
+    // session is always older, so it is replaced; no clock is involved.
+    const stored = await db.drafts.get(draft.surveyId);
+    if (stored && draft.writer && stored.writer === draft.writer && (stored.seq ?? 0) > (draft.seq ?? 0)) return;
     await db.drafts.put(draft);
   });
 }

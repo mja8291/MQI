@@ -34,3 +34,19 @@ describe('drafts and their photos (W46)', () => {
     expect(await missingPhotoIds([])).toEqual([]);
   });
 });
+
+describe('draft writes land in order (W51)', () => {
+  const d = (writer: string, seq: number, n: number) => ({ surveyId: 's', savedAt: '', schoolName: 'X', state: { n } as never, writer, seq });
+  test('an older write from the same app session never replaces a newer one', async () => {
+    await saveDraft(d('page-1', 5, 5));
+    await saveDraft(d('page-1', 3, 3)); // started earlier, landed later
+    expect(((await db.drafts.get('s'))!.state as unknown as { n: number }).n).toBe(5);
+    await saveDraft(d('page-1', 6, 6));
+    expect(((await db.drafts.get('s'))!.state as unknown as { n: number }).n).toBe(6);
+  });
+  test('a write from a new app session always replaces the old session\'s copy', async () => {
+    await saveDraft(d('page-1', 40, 40));
+    await saveDraft(d('page-2', 1, 1));
+    expect(((await db.drafts.get('s'))!.state as unknown as { n: number }).n).toBe(1);
+  });
+});

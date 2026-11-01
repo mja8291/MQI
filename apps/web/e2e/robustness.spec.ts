@@ -195,3 +195,19 @@ for (let run = 1; run <= 6; run++)
     );
     expect([...found.drafts, ...found.queued]).toEqual([1]);
   });
+
+// 7. The app closes a moment after a location is saved (repeated). Before W51 an autosave already
+// under way could land after the close-time save and bring back the survey without that location.
+for (let run = 1; run <= 6; run++)
+  test(`7.${run} the app reloads the instant a location is saved: the location is still there`, async ({ context, page }) => {
+    test.setTimeout(120_000);
+    await installAndSignIn(page);
+    await context.setOffline(true);
+    await startSurvey(page, /^OGS Trust Campus South West/);
+    await addRoof(page);
+    await page.reload(); // at once
+    await expect(page.getByRole('button', { name: 'Review and submit' })).toBeVisible();
+    await page.waitForTimeout(1_000);
+    const d = await draftPhotos(page);
+    expect(Object.keys(d.saved)).toHaveLength(1);
+  });

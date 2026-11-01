@@ -84,8 +84,12 @@ export async function saveDraft(state: SurveyState): Promise<void> {
   notifyChanged();
 }
 
+/** W51: this page load's id and a running count, so draft writes can be put in order (db.saveDraft). */
+const WRITER = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()).slice(2);
+let seq = 0;
+
 function toDraft(state: SurveyState, snapshot: SurveyState): SurveyDraft {
-  return { surveyId: state.surveyId!, savedAt: new Date().toISOString(), schoolName: state.school!.name, state: snapshot };
+  return { surveyId: state.surveyId!, savedAt: new Date().toISOString(), schoolName: state.school!.name, state: snapshot, writer: WRITER, seq: ++seq };
 }
 
 /**

@@ -102,6 +102,14 @@ export async function reviewAndSubmit(page: Page, { expectFewConfirm = true } = 
 
 /** The survey id from the Done screen's URL, or from Sync Pending if it moved on. */
 export async function lastSurveyId(page: Page): Promise<string> {
+  // Submit queues the survey a moment after the tap (it saves a final draft first, W51): wait for it
+  // instead of reading an empty store and then waiting on rows for no survey at all.
+  let id = '';
+  await expect.poll(async () => (id = await queuedSurveyId(page)), { timeout: 20_000 }).not.toBe('');
+  return id;
+}
+
+function queuedSurveyId(page: Page): Promise<string> {
   return page.evaluate(
     () =>
       new Promise<string>((resolve, reject) => {

@@ -69,44 +69,41 @@ export function SurveyTimerBar() {
   stateRef.current = state;
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savingRef = useRef(false);
-  // W51: a change that arrives while a save is running is saved right after it, never dropped.
-  const againRef = useRef(false);
+  // W51: saves run one after another. A save asked for while one is running waits for it and then
+  // writes the state as it is at that moment; every caller asking meanwhile shares that one save.
+  // So awaiting runSave() (Save & exit, Save draft) means the latest state is on the phone.
+  const chainRef = useRef<Promise<void>>(Promise.resolve());
+  const queuedRef = useRef<Promise<void> | null>(null);
 
-  const runSave = useCallback(async () => {
-    const s = stateRef.current;
-    if (!s.school || !s.started || !s.surveyId) return; // nothing to save yet
-    if (savingRef.current) {
-      againRef.current = true; // saved as soon as the running save finishes (W51)
-      return;
-    }
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-    if (maxWaitTimerRef.current) {
-      clearTimeout(maxWaitTimerRef.current);
-      maxWaitTimerRef.current = null;
-    }
-    savingRef.current = true;
-    setSaveState("saving");
-    try {
-      await saveDraft(s);
-      setSaveState("saved");
-    } catch {
-      setSaveState("error");
-    } finally {
-      savingRef.current = false;
-      if (saveFlashTimeoutRef.current) clearTimeout(saveFlashTimeoutRef.current);
-      saveFlashTimeoutRef.current = setTimeout(() => setSaveState("idle"), 2500);
-    }
-    if (againRef.current) {
-      againRef.current = false;
-      void runSaveRef.current();
-    }
+  const runSave = useCallback((): Promise<void> => {
+    if (queuedRef.current) return queuedRef.current;
+    const next = chainRef.current.then(async () => {
+      queuedRef.current = null;
+      const s = stateRef.current; // read now, not when asked: the latest state
+      if (!s.school || !s.started || !s.surveyId) return; // nothing to save yet
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      if (maxWaitTimerRef.current) {
+        clearTimeout(maxWaitTimerRef.current);
+        maxWaitTimerRef.current = null;
+      }
+      setSaveState("saving");
+      try {
+        await saveDraft(s);
+        setSaveState("saved");
+      } catch {
+        setSaveState("error");
+      } finally {
+        if (saveFlashTimeoutRef.current) clearTimeout(saveFlashTimeoutRef.current);
+        saveFlashTimeoutRef.current = setTimeout(() => setSaveState("idle"), 2500);
+      }
+    });
+    queuedRef.current = next;
+    chainRef.current = next.catch(() => undefined);
+    return next;
   }, []);
-  const runSaveRef = useRef(runSave);
-  runSaveRef.current = runSave;
 
   const handleSaveDraft = runSave;
 
@@ -166,6 +163,15 @@ export function SurveyTimerBar() {
   // new surveyId first appears — instead of waiting on the debounce — means
   // there's always at least one real snapshot in IndexedDB from the first
   // instant a survey exists, not just from whenever activity next settles.
+  // W51: finishing, reopening or removing a location is saved at once — a kill in the next
+  // fraction of a second must not take the location with it.
+  const locationCount = state.scoring.locations.length;
+  const editingLocation = state.scoring.current !== null;
+  useEffect(() => {
+    if (state.surveyId) void runSave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationCount, editingLocation]);
+
   const lastSavedSurveyIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (state.surveyId && state.surveyId !== lastSavedSurveyIdRef.current) {
