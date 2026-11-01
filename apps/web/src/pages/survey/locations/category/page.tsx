@@ -15,6 +15,7 @@ import {
 import type { DrillingCheck } from "@mqi/shared";
 import { ColumnCheckFields } from "@/components/survey/ColumnCheckFields";
 import { DrillingCheckFields } from "@/components/survey/DrillingCheckFields";
+import { usePhotoSaving, whenPhotosSaved } from "@/lib/photo-saving";
 import { getSiblingExternal } from "@/lib/sibling-external";
 import type { SiblingExternal } from "@/lib/sibling-external";
 import { Fragment, useEffect, useState } from "react";
@@ -64,6 +65,7 @@ export default function CategoryPage() {
     locDiscardCurrent,
   } = useSurvey();
   const current = state.scoring.current;
+  const photoSaving = usePhotoSaving();
   const { handleAddPhoto, handleRemovePhoto } = usePhotoUploadHandlers({
     surveyId: state.surveyId,
     region: state.school?.region ?? "",
@@ -140,7 +142,8 @@ export default function CategoryPage() {
   // was actually finished. Ask instead of guessing which one they meant;
   // the only way to leave an incomplete location now is the explicit
   // discard below, not a silent partial save.
-  function goBack() {
+  async function goBack() {
+    await whenPhotosSaved(); // W51: a photo still saving belongs to this location
     if (allComplete) {
       locFinalizeCurrent();
       router.push(targetRoute());
@@ -253,8 +256,8 @@ export default function CategoryPage() {
       ) : null}
 
       <BottomBar>
-        <Button variant={allComplete ? "primary" : "muted"} onClick={saveSelectionAndReturn}>
-          Save Selection and Return
+        <Button variant={allComplete && !photoSaving ? "primary" : "muted"} disabled={photoSaving} onClick={saveSelectionAndReturn}>
+          {photoSaving ? "Saving photo…" : "Save Selection and Return"}
         </Button>
         {attemptedSave && !allComplete ? (
           <p className="text-center text-[11.5px] text-band-poor mt-2.5">

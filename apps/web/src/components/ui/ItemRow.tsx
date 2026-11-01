@@ -102,6 +102,7 @@ export function ItemRow({
         <input
           type="text"
           placeholder="Note on this item"
+          maxLength={2000}
           value={note ?? ""}
           onChange={(e) => onNoteChange(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-border px-2.5 py-2 text-xs"

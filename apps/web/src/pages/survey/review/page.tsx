@@ -56,12 +56,13 @@ import { ReviewPhotoField } from "@/components/survey/ReviewPhotoField";
 import { buildSubmission, checkSubmission, countUnresolvedPhotos } from "@/lib/submit";
 import { queueSurvey } from "@/lib/offline/db";
 import { scheduleSync } from "@/lib/offline/sync";
-import { cancelSubmitting, discardSubmittedDraft, markSubmitting } from "@/lib/draft";
+import { cancelSubmitting, discardSubmittedDraft, markSubmitting, saveDraft } from "@/lib/draft";
 import { formatDuration } from "@/lib/format-duration";
 import { buildDraftExcelBlob, buildDraftPdfBlob, downloadBlob, draftExportFilenameBase } from "@/lib/export/draft-export";
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { SavePhotosButton } from "@/components/survey/SavePhotosButton";
 import { draftPhotoCopies } from "@/lib/photos-to-phone";
+import { usePhotoSaving } from "@/lib/photo-saving";
 
 export default function ReviewPage() {
   const { user } = useAuth();
@@ -78,6 +79,7 @@ export default function ReviewPage() {
     setComplaints,
     prunePhotos,
   } = useSurvey();
+  const photoSaving = usePhotoSaving();
   const [powerSupply, setLocalPowerSupply] = useState<PowerSupply | "">(state.powerSupply);
   const [structuralConcern, setLocalStructuralConcern] = useState<StructuralConcern | "">(state.structuralConcern);
   const [buildingStructure, setLocalBuildingStructure] = useState<BuildingStructure | "">(state.buildingStructure);
@@ -273,6 +275,10 @@ export default function ReviewPage() {
       setSubmitting(false);
       return;
     }
+    // W51: one last full save before queuing starts. From markSubmitting on, nothing writes the
+    // draft; if the app is killed before the survey is queued, the draft must be complete (the
+    // robustness probe found it a few seconds behind, missing the last location).
+    await saveDraft(state).catch(() => undefined);
     markSubmitting(submission.survey.id);
     try {
       await queueSurvey(submission.survey, submission.attachments);
@@ -541,6 +547,7 @@ export default function ReviewPage() {
             <input
               type="text"
               placeholder="Please specify"
+              maxLength={500}
               value={site.riskFactorOther}
               onChange={(e) => setSite({ ...site, riskFactorOther: e.target.value })}
               className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
@@ -553,6 +560,7 @@ export default function ReviewPage() {
         <textarea
           rows={3}
           placeholder="Anything not captured item-by-item"
+          maxLength={5000}
           value={complaints}
           onChange={(e) => setLocalComplaints(e.target.value)}
           className="w-full rounded-[10px] border border-border bg-white px-3 py-3 text-base text-ink"
@@ -615,8 +623,8 @@ export default function ReviewPage() {
             </span>
           </Button>
         </div>
-        <Button disabled={!canSubmit} onClick={submit}>
-          {submitting ? "Submitting…" : "Submit survey"}
+        <Button disabled={!canSubmit || photoSaving} onClick={submit}>
+          {photoSaving ? "Saving photo…" : submitting ? "Submitting…" : "Submit survey"}
         </Button>
       </BottomBar>
     </ScreenShell>

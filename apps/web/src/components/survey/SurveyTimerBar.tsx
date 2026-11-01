@@ -5,6 +5,7 @@ import { LogOut, Pause, Play, Save } from "lucide-react";
 import { clearActiveSurveyPointers, useSurvey } from "@/lib/survey-context";
 import { formatElapsedMinutes } from "@/lib/format-duration";
 import { saveDraft, saveDraftOnUnload } from "@/lib/draft";
+import { whenPhotosSaved } from "@/lib/photo-saving";
 
 // Round 3 Task 9 shipped "Save draft" as a manual button only. That's the bug
 // a real user hit: state lives purely in memory (useReducer) until someone
@@ -69,11 +70,16 @@ export function SurveyTimerBar() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const maxWaitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savingRef = useRef(false);
+  // W51: a change that arrives while a save is running is saved right after it, never dropped.
+  const againRef = useRef(false);
 
   const runSave = useCallback(async () => {
     const s = stateRef.current;
     if (!s.school || !s.started || !s.surveyId) return; // nothing to save yet
-    if (savingRef.current) return; // a save is already in flight — it'll pick up this state or the next debounce will
+    if (savingRef.current) {
+      againRef.current = true; // saved as soon as the running save finishes (W51)
+      return;
+    }
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
@@ -94,7 +100,13 @@ export function SurveyTimerBar() {
       if (saveFlashTimeoutRef.current) clearTimeout(saveFlashTimeoutRef.current);
       saveFlashTimeoutRef.current = setTimeout(() => setSaveState("idle"), 2500);
     }
+    if (againRef.current) {
+      againRef.current = false;
+      void runSaveRef.current();
+    }
   }, []);
+  const runSaveRef = useRef(runSave);
+  runSaveRef.current = runSave;
 
   const handleSaveDraft = runSave;
 
@@ -105,6 +117,7 @@ export function SurveyTimerBar() {
   // fresh. A full page load rather than router.push + reset() on purpose: see
   // clearActiveSurveyPointers. Resume from the Queue tab reloads the draft.
   const handleSaveAndExit = useCallback(async () => {
+    await whenPhotosSaved(); // W51: a photo still saving goes into the draft first
     pauseTimer();
     // Let the pause render so stateRef (read by runSave) carries it.
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -121,9 +134,17 @@ export function SurveyTimerBar() {
   useEffect(() => {
     if (!state.school || !state.started || !state.surveyId) return;
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => void runSave(), AUTOSAVE_DEBOUNCE_MS);
+    // W51: each timer forgets itself when it fires, so the 2 s ceiling re-arms on the next change
+    // even when that run had to wait for a save already in flight.
+    debounceTimerRef.current = setTimeout(() => {
+      debounceTimerRef.current = null;
+      void runSave();
+    }, AUTOSAVE_DEBOUNCE_MS);
     if (!maxWaitTimerRef.current) {
-      maxWaitTimerRef.current = setTimeout(() => void runSave(), AUTOSAVE_MAX_WAIT_MS);
+      maxWaitTimerRef.current = setTimeout(() => {
+        maxWaitTimerRef.current = null;
+        void runSave();
+      }, AUTOSAVE_MAX_WAIT_MS);
     }
   }, [state, runSave]);
 

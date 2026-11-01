@@ -42,6 +42,7 @@ test('W50: a submitted survey still waiting to upload can save its photos from S
   await startSurvey(page, /^OGS Trust Campus South West/);
   await addRoof(page);
   await reviewAndSubmit(page);
+  await page.waitForURL(/\/survey\/done/); // queued
   await page.goto('/?tab=sync');
   const got = await downloadsFrom(page, () => page.getByRole('button', { name: 'Save photos to phone' }).click(), 1);
   expect(got[0]!.suggestedFilename()).toMatch(/^MQI OGS Trust Campus \d{4}-\d{2}-\d{2} - Roof.* - .+\.jpg$/);

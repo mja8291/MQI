@@ -66,6 +66,7 @@ export default function SurveyDetailsPage() {
             <div key={i} className="flex gap-2">
               <TextInput
                 placeholder={i === 0 ? "Your name" : "Name of accompanying staff"}
+                maxLength={80}
                 value={name}
                 onChange={(e) => setStaffAt(i, e.target.value)}
               />
@@ -82,19 +83,22 @@ export default function SurveyDetailsPage() {
             </div>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setStaff((list) => [...list, ""])}
-          className="mt-2 text-[13px] font-semibold text-brand-deep underline"
-        >
-          + Add accompanying staff
-        </button>
+        {/* W51: six names of up to 80 characters fit the server's 600-character limit. */}
+        {staff.length < 6 ? (
+          <button
+            type="button"
+            onClick={() => setStaff((list) => [...list, ""])}
+            className="mt-2 text-[13px] font-semibold text-brand-deep underline"
+          >
+            + Add accompanying staff
+          </button>
+        ) : null}
       </Field>
       <Field label="ASM (if present)">
-        <TextInput placeholder="Admin and support manager" value={asm} onChange={(e) => setAsm(e.target.value)} />
+        <TextInput placeholder="Admin and support manager" maxLength={120} value={asm} onChange={(e) => setAsm(e.target.value)} />
       </Field>
       <Field label="Principal (if present)">
-        <TextInput placeholder="School principal's name" value={principal} onChange={(e) => setPrincipal(e.target.value)} />
+        <TextInput placeholder="School principal's name" maxLength={120} value={principal} onChange={(e) => setPrincipal(e.target.value)} />
       </Field>
 
       {!detailsComplete ? (

@@ -8,7 +8,11 @@ import { getPhoto } from "@/lib/offline/db";
 import { draftPhotoCopies } from "@/lib/photos-to-phone";
 import { useSurveyStateOptional } from "@/lib/survey-context";
 import { SavePhotosButton } from "@/components/survey/SavePhotosButton";
+import { beginPhotoSave } from "@/lib/photo-saving";
 import { ConfirmDialog } from "./ConfirmDialog";
+
+/** The server keeps at most this many photos per item (survey schema); the buttons stop here. */
+export const MAX_PHOTOS_PER_ITEM = 20;
 import { IconButton } from "./IconButton";
 
 /**
@@ -37,6 +41,7 @@ export function usePhotoAttachHandler(onAddPhoto: (file: File) => void | Promise
       if (!file) return;
       setCompressing(true);
       setError(null);
+      const done = beginPhotoSave();
       try {
         await onAddPhoto(await compressPhoto(file));
       } catch (err) {
@@ -51,6 +56,7 @@ export function usePhotoAttachHandler(onAddPhoto: (file: File) => void | Promise
               : "This photo couldn't be processed. Try again or pick a different photo."
         );
       } finally {
+        done();
         setCompressing(false);
       }
     },
@@ -75,6 +81,7 @@ interface PhotoAttachButtonsProps {
  * are preferred over removing `capture` and relying on the OS picker.
  */
 export function PhotoAttachButtons({ itemKey, photoCount, compressing, onPick }: PhotoAttachButtonsProps) {
+  const full = photoCount >= MAX_PHOTOS_PER_ITEM;
   const cameraId = `photo_camera_${itemKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
   const galleryId = `photo_gallery_${itemKey.replace(/[^a-zA-Z0-9]/g, "_")}`;
   return (
@@ -83,7 +90,7 @@ export function PhotoAttachButtons({ itemKey, photoCount, compressing, onPick }:
         active={photoCount > 0}
         aria-label="Take photo"
         onClick={() => document.getElementById(cameraId)?.click()}
-        disabled={compressing}
+        disabled={compressing || full}
       >
         <Camera size={16} />
       </IconButton>
@@ -91,7 +98,7 @@ export function PhotoAttachButtons({ itemKey, photoCount, compressing, onPick }:
         active={photoCount > 0}
         aria-label="Choose from gallery"
         onClick={() => document.getElementById(galleryId)?.click()}
-        disabled={compressing}
+        disabled={compressing || full}
       >
         <ImageIcon size={16} />
       </IconButton>
@@ -234,6 +241,9 @@ export function PhotoThumbList({ photos, onRemovePhoto }: PhotoThumbListProps) {
   if (photos.length === 0) return null;
   return (
     <div className="mt-2 space-y-1.5">
+      {photos.length >= MAX_PHOTOS_PER_ITEM ? (
+        <p className="text-[11px] text-ink-soft">{MAX_PHOTOS_PER_ITEM} photos is the most for one item.</p>
+      ) : null}
       {photos.map((p) => (
         <div key={p.id} className="flex items-center gap-2.5 text-[11px] text-ink-faint">
           <PhotoThumb photo={p} onOpen={() => setViewing(p)} />
