@@ -217,6 +217,16 @@ describe('submission rules (Appendix C)', () => {
     expect(submissionIssues(veryPoor)).toEqual([]);
   });
 
+  test('W47: an Unsafe item whose photo the app lost is excused, and only that item', () => {
+    const roof = survey().locations[0]!;
+    const unsafe = { ...roof, scores: { ...roof.scores, 'Roof Screeding/roof drainage': 'Very Poor' as const } };
+    const excused = survey({ locations: [{ ...unsafe, photoLost: ['Roof Screeding/roof drainage'] }] });
+    expect(submittedSurveySchema.safeParse(excused).success).toBe(true);
+    expect(submissionIssues(excused)).toEqual([]);
+    const otherItem = survey({ locations: [{ ...unsafe, photoLost: ['Plaster'] }] });
+    expect(submissionIssues(otherItem).map((i) => i.path)).toEqual(['locations.0.photos']);
+  });
+
   test('W11: engineering staff required, ASM and Principal optional', () => {
     expect(submissionIssues(survey({ asm: '', principal: '' }))).toEqual([]);
     expect(submissionIssues(survey({ apm: ' ; ' })).map((i) => i.path)).toEqual(['apm']);

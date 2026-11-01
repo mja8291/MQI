@@ -108,7 +108,7 @@ export default function CategoryPage() {
     const items = rubricGroupsForLocationAndSection(type, wc);
     const answered = items.filter((i) => current!.scores[i.name]).length;
     // v2 (W13): an Unsafe item without a photo keeps its section incomplete.
-    const unsafeMissing = items.filter((i) => isUnsafe(i, current!.scores[i.name]) && !(current!.photos[i.name]?.length)).length;
+    const unsafeMissing = items.filter((i) => isUnsafe(i, current!.scores[i.name]) && !(current!.photos[i.name]?.length) && !current!.photoLost?.includes(i.name)).length;
     return { wc, items, answered, total: items.length, unsafeMissing, complete: answered === items.length && unsafeMissing === 0 };
   });
   const incomplete = categoryStatus.filter((c) => !c.complete);
@@ -228,7 +228,7 @@ export default function CategoryPage() {
               onAddPhoto={(f) => handleAddPhoto(item.name, f)}
               onRemovePhoto={(id) => handleRemovePhoto(item.name, id)}
               onNoteChange={(v) => locCurrentSetNote(item.name, v)}
-              pending={attemptedSave && (!current!.scores[item.name] || (isUnsafe(item, current!.scores[item.name]) && !(current!.photos[item.name]?.length)))}
+              pending={attemptedSave && (!current!.scores[item.name] || (isUnsafe(item, current!.scores[item.name]) && !(current!.photos[item.name]?.length) && !current!.photoLost?.includes(item.name)))}
             />
             {item.name === COLUMN_ITEM && columnCheckApplies(current!) ? (
               <ColumnCheckFields

@@ -45,6 +45,8 @@ export const locationSchema = z.object({
   photos: z.record(z.string().max(120), z.array(ID).max(20)),
   notes: z.record(z.string().max(120), text(2000)),
   unsafeParts: z.record(z.string().max(120), z.array(z.string().max(40)).max(4)).optional(),
+  /** W47: items whose photo the app itself lost (W46) and that could not be retaken; their Unsafe photo is excused. */
+  photoLost: z.array(z.string().max(120)).max(60).optional(),
   columnCheck: z
     .object({ crackOver3mm: blankOr(['YES', 'NO']), hammerAvailable: blankOr(['YES', 'NO']), reading: text(20) })
     .optional(),

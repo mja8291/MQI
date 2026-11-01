@@ -345,12 +345,14 @@ export function isUnsafe(item: Pick<RubricItem, "conditionOverride">, value: Con
   return Boolean(value && item.conditionOverride?.some((o) => o.condition === value && o.label === "Unsafe"));
 }
 
-/** Items marked Unsafe at this location with no photo attached. */
+/** Items marked Unsafe at this location with no photo attached (W47: except those whose photo the app lost). */
 export function unsafeWithoutPhoto(
-  location: { type: LocationType; scores: Record<string, Condition>; photos: Record<string, readonly unknown[]> },
+  location: { type: LocationType; scores: Record<string, Condition>; photos: Record<string, readonly unknown[]>; photoLost?: readonly string[] },
   groups: readonly Pick<RubricItem, "name" | "conditionOverride">[] = rubricGroupsForLocation(location.type)
 ): string[] {
-  return groups.filter((g) => isUnsafe(g, location.scores[g.name]) && !(location.photos[g.name]?.length)).map((g) => g.name);
+  return groups
+    .filter((g) => isUnsafe(g, location.scores[g.name]) && !(location.photos[g.name]?.length) && !location.photoLost?.includes(g.name))
+    .map((g) => g.name);
 }
 
 export function isLocationComplete(location: { type: LocationType; scores: Record<string, Condition> }): boolean {

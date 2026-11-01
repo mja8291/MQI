@@ -30,4 +30,6 @@ export interface SurveyLocation {
   unsafeParts?: Record<string, string[]>;
   /** v2 (W41): Column Unsafe follow-up (crack > 3 mm, Schmidt Hammer). */
   columnCheck?: ColumnCheck;
+  /** W47: items whose photo the app lost (W46); the Unsafe photo rule excuses them. */
+  photoLost?: string[];
 }

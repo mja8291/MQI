@@ -1,4 +1,4 @@
-import { RUBRIC_VERSION, columnCheckApplies, submissionIssues, submittedSurveySchema } from '@mqi/shared';
+import { RUBRIC_VERSION, columnCheckApplies, submissionIssues, submittedSurveySchema, unsafeWithoutPhoto } from '@mqi/shared';
 import type { AttachmentMeta, RuleIssue, ScoreResult, SubmittedSurvey } from '@mqi/shared';
 import { getPhoto } from './offline/db';
 import type { SurveyState } from './survey-context';
@@ -17,6 +17,9 @@ export interface Submission {
 }
 
 type SubmitState = SurveyState & { reviewPhotos: Record<string, PhotoAsset[]> };
+
+/** W47: the note recorded on an item whose photo the app lost and that was not retaken. */
+export const PHOTO_LOST_NOTE = 'Photo lost on the phone by an app fault (W46) and not retaken; rating kept.';
 
 export async function buildSubmission(state: SubmitState, result: ScoreResult): Promise<Submission> {
   if (!state.school || !state.surveyId) throw new Error('No survey in progress');
@@ -39,6 +42,9 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
   };
 
   const locations: SubmittedSurvey['locations'] = [];
+  // W47: a survey pruned by the first W46 release lost photos without a record of their items; there,
+  // every Unsafe item still without a photo is treated as one whose photo was lost.
+  const unrecorded = (state.lostPhotos ?? 0) > 0 && !state.scoring.locations.some((l) => l.photoLost?.length);
   for (const loc of state.scoring.locations) {
     const photos: Record<string, string[]> = {};
     for (const [itemName, list] of Object.entries(loc.photos)) {
@@ -60,6 +66,14 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
       // W41: the follow-up travels only while Column Unsafe is selected.
       ...(loc.columnCheck && columnCheckApplies(loc) ? { columnCheck: loc.columnCheck } : {}),
     });
+    // W47: an item whose photo the app lost and that still has none is sent with a note saying so.
+    const last = locations.at(-1)!;
+    const lost = [...new Set([...(loc.photoLost ?? []), ...(unrecorded ? unsafeWithoutPhoto({ ...loc, photos }) : [])])].filter((item) => !photos[item]?.length);
+    if (lost.length) {
+      last.photoLost = lost;
+      last.notes = { ...last.notes };
+      for (const item of lost) last.notes[item] = [last.notes[item]?.trim(), PHOTO_LOST_NOTE].filter(Boolean).join(' \u2014 ');
+    }
   }
   const reviewPhotos: Record<string, string[]> = {};
   for (const [itemName, list] of Object.entries(state.reviewPhotos)) {

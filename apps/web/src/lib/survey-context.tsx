@@ -31,6 +31,8 @@ interface CurrentLocation {
   /** Multiple photos per item are allowed. Each uploads to Drive individually on attach — see PhotoAsset. */
   photos: Record<string, PhotoAsset[]>;
   notes: Record<string, string>;
+  /** W47: see SurveyLocation.photoLost. */
+  photoLost?: string[];
 }
 
 export interface SurveyState {
@@ -406,6 +408,7 @@ function reducer(state: SurveyState, action: Action): SurveyState {
         notes: current.notes,
         ...(current.unsafeParts && Object.keys(current.unsafeParts).length ? { unsafeParts: current.unsafeParts } : {}),
         ...(current.columnCheck ? { columnCheck: current.columnCheck } : {}),
+        ...(current.photoLost?.length ? { photoLost: current.photoLost } : {}),
       };
       return { ...state, scoring: { ...state.scoring, locations: [...state.scoring.locations, location], current: null } };
     }
@@ -434,6 +437,7 @@ function reducer(state: SurveyState, action: Action): SurveyState {
         notes: location.notes,
         unsafeParts: location.unsafeParts,
         columnCheck: location.columnCheck,
+        photoLost: location.photoLost,
       };
       return {
         ...state,
@@ -453,12 +457,18 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       const gone = new Set(action.ids);
       const prune = (photos: Record<string, PhotoAsset[]>) =>
         Object.fromEntries(Object.entries(photos).map(([k, v]) => [k, v.filter((p) => !gone.has(p.id))] as const).filter(([, v]) => v.length));
+      // W47: remember which items lost a photo, so they can be submitted without one if it can't be retaken.
+      const lostItems = (photos: Record<string, PhotoAsset[]>, before: string[] = []) => [
+        ...new Set([...before, ...Object.entries(photos).filter(([, v]) => v.some((p) => gone.has(p.id))).map(([k]) => k)]),
+      ];
       return {
         ...state,
         reviewPhotos: prune(state.reviewPhotos),
         scoring: {
-          locations: state.scoring.locations.map((l) => ({ ...l, photos: prune(l.photos) })),
-          current: state.scoring.current ? { ...state.scoring.current, photos: prune(state.scoring.current.photos) } : null,
+          locations: state.scoring.locations.map((l) => ({ ...l, photos: prune(l.photos), photoLost: lostItems(l.photos, l.photoLost) })),
+          current: state.scoring.current
+            ? { ...state.scoring.current, photos: prune(state.scoring.current.photos), photoLost: lostItems(state.scoring.current.photos, state.scoring.current.photoLost) }
+            : null,
         },
         lostPhotos: (state.lostPhotos ?? 0) + action.ids.length,
       };

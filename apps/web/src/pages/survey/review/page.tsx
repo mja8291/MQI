@@ -261,7 +261,7 @@ export default function ReviewPage() {
     if (submission.lostPhotoIds.length) {
       prunePhotos(submission.lostPhotoIds);
       const n = submission.lostPhotoIds.length;
-      setError(`${n === 1 ? "1 photo is" : `${n} photos are`} no longer on this phone. Open the locations again and retake the photos the form asks for, then submit.`);
+      setError(`${n === 1 ? "1 photo is" : `${n} photos are`} no longer on this phone (an app fault). They are now marked as lost: tap Submit again to send the survey, or retake them first if you are at the site.`);
       setSubmitting(false);
       return;
     }
@@ -575,8 +575,9 @@ export default function ReviewPage() {
       ) : null}
       {state.lostPhotos ? (
         <p role="alert" className="text-xs text-band-poor mt-3">
-          {state.lostPhotos === 1 ? "1 photo was" : `${state.lostPhotos} photos were`} lost from this phone when the survey was reopened. Retake the
-          photos the form asks for (Unsafe items need one); everything else you scored is kept.
+          {state.lostPhotos === 1 ? "1 photo was" : `${state.lostPhotos} photos were`} lost from this phone when the survey was reopened (an app fault, now
+          fixed). If you are still at the site you can retake them; otherwise just submit — each such item is recorded as
+          &quot;photo lost&quot; and its rating is kept.
         </p>
       ) : null}
       {error ? <p className="text-xs text-band-poor mt-3">{error}</p> : null}

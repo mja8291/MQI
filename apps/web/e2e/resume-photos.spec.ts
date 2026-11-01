@@ -57,7 +57,7 @@ test('W46: Save & exit, then Resume, keeps every photo; the survey with an Unsaf
   await expect.poll(async () => photoRowsOf(await devState(), id).length, { timeout: 60_000 }).toBe(2);
 });
 
-test('W46: a survey whose photos were already lost tells the user, takes the retaken photo and submits', async ({ page }) => {
+test('W46/W47: a survey whose photos were already lost (surveyor has left the site) submits without retaking; the items are noted', async ({ page }) => {
   await installAndSignIn(page);
   await startSurvey(page, /^OGS Trust Campus South West/);
   await addRoof(page);
@@ -79,18 +79,11 @@ test('W46: a survey whose photos were already lost tells the user, takes the ret
   await page.reload(); // the user reopens the app on the fixed version
   await expect(page.getByRole('button', { name: 'Review and submit' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Review and submit' }).click();
-  await page.getByRole('button', { name: 'Proceed anyway' }).click();
-  await expect(page.getByText(/2 photos were lost from this phone when the survey was reopened/)).toBeVisible();
-
-  // Retake the Unsafe item's photo.
-  await page.goBack();
-  await expect(page.getByRole('button', { name: 'Review and submit' })).toBeVisible();
-  await page.getByRole('button', { name: /Girls Toilet/ }).click();
-  await attachWallPhoto(page, false);
-
+  // No retake: the Unsafe wall stays without a photo, and the survey still submits.
   await reviewAndSubmit(page);
   const id = await lastSurveyId(page);
   await expect.poll(async () => rowsOf(await devState(), id).length, { timeout: 60_000 }).toBe(2);
-  await expect.poll(async () => photoRowsOf(await devState(), id).length, { timeout: 60_000 }).toBe(1);
+  const notes = (await devState()).attachments.filter((r) => r['Survey ID'] === id && String(r['Note']).includes('Photo lost on the phone'));
+  expect(notes).toHaveLength(2); // the roof photo and the toilet wall photo were both lost
+  expect(notes.some((r) => r['Item Name'] === 'Wall/Column Condition i.e. cracks' && r['Location Name'] === 'Girls Toilet')).toBe(true);
 });
