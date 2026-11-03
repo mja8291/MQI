@@ -7,6 +7,7 @@ import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
+import { uniqueLocationName } from "@mqi/shared";
 import { FLOOR_LEVELS, LOCATION_NAME_OPTIONS, LOCATION_TYPES } from "@/lib/data/items";
 import type { FloorLevel, LocationType } from "@/lib/types";
 
@@ -19,7 +20,7 @@ function isLocationType(v: string | null): v is LocationType {
 
 function LocationNameContent() {
   const router = useRouter();
-  const { locSetLocationType, locSetLocationName } = useSurvey();
+  const { state, locSetLocationType, locSetLocationName } = useSurvey();
   const params = useSearchParams();
   const floorParam = params.get("floor");
   const typeParam = params.get("type");
@@ -59,6 +60,12 @@ function LocationNameContent() {
           ))}
         </select>
       </Field>
+      {/* W52: a second location of the same kind is numbered, so each keeps its own rows and photos. */}
+      {name && uniqueLocationName(name, state.scoring.locations.map((l) => l.name)) !== name ? (
+        <p className="text-[12px] leading-snug text-ink-soft -mt-2">
+          "{name}" is already in this survey, so this one will be saved as "{uniqueLocationName(name, state.scoring.locations.map((l) => l.name))}".
+        </p>
+      ) : null}
       <BottomBar>
         <Button onClick={start} disabled={!name}>
           Continue

@@ -17,7 +17,7 @@ import type {
 } from "@/lib/types";
 import type { ColumnCheck } from "@mqi/shared";
 import { UNNAMED_LOCATION_TYPES } from "@/lib/data/items";
-import { uuidv7 } from "@mqi/shared";
+import { uuidv7, repairLocations, uniqueLocationName } from "@mqi/shared";
 
 interface CurrentLocation {
   floorLevel: FloorLevel;
@@ -400,7 +400,8 @@ function reducer(state: SurveyState, action: Action): SurveyState {
         id: `${current.type}-${Date.now()}`,
         floorLevel: current.floorLevel,
         type: current.type,
-        name: current.name,
+        // W52: a name already used in this survey gets the next number ("Female Staff Toilet 2").
+        name: uniqueLocationName(current.name, state.scoring.locations.map((l) => l.name)),
         classroomGrade: current.classroomGrade,
         classroomSection: current.classroomSection,
         scores: current.scores,
@@ -452,7 +453,13 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       // initialState() only so a draft saved before a field existed (e.g.
       // structuralConcern) resumes with that field defaulted instead of
       // undefined — every field a draft does carry still wins.
-      return { ...initialState(), ...action.state };
+      {
+        // W52: surveys saved before names were numbered may list two locations with one name (or
+        // the same location twice); Submit refused them with no way to fix it. Repaired here.
+        const loaded = { ...initialState(), ...action.state };
+        const locations = repairLocations(loaded.scoring.locations);
+        return locations === loaded.scoring.locations ? loaded : { ...loaded, scoring: { ...loaded.scoring, locations } };
+      }
     case "PRUNE_PHOTOS": {
       const gone = new Set(action.ids);
       const prune = (photos: Record<string, PhotoAsset[]>) =>

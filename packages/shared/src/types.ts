@@ -261,6 +261,41 @@ export function emptyColumnCheck(): ColumnCheck {
   return { crackOver3mm: "", hammerAvailable: "", reading: "" };
 }
 
+/**
+ * v2 (W52): location names must be unique in a survey (photos, notes and sheet rows are matched by
+ * name), but a campus can have two of the same — e.g. a Female Staff Toilet on two floors — and the
+ * names come from a fixed list. A name already used gets the next free number: "Female Staff Toilet 2".
+ */
+export function uniqueLocationName(name: string, used: Iterable<string>): string {
+  const taken = new Set(used);
+  if (!taken.has(name)) return name;
+  for (let n = 2; ; n++) if (!taken.has(`${name} ${n}`)) return `${name} ${n}`;
+}
+
+/**
+ * W52: repairs a survey's location list — the same location listed twice (same id) is kept once,
+ * and repeated names are numbered as uniqueLocationName does. Returns the list unchanged when there
+ * is nothing to repair.
+ */
+export function repairLocations<L extends { id: string; name: string }>(locations: readonly L[]): L[] {
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  let changed = false;
+  const out: L[] = [];
+  for (const loc of locations) {
+    if (ids.has(loc.id)) {
+      changed = true;
+      continue;
+    }
+    ids.add(loc.id);
+    const name = uniqueLocationName(loc.name, names);
+    names.add(name);
+    if (name !== loc.name) changed = true;
+    out.push(name === loc.name ? loc : { ...loc, name });
+  }
+  return changed ? out : (locations as L[]);
+}
+
 /** True when this location has Column Unsafe, i.e. the follow-up applies. */
 export function columnCheckApplies(loc: { unsafeParts?: Record<string, string[]> }): boolean {
   return Boolean(loc.unsafeParts?.[COLUMN_ITEM]?.includes("Column"));

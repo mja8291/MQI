@@ -38,6 +38,8 @@ import {
   maxScreedMm,
   SCREED_ITEM,
   SCREED_UNSAFE_MM,
+  repairLocations,
+  uniqueLocationName,
 } from './index';
 import type { SurveyLocation, SubmittedSurvey } from './index';
 
@@ -300,6 +302,26 @@ describe('submission rules (Appendix C)', () => {
     expect(submissionIssues(survey({ drillingCheck: blankDrilling })).map((i) => i.path)).toContain('drillingCheck');
     const room = { ...s.locations[0]!, id: 'KG', type: 'Classroom' as const, floorLevel: 'Ground' as const, name: 'KG A', scores: Object.fromEntries(rubricGroupsForLocation('Classroom').map((g) => [g.name, 'Good'])) };
     expect(submissionIssues(survey({ drillingCheck: blankDrilling, locations: [room as SubmittedSurvey['locations'][number]] })).map((i) => i.path)).not.toContain('drillingCheck');
+  });
+
+  test('W52: a repeated location name is numbered; a repaired list submits', () => {
+    expect(uniqueLocationName('Female Staff Toilet', [])).toBe('Female Staff Toilet');
+    expect(uniqueLocationName('Female Staff Toilet', ['Female Staff Toilet'])).toBe('Female Staff Toilet 2');
+    expect(uniqueLocationName('Female Staff Toilet', ['Female Staff Toilet', 'Female Staff Toilet 2'])).toBe('Female Staff Toilet 3');
+    const a = { id: 'a', name: 'Female Staff Toilet' };
+    const b = { id: 'b', name: 'Female Staff Toilet' };
+    const c = { id: 'c', name: 'Girls Toilet' };
+    expect(repairLocations([a, b, a, c]).map((l) => `${l.id}:${l.name}`)).toEqual(['a:Female Staff Toilet', 'b:Female Staff Toilet 2', 'c:Girls Toilet']);
+    const fine = [a, c];
+    expect(repairLocations(fine)).toBe(fine);
+    // The survey rule that blocked Submit no longer fires once repaired.
+    const s = survey();
+    const roof = s.locations[0]!;
+    const t1 = { ...roof, id: 't1', type: 'Toilet' as const, floorLevel: 'Ground' as const, name: 'Female Staff Toilet', scores: Object.fromEntries(rubricGroupsForLocation('Toilet').map((g) => [g.name, 'Good'])) };
+    const t2 = { ...t1, id: 't2', floorLevel: 'First' as const };
+    const dup = survey({ locations: [roof, t1, t2] as SubmittedSurvey['locations'] });
+    expect(submissionIssues(dup).map((i) => i.message)).toContain('Two locations are both named "Female Staff Toilet".');
+    expect(submissionIssues(survey({ locations: repairLocations(dup.locations) })).filter((i) => i.message.startsWith('Two locations'))).toEqual([]);
   });
 
   test('W44: Solar Panels on the Roof, Inverter/Batteries in Corridor & Stairs; the column keeps the full name', () => {
