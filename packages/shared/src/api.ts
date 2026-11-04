@@ -191,6 +191,8 @@ export interface FoundSurvey {
     schmidtAvailable?: string;
     schmidtReading?: string;
   }[];
+  /** v2 (W54): the survey's uploaded photos, for My assessments to load one by one (files.get). */
+  photos?: { attachmentId: string; itemName: string; locationName: string }[];
 }
 
 export const exportRowsPayload = z.object({

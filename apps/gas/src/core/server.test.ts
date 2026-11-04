@@ -384,6 +384,10 @@ describe('files.upload (chunked, idempotent)', () => {
     expect(file!.name).toBe('Roof Screeding-roof drainage.jpg');
     const got = ok(call<{ data: string }>('files.get', { attachmentId: a.id }, login('reviewer@tcf.test')));
     expect(got.data).toBe(base64Encode(bytes));
+    // W54: My assessments reads the photo list with the survey, then each photo through files.get.
+    const found = ok(call<{ photos: { attachmentId: string; itemName: string; locationName: string }[] }>('surveys.get', { surveyId: item.survey.id }, t));
+    expect(found.photos).toEqual([{ attachmentId: a.id, itemName: 'Roof Screeding/roof drainage', locationName: 'Roof 1' }]);
+    expect(ok(call<{ data: string }>('files.get', { attachmentId: a.id }, t)).data).toBe(base64Encode(bytes)); // the owner can open it
   });
 
   test('W14: a damaged chunk is refused as retryable and nothing reaches Drive; the good one then goes', () => {

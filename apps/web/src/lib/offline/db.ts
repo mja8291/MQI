@@ -62,6 +62,16 @@ export interface PhotoBlob {
   evicted?: boolean;
 }
 
+/**
+ * v2 (W54): what stays on the phone of a survey the server has confirmed — answers and every photo.
+ * The survey and its photos are deleted (they load from the server under My assessments); this
+ * marker keeps the survey from being queued again or coming back as a draft.
+ */
+export interface SentSurvey {
+  id: string;
+  syncedAt: string;
+}
+
 export interface MetaRow {
   key: string;
   value: unknown;
@@ -73,6 +83,7 @@ export class MqiDb extends Dexie {
   outbox!: Table<OutboxEntry, number>;
   photos!: Table<PhotoBlob, string>;
   meta!: Table<MetaRow, string>;
+  sent!: Table<SentSurvey, string>;
 
   constructor(name = 'mqi-v2') {
     super(name);
@@ -83,6 +94,8 @@ export class MqiDb extends Dexie {
       photos: 'id, surveyId, createdAt, uploaded',
       meta: 'key',
     });
+    // W54: confirmed surveys leave only a marker here.
+    this.version(2).stores({ sent: 'id, syncedAt' });
   }
 }
 
@@ -150,8 +163,8 @@ export async function saveDraft(draft: SurveyDraft): Promise<void> {
   await withReconnect(() => saveDraftOnce(draft));
 }
 async function saveDraftOnce(draft: SurveyDraft): Promise<void> {
-  await db.transaction('rw', db.drafts, db.surveys, async () => {
-    if (await db.surveys.get(draft.surveyId)) return;
+  await db.transaction('rw', [db.drafts, db.surveys, db.sent], async () => {
+    if ((await db.surveys.get(draft.surveyId)) || (await db.sent.get(draft.surveyId))) return;
     // W51: never overwrite a later copy written by this same app session. A save started a moment
     // before the app closed could otherwise land after the close-time save and bring back an older
     // survey (the robustness suite lost a just-saved location this way). A copy from an earlier
@@ -168,7 +181,11 @@ async function saveDraftOnce(draft: SurveyDraft): Promise<void> {
  */
 async function withoutQueued(drafts: SurveyDraft[]): Promise<SurveyDraft[]> {
   if (!drafts.length) return drafts;
-  const queued = new Set((await db.surveys.bulkGet(drafts.map((d) => d.surveyId))).filter(Boolean).map((s) => s!.id));
+  const ids = drafts.map((d) => d.surveyId);
+  const queued = new Set([
+    ...(await db.surveys.bulkGet(ids)).filter(Boolean).map((s) => s!.id),
+    ...(await db.sent.bulkGet(ids)).filter(Boolean).map((s) => s!.id), // W54: already on the server
+  ]);
   if (!queued.size) return drafts;
   await db.drafts.bulkDelete([...queued]);
   return drafts.filter((d) => !queued.has(d.surveyId));
@@ -242,14 +259,29 @@ export async function queueSurvey(survey: SubmittedSurvey, attachments: Attachme
 }
 async function queueSurveyOnce(survey: SubmittedSurvey, attachments: AttachmentMeta[]): Promise<void> {
   const now = new Date().toISOString();
-  await db.transaction('rw', [db.surveys, db.outbox, db.drafts, db.photos], async () => {
-    if (await db.surveys.get(survey.id)) return; // a double tap must not queue twice
+  await db.transaction('rw', [db.surveys, db.outbox, db.drafts, db.photos, db.sent], async () => {
+    // A double tap must not queue twice, nor a survey the server already has (W54).
+    if ((await db.surveys.get(survey.id)) || (await db.sent.get(survey.id))) return;
     await db.surveys.put({ id: survey.id, status: 'pending', createdAt: now, survey, attachments, attempts: 0, nextAttemptAt: 0 });
     await db.outbox.add({ kind: 'survey', surveyId: survey.id, createdAt: now });
     await db.drafts.delete(survey.id);
     // W49: photos removed from the form were kept until now; the ones the submission doesn't use go.
     const used = new Set(attachments.map((a) => a.id));
     await db.photos.where('surveyId').equals(survey.id).filter((p) => !used.has(p.id)).delete();
+  });
+}
+
+/**
+ * W54: the server has confirmed the survey's answers and every photo. Its record, queue entries and
+ * photo bytes leave the phone in one step; only the SentSurvey marker stays.
+ */
+export async function forgetSentSurvey(id: string, syncedAt = new Date().toISOString()): Promise<void> {
+  await db.transaction('rw', [db.surveys, db.outbox, db.photos, db.sent, db.drafts], async () => {
+    await db.sent.put({ id, syncedAt });
+    await db.outbox.where('surveyId').equals(id).delete();
+    await db.photos.where('surveyId').equals(id).delete();
+    await db.drafts.delete(id);
+    await db.surveys.delete(id);
   });
 }
 

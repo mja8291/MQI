@@ -135,18 +135,19 @@ test('4. remove a photo, Save & exit, resume, submit: only the kept photo is sen
   const id = await lastSurveyId(page);
   await expect.poll(async () => photoRowsOf(await devState(), id).length, { timeout: 60_000 }).toBe(1);
   expect((await devState()).files).toBe(before.files + 1);
-  // The removed photo's bytes were dropped when the survey was queued.
-  const left = await page.evaluate(
-    () =>
-      new Promise<number>((resolve) => {
-        const open = indexedDB.open('mqi-v2');
-        open.onsuccess = () => {
-          const req = open.result.transaction('photos').objectStore('photos').count();
-          req.onsuccess = () => resolve(req.result);
-        };
-      }),
-  );
-  expect(left).toBe(1);
+  // The removed photo's bytes were dropped when the survey was queued; the sent one once the server confirmed it (W54).
+  const photosOnPhone = () =>
+    page.evaluate(
+      () =>
+        new Promise<number>((resolve) => {
+          const open = indexedDB.open('mqi-v2');
+          open.onsuccess = () => {
+            const req = open.result.transaction('photos').objectStore('photos').count();
+            req.onsuccess = () => resolve(req.result);
+          };
+        }),
+    );
+  await expect.poll(photosOnPhone, { timeout: 15_000 }).toBe(0);
 });
 
 test('5. Submit tapped twice: the survey is written once', async ({ page }) => {

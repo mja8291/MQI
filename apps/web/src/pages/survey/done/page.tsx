@@ -19,6 +19,8 @@ export default function DonePage() {
   const params = useSearchParams();
   const surveyId = params.get("id");
   const record = useLiveQuery(() => (surveyId ? db.surveys.get(surveyId) : undefined), [surveyId]);
+  // W54: once the server has everything, the phone keeps only a "sent" marker.
+  const sent = useLiveQuery(() => (surveyId ? db.sent.get(surveyId) : undefined), [surveyId]);
   const [busy, setBusy] = useState<"excel" | "pdf" | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
@@ -29,14 +31,14 @@ export default function DonePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onServer = record?.status === "synced" || record?.status === "uploading";
+  const onServer = Boolean(sent) || record?.status === "synced" || record?.status === "uploading";
   const sending = record?.status === "pending" && !record.lastError;
   const offline = !onServer && !sending;
 
   // v2 (W29): a weak or missing connection lands on Sync Pending, which explains what to do and
   // keeps retrying — as soon as the first attempt fails, or after 20 s still sending.
   const router = useRouter();
-  const failedToSend = record !== undefined && offline && record.status !== "failed";
+  const failedToSend = !sent && record !== undefined && offline && record.status !== "failed";
   useEffect(() => {
     if (failedToSend) {
       router.replace("/?tab=sync&weak=1");

@@ -108,6 +108,9 @@ async function makeQueued(opts: { photoBytes?: number; tamper?: boolean } = {}):
   return survey;
 }
 
+/** W54: confirmed on the server — only the "sent" marker is left on the phone, no survey, no photo bytes. */
+const confirmedAndFreed = async (id: string) =>
+  Boolean(await db.sent.get(id)) && !(await db.surveys.get(id)) && (await db.photos.where('surveyId').equals(id).count()) === 0;
 const rows = (id: string) => env.responses.objects(RESPONSES_TAB).filter((r) => r['Survey ID'] === id);
 const photoRows = (id: string) => env.responses.objects('MQI Survey Attachments').filter((r) => r['Survey ID'] === id && r['Photo URL']);
 
@@ -153,7 +156,7 @@ describe('sync engine', () => {
   test('a survey with a photo syncs exactly once, then repeated syncs write nothing', async () => {
     const s = await makeQueued({ photoBytes: 5000 });
     await flushPendingSubmissions();
-    expect((await db.surveys.get(s.id))!.status).toBe('synced');
+    expect(await confirmedAndFreed(s.id)).toBe(true);
     expect(rows(s.id)).toHaveLength(1);
     expect(photoRows(s.id)).toHaveLength(1);
     expect(env.drive.createdFiles).toBe(1);
@@ -176,7 +179,7 @@ describe('sync engine', () => {
     await flushPendingSubmissions(); // still inside the backoff window
     expect((await db.surveys.get(s.id))!.status).toBe('pending');
     await flushPendingSubmissions(true); // Sync now ignores backoff
-    expect((await db.surveys.get(s.id))!.status).toBe('synced');
+    expect(await confirmedAndFreed(s.id)).toBe(true);
     expect(rows(s.id)).toHaveLength(1);
   });
 
@@ -187,7 +190,7 @@ describe('sync engine', () => {
     expect(rows(s.id)).toHaveLength(1);
     expect((await db.surveys.get(s.id))!.status).toBe('pending');
     await flushPendingSubmissions(true);
-    expect((await db.surveys.get(s.id))!.status).toBe('synced');
+    expect(await confirmedAndFreed(s.id)).toBe(true);
     expect(rows(s.id)).toHaveLength(1);
   });
 
@@ -197,7 +200,7 @@ describe('sync engine', () => {
     await flushPendingSubmissions();
     expect((await db.surveys.get(bad.id))!.status).toBe('failed');
     expect((await db.surveys.get(bad.id))!.lastError?.code).toBe('VALIDATION');
-    expect((await db.surveys.get(good.id))!.status).toBe('synced');
+    expect(await confirmedAndFreed(good.id)).toBe(true);
     // Retry puts it back; it is rejected again (the data is still wrong), never duplicated.
     await retrySurvey(bad.id);
     expect((await db.surveys.get(bad.id))!.status).toBe('pending');
@@ -220,10 +223,10 @@ describe('sync engine', () => {
     const [photo] = await db.photos.toArray();
     await db.photos.update(photo!.id, { uploadedChunks: [0] }); // recorded as sent, never confirmed
     await flushPendingSubmissions();
-    expect((await db.surveys.get(s.id))!.status).toBe('synced');
+    expect(await confirmedAndFreed(s.id)).toBe(true);
     expect(env.drive.createdFiles).toBe(1);
     expect(photoRows(s.id)).toHaveLength(1);
-    expect((await db.photos.get(photo!.id))!.uploaded).toBe(true);
+    expect(await db.photos.get(photo!.id)).toBeUndefined(); // confirmed, so freed (W54)
   });
 
   test('a big photo resumes from the last chunk after an interruption', async () => {
@@ -242,7 +245,7 @@ describe('sync engine', () => {
     expect(photo.uploadedChunks).toEqual([0]);
     expect((await db.surveys.get(s.id))!.status).toBe('uploading');
     await flushPendingSubmissions(true);
-    expect((await db.surveys.get(s.id))!.status).toBe('synced');
+    expect(await confirmedAndFreed(s.id)).toBe(true);
     expect(env.drive.createdFiles).toBe(1);
     expect([...env.drive.files.values()][0]!.bytes.length).toBe(size);
     expect(photoRows(s.id)).toHaveLength(1);
@@ -270,14 +273,18 @@ describe('sync engine', () => {
     expect(backoffMs(1, () => 1)).toBe(12_000);
   });
 
-  test('the photo budget evicts only uploaded photos', async () => {
+  test('W54: a confirmed survey frees the phone; photos not yet sent are never removed', async () => {
     const sent = await makeQueued({ photoBytes: 3000 });
     await flushPendingSubmissions();
+    expect(await confirmedAndFreed(sent.id)).toBe(true);
     offline = true;
-    await makeQueued({ photoBytes: 4000 });
-    expect(await enforcePhotoBudget(1000)).toBe(1);
-    const photos = await db.photos.toArray();
-    expect(photos.find((p) => p.surveyId === sent.id)!.evicted).toBe(true);
-    expect(photos.find((p) => p.surveyId !== sent.id)!.evicted).toBeFalsy();
+    const waiting = await makeQueued({ photoBytes: 4000 });
+    expect(await enforcePhotoBudget(1000)).toBe(0); // the only photo left is unsent: kept
+    expect(await db.photos.where('surveyId').equals(waiting.id).count()).toBe(1);
+    // The marker keeps a confirmed survey from being queued again or coming back as a draft.
+    await queueSurvey({ ...sent }, []);
+    expect(await db.surveys.get(sent.id)).toBeUndefined();
+    await saveDraft({ surveyId: sent.id, savedAt: new Date().toISOString(), schoolName: 'X', state: {} as never });
+    expect(await db.drafts.get(sent.id)).toBeUndefined();
   });
 });

@@ -27,6 +27,7 @@ const Classroom = lazy(() => import('@/pages/survey/locations/location/classroom
 const Category = lazy(() => import('@/pages/survey/locations/category/page'));
 const Review = lazy(() => import('@/pages/survey/review/page'));
 const Done = lazy(() => import('@/pages/survey/done/page'));
+const MyAssessment = lazy(() => import('@/pages/my-assessments/page'));
 
 /**
  * Provider order as in v1's root layout: SurveyProvider sits outside AuthGate so a session
@@ -50,6 +51,7 @@ export function App() {
                   <Route path="/terms" element={<Terms />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/my-assessments" element={<MyAssessment />} />
                   <Route
                     path="/survey"
                     element={

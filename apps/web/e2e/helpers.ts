@@ -109,16 +109,24 @@ export async function lastSurveyId(page: Page): Promise<string> {
   return id;
 }
 
-function queuedSurveyId(page: Page): Promise<string> {
+/** The Done screen's survey, else the newest survey on the phone: queued, or already confirmed (W54 "sent" marker). */
+async function queuedSurveyId(page: Page): Promise<string> {
+  const fromUrl = new URL(page.url()).searchParams.get('id');
+  if (fromUrl && page.url().includes('/survey/done')) return fromUrl;
   return page.evaluate(
     () =>
       new Promise<string>((resolve, reject) => {
         const open = indexedDB.open('mqi-v2');
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
-          const req = open.result.transaction('surveys').objectStore('surveys').getAll();
-          req.onsuccess = () => {
-            const all = (req.result as { id: string; createdAt: string }[]).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+          const tx = open.result.transaction(['surveys', 'sent']);
+          const q = tx.objectStore('surveys').getAll();
+          const sent = tx.objectStore('sent').getAll();
+          tx.oncomplete = () => {
+            const all = [
+              ...(q.result as { id: string; createdAt: string }[]).map((r) => ({ id: r.id, at: r.createdAt })),
+              ...(sent.result as { id: string; syncedAt: string }[]).map((r) => ({ id: r.id, at: r.syncedAt })),
+            ].sort((a, b) => b.at.localeCompare(a.at));
             resolve(all[0]?.id ?? '');
           };
         };

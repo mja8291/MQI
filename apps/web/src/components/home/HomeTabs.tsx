@@ -6,10 +6,11 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/lib/auth/client";
 import { can } from "@mqi/shared";
 import { QueueTab } from "./QueueTab";
+import { MyAssessments } from "./MyAssessments";
 import { LOW_SPACE_MB, onMobile, runningInstalled, useOfflineReadiness } from "@/lib/offline/readiness";
 import { useQueue } from "./useQueue";
 
-type Tab = "start" | "incomplete" | "sync";
+type Tab = "start" | "incomplete" | "sync" | "mine";
 
 /**
  * Home is two tabs. "Start" is the front door (new survey, dashboard);
@@ -33,6 +34,7 @@ export function HomeTabs() {
       const t = params.get("tab");
       if (t === "sync" || t === "queue") setTab("sync");
       if (t === "incomplete") setTab("incomplete");
+      if (t === "mine") setTab("mine");
       if (params.get("weak") === "1") setWeak(true);
     });
   }, []);
@@ -50,7 +52,7 @@ export function HomeTabs() {
     ) : null;
 
   const tabClass = (active: boolean) =>
-    `flex-1 min-h-11 rounded-lg px-1.5 text-[13px] font-semibold flex items-center justify-center gap-1.5 transition-colors whitespace-nowrap ${
+    `flex-1 min-h-11 rounded-lg px-1 text-[12px] leading-tight text-center font-semibold flex items-center justify-center gap-1 transition-colors ${
       active ? "bg-white text-brand-deep shadow-sm" : "text-ink-soft"
     }`;
 
@@ -78,6 +80,10 @@ export function HomeTabs() {
         <button type="button" role="tab" aria-selected={tab === "sync"} onClick={() => setTab("sync")} className={tabClass(tab === "sync")}>
           Sync Pending
           {badge(queue.pending.length, needsAttention || queue.pending.some((p) => p.lastError), "waiting to sync")}
+        </button>
+        {/* W54: what this user has submitted, loaded from the server. */}
+        <button type="button" role="tab" aria-selected={tab === "mine"} onClick={() => setTab("mine")} className={tabClass(tab === "mine")}>
+          My assessments
         </button>
       </div>
 
@@ -142,6 +148,10 @@ export function HomeTabs() {
             </button>
           ) : null}
           <div className="flex-1" />
+        </div>
+      ) : tab === "mine" ? (
+        <div className="pb-8">
+          <MyAssessments />
         </div>
       ) : (
         <div className="pb-8">

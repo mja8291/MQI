@@ -2,7 +2,7 @@ import { PUSH_BATCH_MAX, TRANSIENT_ERRORS, UPLOAD_CHUNK_BYTES, base64Encode, byt
 import type { PullResult, PushResult, UploadResult } from '@mqi/shared';
 import { ApiCallError, api, isAuthError } from '@/lib/api';
 import { notifyAuthRequired } from '@/lib/auth/events';
-import { db, enforcePhotoBudget, getMeta, saveOwnSurveys } from './db';
+import { db, enforcePhotoBudget, forgetSentSurvey, getMeta, saveOwnSurveys } from './db';
 import type { OutboxSurvey, SyncFailureKind } from './db';
 
 /**
@@ -96,6 +96,7 @@ async function pushSurveys(force: boolean): Promise<boolean> {
       continue;
     }
     const now = new Date().toISOString();
+    const done: string[] = [];
     await db.transaction('rw', db.surveys, db.outbox, async () => {
       for (const r of results) {
         const id = String(r.outboxId);
@@ -106,12 +107,15 @@ async function pushSurveys(force: boolean): Promise<boolean> {
           // The server holds the parent now, so its photos may follow.
           for (const a of s.attachments) await db.outbox.add({ kind: 'photo', surveyId: id, attachmentId: a.id, createdAt: now });
           await db.surveys.update(id, { status: s.attachments.length ? 'uploading' : 'synced', syncedAt: s.attachments.length ? undefined : now, attempts: 0, nextAttemptAt: 0, lastError: undefined, lastAttemptAt: now });
+          if (!s.attachments.length) done.push(id);
         } else {
           // The outbox entry stays: Retry puts the survey back to pending, Discard removes both.
           await db.surveys.update(id, { status: 'failed', lastAttemptAt: now, lastError: { kind: 'server', message: r.error?.message ?? 'Rejected by the server', code: r.error?.code } });
         }
       }
     });
+    // W54: a survey with no photos is complete on the server now: free the phone.
+    for (const id of done) await forgetSentSurvey(id, now);
     if (results.some((r) => r.status === 'ok')) setLastSync(now);
     notifyChanged();
   }
@@ -209,12 +213,18 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
           continue;
         }
         if (!r.done) throw new Error('The photo upload did not finish'); // retried with backoff
+        let complete = false;
         await db.transaction('rw', db.photos, db.outbox, db.surveys, async () => {
           await db.photos.update(entry.attachmentId!, { uploaded: true, url: r.url });
           await db.outbox.delete(entry.seq!);
           const left = await db.outbox.where('surveyId').equals(entry.surveyId).count();
-          if (left === 0) await db.surveys.update(entry.surveyId, { status: 'synced', syncedAt: now, lastError: undefined, attempts: 0 });
+          if (left === 0) {
+            await db.surveys.update(entry.surveyId, { status: 'synced', syncedAt: now, lastError: undefined, attempts: 0 });
+            complete = true;
+          }
         });
+        // W54: answers and every photo are confirmed on the server: free the phone.
+        if (complete) await forgetSentSurvey(entry.surveyId, now);
         setLastSync(now);
         notifyChanged();
       } catch (e) {
@@ -270,7 +280,7 @@ async function run(force: boolean): Promise<void> {
  */
 export async function flushPendingSubmissions(force = false): Promise<{ succeeded: number; remaining: number }> {
   if (flushing) return { succeeded: 0, remaining: await openCount() };
-  const before = await db.surveys.where('status').equals('synced').count();
+  const before = await db.sent.count();
   flushing = true;
   notifyChanged();
   try {
@@ -286,7 +296,7 @@ export async function flushPendingSubmissions(force = false): Promise<{ succeede
     notifyChanged();
   }
   await scheduleNextRetry();
-  const after = await db.surveys.where('status').equals('synced').count();
+  const after = await db.sent.count();
   return { succeeded: after - before, remaining: await openCount() };
 }
 

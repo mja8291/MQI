@@ -2,6 +2,7 @@ import { RESPONSES_TAB, cellCondition, rubricGroupsForLocation, siblingExternalP
 import type { DashboardData, ExportRowsResult, FoundSurvey, SchoolsResult, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
+import { Table } from './system';
 import type { Env } from './ports';
 import { columnRows, findRows, rowsAt } from './responses';
 
@@ -53,7 +54,12 @@ export function surveyGet(ctx: Ctx, raw: unknown): FoundSurvey {
   const rows = rowsAt(ctx.env, RESPONSES_TAB, findRows(ctx.env, RESPONSES_TAB, 'Survey ID', ids));
   const found = foundSurveyFromRows(surveyId, rows);
   if (!found) return fail('NOT_FOUND', 'Survey not found.');
-  return found;
+  // W54: the photos on Drive, so My assessments can show them (each read through files.get).
+  const photos = Table.of(ctx.env, 'FILES', 'attachmentId')
+    .all()
+    .filter((f) => f.surveyId === surveyId && f.driveFileId)
+    .map((f) => ({ attachmentId: f.attachmentId ?? '', itemName: f.itemName ?? '', locationName: f.locationName ?? '' }));
+  return { ...found, photos };
 }
 
 export function exportRows(ctx: Ctx, raw: unknown): ExportRowsResult {
