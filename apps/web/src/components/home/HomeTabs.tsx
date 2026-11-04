@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useAuth } from "@/lib/auth/client";
 import { can } from "@mqi/shared";
 import { QueueTab } from "./QueueTab";
-import { LOW_SPACE_MB, useOfflineReadiness } from "@/lib/offline/readiness";
+import { LOW_SPACE_MB, onMobile, runningInstalled, useOfflineReadiness } from "@/lib/offline/readiness";
 import { useQueue } from "./useQueue";
 
 type Tab = "start" | "incomplete" | "sync";
@@ -181,6 +181,12 @@ function OfflineReadyLine() {
       {ready
         ? `✓ Ready to work offline (${r.schools.toLocaleString()} campuses saved on this phone)`
         : "Preparing offline use… stay connected for a moment before going to a site with no signal."}
+      {/* W53: a browser tab keeps its own copy of the app's data, apart from the installed app. */}
+      {onMobile() && !runningInstalled() ? (
+        <span role="alert" className="block mt-1 font-semibold text-band-poor">
+          You are using MQI in a browser tab. Surveys saved here stay in this browser only and do not show in the installed MQI app (or the other way round). Always open MQI from its app icon.
+        </span>
+      ) : null}
       {/* W49: the two storage conditions that can cost unsent photos. */}
       {r.freeMb !== null && r.freeMb < LOW_SPACE_MB ? (
         <span className="block mt-1 text-band-poor">

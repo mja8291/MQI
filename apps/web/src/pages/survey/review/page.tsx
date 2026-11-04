@@ -284,7 +284,7 @@ export default function ReviewPage() {
       await queueSurvey(submission.survey, submission.attachments);
     } catch {
       cancelSubmitting(submission.survey.id);
-      setError("Couldn't save the survey on this phone. Free some storage and try again — nothing has been lost.");
+      setError("Couldn't save the survey on this phone. Keep the app open and tap Submit again. If it keeps failing, download the Excel or PDF copy below before closing the app, and free some storage.");
       setSubmitting(false);
       return;
     }

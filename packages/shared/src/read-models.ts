@@ -121,6 +121,7 @@ export const DASHBOARD_COLUMNS: readonly string[] = [
   'Rating Band',
   'Major Score',
   'Minor Score',
+  'Submitted By',
   ...CRITICAL_ITEMS.map(criticalColumn),
 ];
 
@@ -142,6 +143,7 @@ function rowToCaptured(r: SheetRow): CapturedSchool | null {
     major: num(r['Major Score']),
     minor: num(r['Minor Score']),
     criticalItems,
+    submittedBy: r['Submitted By'] ?? '',
   };
 }
 
@@ -161,13 +163,14 @@ export function buildDashboard(totalSchools: number, rows: readonly SheetRow[]):
     const s = rowToCaptured(r);
     if (s) surveys.push(s);
   }
-  // Latest submission per school (FR-DASH-2).
-  const byKey = new Map<string, CapturedSchool>();
-  for (const s of surveys) {
-    const existing = byKey.get(s.schoolId);
-    if (!existing || s.date > existing.date) byKey.set(s.schoolId, s);
-  }
-  const captured = [...byKey.values()];
+  // Latest submission per school (FR-DASH-2) carries the figures; W53: the others ride along.
+  const bySchool = new Map<string, CapturedSchool[]>();
+  for (const s of surveys) bySchool.set(s.schoolId, [...(bySchool.get(s.schoolId) ?? []), s]);
+  const captured = [...bySchool.values()].map((list) => {
+    const [latest, ...rest] = [...list].sort((a, b) => b.date.localeCompare(a.date));
+    const earlier = rest.map((s) => ({ surveyId: s.surveyId, date: s.date, overall: s.overall, band: s.band, submittedBy: s.submittedBy ?? '' }));
+    return earlier.length ? { ...latest!, earlier } : latest!;
+  });
 
   const distribution: Record<RatingBand, number> = { Excellent: 0, Good: 0, Average: 0, Poor: 0 };
   for (const s of captured) distribution[s.band]++;

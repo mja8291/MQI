@@ -88,6 +88,36 @@ export class MqiDb extends Dexie {
 
 export const db = new MqiDb();
 
+/**
+ * v2 (W53): Safari on iPhone can drop the app's connection to its storage after the app has been
+ * in the background (e.g. while the camera is open) — WebKit's "Connection to Indexed Database
+ * server lost". Every later read or write then fails until the app restarts, so answers and
+ * photos would live only in memory and go when the app is closed. Such a failure reopens the
+ * database and tries the operation once more.
+ */
+const CONNECTION_LOST = /Connection to Indexed Database server lost|DatabaseClosed|InvalidState|UnknownError|database connection is closing|The database connection is closing/i;
+
+export function isConnectionLost(e: unknown): boolean {
+  const err = e as { name?: string; message?: string; inner?: { name?: string; message?: string } } | null;
+  const text = [err?.name, err?.message, err?.inner?.name, err?.inner?.message].filter(Boolean).join(' ');
+  return CONNECTION_LOST.test(text);
+}
+
+export async function withReconnect<T>(op: () => Promise<T>): Promise<T> {
+  try {
+    return await op();
+  } catch (e) {
+    if (!isConnectionLost(e)) throw e;
+    try {
+      db.close();
+    } catch {
+      // already closed
+    }
+    await db.open();
+    return op();
+  }
+}
+
 // ---- meta ----
 
 export async function getMeta<T>(key: string): Promise<T | undefined> {
@@ -117,6 +147,9 @@ export async function getCachedSchools(): Promise<School[] | null> {
  * that started before Submit can never land after it and bring the survey back as a draft.
  */
 export async function saveDraft(draft: SurveyDraft): Promise<void> {
+  await withReconnect(() => saveDraftOnce(draft));
+}
+async function saveDraftOnce(draft: SurveyDraft): Promise<void> {
   await db.transaction('rw', db.drafts, db.surveys, async () => {
     if (await db.surveys.get(draft.surveyId)) return;
     // W51: never overwrite a later copy written by this same app session. A save started a moment
@@ -175,10 +208,10 @@ export async function missingPhotoIds(ids: readonly string[]): Promise<string[]>
 // ---- photos ----
 
 export async function putPhoto(p: Omit<PhotoBlob, 'uploadedChunks' | 'uploaded' | 'createdAt'>): Promise<void> {
-  await db.photos.put({ ...p, createdAt: new Date().toISOString(), uploadedChunks: [], uploaded: false });
+  await withReconnect(() => db.photos.put({ ...p, createdAt: new Date().toISOString(), uploadedChunks: [], uploaded: false }));
 }
 export async function getPhoto(id: string): Promise<PhotoBlob | undefined> {
-  return db.photos.get(id);
+  return withReconnect(() => db.photos.get(id));
 }
 export async function removePhoto(id: string): Promise<void> {
   const p = await db.photos.get(id);
@@ -205,6 +238,9 @@ export async function enforcePhotoBudget(budget = PHOTO_CACHE_BUDGET_BYTES): Pro
 // ---- submit: record + outbox entry + draft removal in ONE transaction ----
 
 export async function queueSurvey(survey: SubmittedSurvey, attachments: AttachmentMeta[]): Promise<void> {
+  await withReconnect(() => queueSurveyOnce(survey, attachments));
+}
+async function queueSurveyOnce(survey: SubmittedSurvey, attachments: AttachmentMeta[]): Promise<void> {
   const now = new Date().toISOString();
   await db.transaction('rw', [db.surveys, db.outbox, db.drafts, db.photos], async () => {
     if (await db.surveys.get(survey.id)) return; // a double tap must not queue twice

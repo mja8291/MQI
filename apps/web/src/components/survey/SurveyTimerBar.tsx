@@ -97,7 +97,7 @@ export function SurveyTimerBar() {
         setSaveState("error");
       } finally {
         if (saveFlashTimeoutRef.current) clearTimeout(saveFlashTimeoutRef.current);
-        saveFlashTimeoutRef.current = setTimeout(() => setSaveState("idle"), 2500);
+        saveFlashTimeoutRef.current = setTimeout(() => setSaveState((v) => (v === "error" ? v : "idle")), 2500);
       }
     });
     queuedRef.current = next;
@@ -277,6 +277,16 @@ export function SurveyTimerBar() {
           </button>
         </span>
       </div>
+      {/* W53: a failed save must be impossible to miss — until a save works, this survey exists only in the app's memory. */}
+      {saveState === "error" ? (
+        <div role="alert" className="mt-1.5 rounded-lg border border-band-poor bg-band-poor-tint px-3 py-2 text-[12px] leading-snug text-band-poor">
+          <strong>Not saved on this phone.</strong> Keep the app open and tap{" "}
+          <button type="button" onClick={handleSaveDraft} className="font-semibold underline">
+            Save draft
+          </button>
+          . If it keeps failing, download an Excel or PDF copy from the Review page before closing the app.
+        </div>
+      ) : null}
     </div>
   );
 }

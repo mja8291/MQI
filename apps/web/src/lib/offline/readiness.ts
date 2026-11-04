@@ -36,6 +36,22 @@ export interface OfflineReadiness {
   freeMb: number | null;
 }
 
+/**
+ * v2 (W53): true when MQI runs as an installed app (home-screen icon, Play Store app) rather than
+ * a browser tab. They keep separate storage: a survey saved in one is not in the other, so a
+ * surveyor who switches between them sees their work "disappear".
+ */
+export function runningInstalled(): boolean {
+  if (typeof window === "undefined") return true;
+  const mode = (m: string) => window.matchMedia?.(`(display-mode: ${m})`).matches === true;
+  return mode("standalone") || mode("fullscreen") || mode("minimal-ui") || (navigator as { standalone?: boolean }).standalone === true || document.referrer.startsWith("android-app://");
+}
+
+/** A phone or tablet (the warning is meaningless on a desktop browser). */
+export function onMobile(): boolean {
+  return typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 /** Below this, photos may fail to save: warn on Home. */
 export const LOW_SPACE_MB = 200;
 

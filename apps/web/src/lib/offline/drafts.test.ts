@@ -50,3 +50,25 @@ describe('draft writes land in order (W51)', () => {
     expect(((await db.drafts.get('s'))!.state as unknown as { n: number }).n).toBe(1);
   });
 });
+
+describe('storage connection lost (W53, Safari on iPhone)', () => {
+  test('a save that fails because the connection was lost reconnects and succeeds', async () => {
+    const { withReconnect, isConnectionLost } = await import('./db');
+    let calls = 0;
+    const result = await withReconnect(async () => {
+      calls++;
+      if (calls === 1) throw Object.assign(new Error('Connection to Indexed Database server lost. Refresh the page to try again'), { name: 'UnknownError' });
+      return 'saved';
+    });
+    expect(result).toBe('saved');
+    expect(calls).toBe(2);
+    expect(isConnectionLost({ name: 'DatabaseClosedError' })).toBe(true);
+    expect(isConnectionLost(new Error('QuotaExceededError'))).toBe(false);
+  });
+  test('any other failure is not retried', async () => {
+    const { withReconnect } = await import('./db');
+    let calls = 0;
+    await expect(withReconnect(async () => { calls++; throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); })).rejects.toThrow('full');
+    expect(calls).toBe(1);
+  });
+});

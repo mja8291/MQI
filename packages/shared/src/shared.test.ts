@@ -40,6 +40,8 @@ import {
   SCREED_UNSAFE_MM,
   repairLocations,
   uniqueLocationName,
+  buildDashboard,
+  DASHBOARD_COLUMNS,
 } from './index';
 import type { SurveyLocation, SubmittedSurvey } from './index';
 
@@ -302,6 +304,27 @@ describe('submission rules (Appendix C)', () => {
     expect(submissionIssues(survey({ drillingCheck: blankDrilling })).map((i) => i.path)).toContain('drillingCheck');
     const room = { ...s.locations[0]!, id: 'KG', type: 'Classroom' as const, floorLevel: 'Ground' as const, name: 'KG A', scores: Object.fromEntries(rubricGroupsForLocation('Classroom').map((g) => [g.name, 'Good'])) };
     expect(submissionIssues(survey({ drillingCheck: blankDrilling, locations: [room as SubmittedSurvey['locations'][number]] })).map((i) => i.path)).not.toContain('drillingCheck');
+  });
+
+  test('W53: a campus surveyed four times shows once in the figures and lists all four surveys', () => {
+    const row = (id: string, at: string, by: string, overall: string, band: string) => ({
+      'Survey ID': id, 'School ID': '1338', 'Campus Name': 'Habibmetro Campus', Region: 'Lower Sindh', Area: 'A', Timestamp: at,
+      'Overall Score': overall, 'Rating Band': band, 'Submitted By': by,
+    });
+    const rows = [
+      row('s1', '2026-11-04T08:40:16.716Z', 'Hafiz Owais Ahmed', '72', 'Good'),
+      row('s1', '2026-11-04T08:40:16.716Z', 'Hafiz Owais Ahmed', '72', 'Good'), // a second location row of the same survey
+      row('s2', '2026-11-04T08:40:38.949Z', 'Sikandar Ali', '78', 'Good'),
+      row('s3', '2026-11-04T09:56:33.373Z', 'Awais Rasool', '87', 'Excellent'),
+      row('s4', '2026-11-04T09:56:35.164Z', 'Sanjay kumar', '100', 'Excellent'),
+    ];
+    const d = buildDashboard(10, rows);
+    expect(d.captured).toBe(1);
+    expect(d.schools).toHaveLength(1);
+    expect(d.averageScore).toBe(100); // the latest survey carries the figures, as before
+    expect(d.schools[0]!.submittedBy).toBe('Sanjay kumar');
+    expect(d.schools[0]!.earlier!.map((e) => e.submittedBy)).toEqual(['Awais Rasool', 'Sikandar Ali', 'Hafiz Owais Ahmed']);
+    expect(DASHBOARD_COLUMNS).toContain('Submitted By');
   });
 
   test('W52: a repeated location name is numbered; a repaired list submits', () => {

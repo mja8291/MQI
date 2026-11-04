@@ -215,6 +215,21 @@ export interface CapturedSchool {
   major: number | null;
   minor: number | null;
   criticalItems: Record<string, number | null>;
+  /** v2 (W53): who submitted it ('' on rows without the column). */
+  submittedBy?: string;
+  /**
+   * v2 (W53): the campus's other surveys, newest first. The dashboard's figures still count each
+   * campus once (its latest survey, FR-DASH-2); the list shows every survey so none looks lost.
+   */
+  earlier?: EarlierSurvey[];
+}
+
+export interface EarlierSurvey {
+  surveyId: string;
+  date: string;
+  overall: number;
+  band: RatingBand;
+  submittedBy: string;
 }
 
 /** v1 DashboardData (src/lib/sheets/dashboard.ts). */

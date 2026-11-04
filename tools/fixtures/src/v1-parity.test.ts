@@ -287,7 +287,11 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
   test('dashboard figures match v1', async () => {
     const { getDashboardData } = await import('../../../reference/src/lib/sheets/dashboard');
     const v1 = await getDashboardData();
-    const v2 = buildDashboard(SCHOOLS.length, ALL_M2);
+    const built = buildDashboard(SCHOOLS.length, ALL_M2);
+    // v2 (W53) adds who submitted each survey and the campus's earlier surveys to the list; the
+    // figures are v1's. Those two list fields are set aside for the comparison.
+    const v2 = { ...built, schools: built.schools.map(({ submittedBy: _by, earlier: _earlier, ...rest }) => rest) };
+    expect(built.schools.find((s) => s.schoolId === '947')!.earlier).toHaveLength(2); // 947's three surveys: all listed
     // v1 tags each campus with its method; v2 has no methods (D15).
     expect(v2).toEqual({ ...v1, schools: v1.schools.map(({ method: _method, ...rest }: { method: number }) => rest) });
     expect(v2.captured).toBe(3); // 947 (three surveys, latest wins), 499, 107
