@@ -84,7 +84,10 @@ export async function addRoof(page: Page, withPhoto = true): Promise<void> {
 }
 
 /** Answers every Review question (roof clean = Yes, so no extra photo) and submits. */
-export async function reviewAndSubmit(page: Page, { expectFewConfirm = true } = {}): Promise<void> {
+export async function reviewAndSubmit(
+  page: Page,
+  { expectFewConfirm = true, beforeSubmit }: { expectFewConfirm?: boolean; beforeSubmit?: () => Promise<void> } = {},
+): Promise<void> {
   await page.getByRole('button', { name: 'Review and submit' }).click();
   if (expectFewConfirm) await page.getByRole('button', { name: 'Proceed anyway' }).click();
   const s = page.locator('select');
@@ -97,6 +100,7 @@ export async function reviewAndSubmit(page: Page, { expectFewConfirm = true } = 
   await s.nth(6).selectOption('Yes');
   await s.nth(7).selectOption('Yes');
   await page.locator('input[type=checkbox]').last().check();
+  if (beforeSubmit) await beforeSubmit();
   await page.getByRole('button', { name: 'Submit survey' }).click();
 }
 

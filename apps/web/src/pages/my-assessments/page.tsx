@@ -148,7 +148,7 @@ function AssessmentContent() {
             ))}
             <Row label="Column crack > 3 mm" value={loc.columnCrackOver3mm} />
             <Row label="Schmidt Hammer available" value={loc.schmidtAvailable} />
-            <Row label="Schmidt Hammer reading" value={loc.schmidtReading} />
+            <Row label="Schmidt Hammer reading" value={loc.schmidtReading ? `${loc.schmidtReading} N/mm²` : ""} />
             {photosAt(loc.name).length ? (
               <div className="pt-2 space-y-1.5">
                 {photosAt(loc.name).map((p) => (

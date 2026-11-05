@@ -17,7 +17,7 @@ test('W44/W45: Roof shows Solar Panels; total depth comes first with its guidanc
 
   await page.locator('select').first().selectOption('YES');
   await field(page, 'Drilling point marked').selectOption('YES');
-  await expect(page.getByText('If the total depth is more than 260 mm, remove the roof screed and inspect it.')).toBeVisible();
+  await expect(page.getByText('If the total depth is more than 260 mm (10.2 in), remove the roof screed and inspect it.')).toBeVisible();
   await field(page, 'Total depth of slab + roof screed/waterproofing (mm)').fill('300');
   await field(page, 'Slab thickness recorded (mm)').fill('150');
   await field(page, 'Slab thickness assessment').selectOption('Ok');
@@ -25,7 +25,7 @@ test('W44/W45: Roof shows Solar Panels; total depth comes first with its guidanc
   const screed = page.locator('div.py-2\\.5', { hasText: 'Roof Screeding/roof drainage' });
   await expect(screed.getByText(/Marked Unsafe/)).toHaveCount(0);
   await field(page, 'Roof screeding thickness recorded (mm)').fill('120');
-  await expect(page.getByText(/110 mm or more: Roof Screeding\/roof drainage is marked Unsafe/)).toBeVisible();
+  await expect(page.getByText(/110 mm \(4\.3 in\) or more: Roof Screeding\/roof drainage is marked Unsafe/)).toBeVisible();
   await expect(screed.getByText(/Marked Unsafe/)).toBeVisible();
 
   // The surveyor can change it back, and a further edit of the reading doesn't override that.

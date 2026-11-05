@@ -42,8 +42,23 @@ export interface DrillingCheck {
   slabThicknessMm: string;
   screedThicknessMm: string;
   holeRepaired: "YES" | "NO" | "";
+  /** v2 (W55): the unit the surveyor typed the depths in. They are always stored in mm; absent means mm. */
+  unit?: LengthUnit;
   /** v2 (W36): holes drilled after the first one, each with its own readings. */
   extraHoles?: DrillHole[];
+}
+
+export type LengthUnit = "mm" | "in";
+export const MM_PER_INCH = 25.4;
+/** A reading typed in `unit` as the stored mm text (one decimal); blank or not a number stays as typed. */
+export function toMmText(value: string, unit: LengthUnit): string {
+  if (unit === "mm" || value.trim() === "" || !Number.isFinite(Number(value))) return value;
+  return String(Math.round(Number(value) * MM_PER_INCH * 10) / 10);
+}
+/** Stored mm text shown in `unit` (inches to two decimals). */
+export function fromMmText(mm: string, unit: LengthUnit): string {
+  if (unit === "mm" || mm.trim() === "" || !Number.isFinite(Number(mm))) return mm;
+  return String(Math.round((Number(mm) / MM_PER_INCH) * 100) / 100);
 }
 
 /** One additional drill hole and its readings (v2, W36). */
@@ -384,10 +399,10 @@ export interface SurveySubmission {
   attachments: { itemName: string; locationName: string; photoUrl?: string; note?: string }[];
 }
 
-/** v2 (W41): one location's Column Unsafe follow-up as text, e.g. "KG A: crack > 3 mm, Schmidt Hammer 32". */
+/** v2 (W41): one location's Column Unsafe follow-up as text, e.g. "KG A: crack > 3 mm, Schmidt Hammer 32 N/mm²". */
 export function columnCheckLine(name: string, crackOver3mm: string, hammerAvailable: string, reading: string): string {
   if (!crackOver3mm) return "";
   if (crackOver3mm !== "YES") return `${name}: crack up to 3 mm`;
-  if (hammerAvailable === "YES") return `${name}: crack > 3 mm, Schmidt Hammer ${reading.trim()}`;
+  if (hammerAvailable === "YES") return `${name}: crack > 3 mm, Schmidt Hammer ${reading.trim()} N/mm²`;
   return `${name}: crack > 3 mm, no Schmidt Hammer available`;
 }

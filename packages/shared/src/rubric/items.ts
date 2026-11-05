@@ -261,6 +261,12 @@ export const FLOOR_LEVELS: FloorLevel[] = ["External", "Ground", "First", "Secon
 /** v2 (W24): levels the surveyor confirms for the campus. External is always on. */
 export const DEFAULT_LEVELS: FloorLevel[] = ["External", "Ground", "First", "Roof"];
 export const REQUIRED_LEVELS: FloorLevel[] = ["External"];
+/** v2 (W55): levels that don't count towards "at least one level" (the building itself needs one). */
+export const NON_BUILDING_LEVELS: FloorLevel[] = ["External", "Roof"];
+export const NEED_BUILDING_LEVEL_MESSAGE = "Tick at least one level besides External and Roof.";
+export function hasBuildingLevel(levels: readonly FloorLevel[]): boolean {
+  return levels.some((l) => !NON_BUILDING_LEVELS.includes(l));
+}
 export const NO_ROOF_MESSAGE = "Leave Roof unticked only if another vertical campus is built above this campus.";
 /** The chosen levels in floor order (External first, Roof last); null (older drafts) → every level. */
 export function applicableLevels(levels: readonly FloorLevel[] | null | undefined): FloorLevel[] {

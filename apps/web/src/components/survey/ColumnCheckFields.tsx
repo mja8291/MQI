@@ -64,13 +64,13 @@ export function ColumnCheckFields({
       ) : null}
       {c.crackOver3mm === "YES" && c.hammerAvailable === "YES" ? (
         <>
-          <Field label="Schmidt Hammer reading (rebound value)">
+          <Field label="Schmidt Hammer reading (N/mm²)">
             <input
               type="number"
               inputMode="decimal"
               min={0}
               step="any"
-              placeholder="e.g. 32"
+              placeholder="N/mm²"
               aria-label="Schmidt Hammer reading"
               value={c.reading}
               onChange={(e) => onChange({ ...c, reading: e.target.value })}

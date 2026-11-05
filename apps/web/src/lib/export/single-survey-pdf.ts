@@ -28,7 +28,7 @@ export interface SingleSurveyPdfInput {
   drillingCheck: DrillingCheck;
   /** v2 (W36): "Hole 2: …; Hole 3: …"; omitted when there are none. */
   additionalDrillHoles?: string;
-  /** v2 (W41): Column Unsafe follow-ups, "KG A: crack > 3 mm, Schmidt Hammer 32; …". */
+  /** v2 (W41): Column Unsafe follow-ups, "KG A: crack > 3 mm, Schmidt Hammer 32 N/mm²; …". */
   columnChecks?: string;
   siteChecks: SiteChecks;
   complaints: string;

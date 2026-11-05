@@ -7,7 +7,7 @@ import { TopBar } from "@/components/ui/TopBar";
 import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
-import { DEFAULT_LEVELS, FLOOR_LEVELS, NO_ROOF_MESSAGE, REQUIRED_LEVELS, applicableLevels } from "@mqi/shared";
+import { DEFAULT_LEVELS, FLOOR_LEVELS, NEED_BUILDING_LEVEL_MESSAGE, NO_ROOF_MESSAGE, REQUIRED_LEVELS, applicableLevels, hasBuildingLevel } from "@mqi/shared";
 import type { FloorLevel } from "@/lib/types";
 
 /**
@@ -34,7 +34,11 @@ export default function LevelsPage() {
     setLocal((list) => (list.includes(level) ? list.filter((l) => l !== level) : applicableLevels([...list, level])));
   }
 
+  // v2 (W55): besides External and Roof, at least one level of the building itself.
+  const enough = hasBuildingLevel(levels);
+
   function next() {
+    if (!enough) return;
     setLevels(applicableLevels(levels));
     router.push("/survey/locations");
   }
@@ -88,8 +92,16 @@ export default function LevelsPage() {
         </p>
       ) : null}
 
+      {!enough ? (
+        <p role="alert" className="mt-3 rounded-lg bg-band-poor-tint px-3 py-2 text-[12.5px] leading-snug text-band-poor">
+          {NEED_BUILDING_LEVEL_MESSAGE}
+        </p>
+      ) : null}
+
       <BottomBar>
-        <Button onClick={next}>Continue</Button>
+        <Button onClick={next} disabled={!enough}>
+          Continue
+        </Button>
       </BottomBar>
     </ScreenShell>
   );

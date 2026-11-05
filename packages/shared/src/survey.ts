@@ -57,6 +57,7 @@ export const drillingCheckSchema = z.object({
   pointMarked: blankOr(['YES', 'NO', 'Ok', 'Unsafe']),
   slabAssessment: blankOr(['Ok', 'Unsafe']).optional(),
   totalDepthMm: text(20).optional(),
+  unit: z.enum(["mm", "in"]).optional(),
   slabThicknessMm: text(20),
   screedThicknessMm: text(20),
   holeRepaired: blankOr(['YES', 'NO']),
