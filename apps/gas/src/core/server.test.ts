@@ -542,3 +542,76 @@ describe('observability and limits', () => {
     expect(getSharded(env, 'k')).toBe(big);
   });
 });
+
+/** QA pass (2026-11-07) on W56: the switch-over and its edge cases on the server. */
+describe('W56 server edge cases', () => {
+  const SLAB = 'Slab + Screeding/Waterproofing thickness assessment';
+  const OVERFLOW = 'Proper Overflow Disposal System';
+
+  test('a phone still on the old app (rubric 2026-10-28, no derived items) is accepted and scored with the old weights', () => {
+    const t = login('surveyor@tcf.test');
+    const item = makeSurvey();
+    const locations = item.survey.locations.map((l) => ({ ...l, scores: Object.fromEntries(Object.entries(l.scores).filter(([n]) => n !== SLAB && n !== OVERFLOW)) }));
+    const r = scoreSurveyFor(locations, '2026-10-28');
+    const old = {
+      ...item,
+      survey: {
+        ...item.survey,
+        rubricVersion: '2026-10-28',
+        locations,
+        scores: { overall: r.overall, functionality: r.categories.Functionality.score, safety: r.categories.Safety.score, aesthetics: r.categories.Aesthetics.score, major: r.major, minor: r.minor, criticalItems: r.criticalItems },
+      },
+    };
+    expect(ok(push(t, old)).results[0]).toMatchObject({ status: 'ok' });
+    const [row] = rowsFor(old.survey.id);
+    expect(row!['Rubric Version']).toBe('2026-10-28');
+    expect(row![OVERFLOW] ?? '').toBe('');
+  });
+
+  test('an old-app survey sent with the new version stamp but no derived items is refused, not mis-scored', () => {
+    const t = login('surveyor@tcf.test');
+    const item = makeSurvey();
+    const bad = { ...item, survey: { ...item.survey, locations: item.survey.locations.map((l) => ({ ...l, scores: Object.fromEntries(Object.entries(l.scores).filter(([n]) => n !== OVERFLOW)) })) } };
+    const res = ok(push(t, bad)).results[0]!;
+    expect(res.status).toBe('rejected');
+    expect(rowsFor(item.survey.id)).toHaveLength(0);
+  });
+
+  test('two Roof locations both carry the derived items; a Guardroom row is written with its own type', () => {
+    const t = login('surveyor@tcf.test');
+    const base = makeSurvey().survey.locations[0]!;
+    const roof2 = { ...base, id: 'Roof 2', name: 'Roof 2', photos: {}, notes: {}, scores: { ...base.scores, 'Roof Screeding/roof drainage': 'Good' as const } };
+    const guard = {
+      id: 'g', floorLevel: 'External' as const, type: 'Guardroom' as const, name: 'Guardroom', photos: {}, notes: {},
+      scores: Object.fromEntries(rubricGroupsForLocation('Guardroom').map((g) => [g.name, 'Good'])) as SurveyLocation['scores'],
+    };
+    const item = makeSurvey({ locations: [base, roof2, guard] });
+    expect(ok(push(t, item)).results[0]).toMatchObject({ status: 'ok' });
+    const rows = rowsFor(item.survey.id);
+    expect(rows.map((r) => r['Location Type'])).toEqual(['Guardroom', 'Roof', 'Roof']); // External floor first
+    expect(rows.filter((r) => r['Location Type'] === 'Roof').map((r) => r[OVERFLOW])).toEqual(['Good', 'Good']);
+    expect(rows.find((r) => r['Location Type'] === 'Guardroom')!['Flush Tanks']).toBe('Good');
+  });
+
+  test('a Guardroom missing a Toilet item is incomplete', () => {
+    const t = login('surveyor@tcf.test');
+    const guard = {
+      id: 'g', floorLevel: 'External' as const, type: 'Guardroom' as const, name: 'Guardroom', photos: {}, notes: {},
+      scores: { 'Flush Tanks': 'Good' } as SurveyLocation['scores'],
+    };
+    const item = makeSurvey({ locations: [makeSurvey().survey.locations[0]!, guard] });
+    expect(ok(push(t, item)).results[0]!.status).toBe('rejected');
+  });
+
+  test('a new survey shows on the dashboard at once, and its Unsafe items with it', () => {
+    const admin = login('admin@tcf.test');
+    const before = ok(call<{ schools: { surveyId: string }[] }>('dashboard.get', {}, admin)); // now cached
+    const t = login('surveyor@tcf.test');
+    const item = makeSurvey(); // Roof Screeding Unsafe, with its photo
+    ok(push(t, item));
+    const after = ok(call<{ schools: { surveyId: string; unsafeItems?: string[] }[] }>('dashboard.get', {}, admin));
+    expect(before.schools.some((s) => s.surveyId === item.survey.id)).toBe(false);
+    const row = after.schools.find((s) => s.surveyId === item.survey.id);
+    expect(row?.unsafeItems).toEqual(['Roof Screeding/roof drainage']);
+  });
+});
