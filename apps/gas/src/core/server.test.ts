@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, test } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   API_VERSION,
+  DASHBOARD_COLUMNS,
   RESPONSES_HEADER,
   RESPONSES_TAB,
   RUBRIC_VERSION,
@@ -19,6 +20,7 @@ import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../dev/server';
 import { getSharded, putSharded } from './reads';
+import { columnRows } from './responses';
 import { handleRequest, scrub } from './router';
 
 let env: MemoryEnv;
@@ -613,5 +615,29 @@ describe('W56 server edge cases', () => {
     expect(before.schools.some((s) => s.surveyId === item.survey.id)).toBe(false);
     const row = after.schools.find((s) => s.surveyId === item.survey.id);
     expect(row?.unsafeItems).toEqual(['Roof Screeding/roof drainage']);
+  });
+});
+
+describe('W57 dashboard read', () => {
+  test('neighbouring columns come in a few block reads, with exactly the rows one read per column gave', () => {
+    const t = login('surveyor@tcf.test');
+    ok(push(t, makeSurvey(), makeSurvey()));
+    // Someone moved a column far away in the live sheet: it still reads right, in its own block.
+    const tab = env.responses.tabs.get(RESPONSES_TAB)!;
+    const at = tab[0]!.map(String).indexOf('Submitted By');
+    for (const row of tab) row.push(row.splice(at, 1)[0]!);
+    const header = env.responses.header(RESPONSES_TAB)!;
+    const last = env.responses.lastRow(RESPONSES_TAB);
+    const byColumn = DASHBOARD_COLUMNS.map((name) => {
+      const i = header.findIndex((h) => h.trim().toLowerCase() === name.toLowerCase());
+      return { name, values: i < 0 ? [] : env.responses.readColumn(RESPONSES_TAB, i + 1, 2, last - 1) };
+    });
+    const expected = Array.from({ length: last - 1 }, (_, r) => Object.fromEntries(byColumn.map((c) => [c.name, c.values[r] ?? ''])));
+    const blocks = vi.spyOn(env.responses, 'readBlock');
+    const columns = vi.spyOn(env.responses, 'readColumn');
+    expect(columnRows(env, RESPONSES_TAB, DASHBOARD_COLUMNS)).toEqual(expected);
+    expect(columns).not.toHaveBeenCalled();
+    expect(blocks.mock.calls.length).toBeLessThanOrEqual(6);
+    expect(blocks.mock.calls.length).toBeGreaterThan(1);
   });
 });

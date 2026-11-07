@@ -73,11 +73,27 @@ export function toRow(header: readonly string[], cells: readonly string[]): Shee
  * Every data row, but only the named columns (one column read each): what the dashboard needs
  * without loading all ~90 columns of every location row.
  */
+/** Unused columns read through rather than starting another read (each read is a round trip in Apps Script). */
+const BLOCK_GAP = 8;
+
 export function columnRows(env: Env, tab: string, columns: readonly string[]): SheetRow[] {
   const header = env.responses.header(tab);
   const last = env.responses.lastRow(tab);
   if (!header || last < 2) return [];
-  const cols = columns.map((name) => ({ name, values: colIndex(header, name) < 0 ? [] : env.responses.readColumn(tab, colIndex(header, name) + 1, 2, last - 1) }));
+  // W57: neighbouring columns come in one read (a gap of up to BLOCK_GAP unused columns is read
+  // through), so the dashboard's ~25 columns cost a few Apps Script calls, not one each.
+  const wanted = columns.map((name) => ({ name, at: colIndex(header, name) }));
+  const present = [...new Set(wanted.map((w) => w.at).filter((at) => at >= 0))].sort((a, b) => a - b);
+  const byIndex = new Map<number, string[]>();
+  for (let i = 0; i < present.length; ) {
+    let j = i;
+    while (j + 1 < present.length && present[j + 1]! - present[j]! <= BLOCK_GAP + 1) j++;
+    const start = present[i]!;
+    const block = env.responses.readBlock(tab, 2, last - 1, start + 1, present[j]! - start + 1);
+    for (let k = i; k <= j; k++) byIndex.set(present[k]!, block.map((r) => r[present[k]! - start] ?? ''));
+    i = j + 1;
+  }
+  const cols = wanted.map(({ name, at }) => ({ name, values: byIndex.get(at) ?? [] }));
   const rows: SheetRow[] = [];
   for (let i = 0; i < last - 1; i++) {
     const o: SheetRow = {};

@@ -84,6 +84,9 @@ export class MemoryResponses implements ResponsesPort {
     const width = (t[0] ?? []).length;
     return t.slice(startRow - 1, startRow - 1 + numRows).map((r) => Array.from({ length: width }, (_, i) => (r[i] === undefined ? '' : String(r[i]))));
   }
+  readBlock(tab: string, startRow: number, numRows: number, startCol: number, numCols: number): string[][] {
+    return this.readRows(tab, startRow, numRows).map((r) => Array.from({ length: numCols }, (_, i) => r[startCol - 1 + i] ?? ''));
+  }
   readColumn(tab: string, col: number, startRow: number, numRows: number): string[] {
     return this.readRows(tab, startRow, numRows).map((r) => r[col - 1] ?? '');
   }

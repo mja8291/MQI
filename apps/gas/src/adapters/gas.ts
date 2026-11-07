@@ -119,6 +119,11 @@ class Responses implements ResponsesPort {
     if (!s || numRows <= 0) return [];
     return s.getRange(startRow, 1, numRows, Math.max(1, s.getLastColumn())).getDisplayValues();
   }
+  readBlock(tab: string, startRow: number, numRows: number, startCol: number, numCols: number): string[][] {
+    const s = this.sheet(tab);
+    if (!s || numRows <= 0 || numCols <= 0) return [];
+    return s.getRange(startRow, startCol, numRows, numCols).getDisplayValues().map((r) => r.map((v) => String(v ?? '')));
+  }
   readColumn(tab: string, col: number, startRow: number, numRows: number): string[] {
     const s = this.sheet(tab);
     if (!s || numRows <= 0) return [];

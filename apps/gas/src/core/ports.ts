@@ -40,6 +40,8 @@ export interface ResponsesPort {
   /** Formatted (display) values, as v1 read them; rows are 1-based. */
   readRows(tab: string, startRow: number, numRows: number): string[][];
   readColumn(tab: string, col: number, startRow: number, numRows: number): string[];
+  /** W57: a block of columns (1-based) in one read; formatted values like readRows. */
+  readBlock(tab: string, startRow: number, numRows: number, startCol: number, numCols: number): string[][];
 }
 
 /** The read-only school list. */
