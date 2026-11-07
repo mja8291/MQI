@@ -42,6 +42,19 @@ function Downloads({ surveyId, name }: { surveyId: string; name: string }) {
   );
 }
 
+/** v2 (W56): a survey with any item marked Unsafe (Wall Unsafe alone excepted) shows in red as Unsafe. */
+function UnsafeBadge({ items }: { items?: string[] }) {
+  if (!items?.length) return null;
+  return (
+    <span
+      title={`Unsafe: ${items.join(", ")}`}
+      className="text-[10.5px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-band-poor text-white"
+    >
+      Unsafe
+    </span>
+  );
+}
+
 const when = (iso: string) =>
   iso
     ? new Date(iso).toLocaleString([], {
@@ -76,7 +89,13 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
               <ChevronDown size={13} className={open ? "rotate-180" : ""} />
             </button>
           ) : null}
+          {school.unsafeItems?.length ? (
+            <div className="text-[11px] font-semibold text-band-poor leading-snug">
+              Unsafe: {school.unsafeItems.join(", ")}
+            </div>
+          ) : null}
         </div>
+        <UnsafeBadge items={school.unsafeItems} />
         <span
           className="text-[10.5px] font-semibold px-2.5 py-1 rounded-full shrink-0"
           style={{
@@ -99,7 +118,11 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
               <div className="flex-1 min-w-0 text-[11.5px] text-ink-soft">
                 {when(e.date)}
                 {e.submittedBy ? ` · ${e.submittedBy}` : ""}
+                {e.unsafeItems?.length ? (
+                  <div className="font-semibold text-band-poor">Unsafe: {e.unsafeItems.join(", ")}</div>
+                ) : null}
               </div>
+              <UnsafeBadge items={e.unsafeItems} />
               <span
                 className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full shrink-0"
                 style={{

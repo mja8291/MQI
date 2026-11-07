@@ -58,6 +58,8 @@ async function makeQueued(opts: { photoBytes?: number; tamper?: boolean } = {}):
       'Solar Panels/Inverter/Batteries': 'Good',
       Plaster: 'Poor',
       Masonry: 'Good',
+      // W56: from the overflow answer below (Provided); no drilling check, so no slab assessment.
+      'Proper Overflow Disposal System': 'Good',
     },
     photos: withPhoto ? { Plaster: [photoId] } : {},
     notes: {},

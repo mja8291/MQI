@@ -6,7 +6,7 @@ import { TopBar } from "@/components/ui/TopBar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LocationTypeCard } from "@/components/survey/LocationTypeCard";
 import { useSurvey } from "@/lib/survey-context";
-import { FLOOR_LEVELS, FLOOR_LOCATION_TYPES, LOCATION_NAME_OPTIONS, UNNAMED_LOCATION_TYPES } from "@/lib/data/items";
+import { FLOOR_LEVELS, FLOOR_LOCATION_TYPES, LOCATION_NAME_OPTIONS, UNNAMED_LOCATION_TYPES, locationCardFor } from "@/lib/data/items";
 import type { Condition, FloorLevel, LocationType } from "@/lib/types";
 import { getSiblingExternal } from "@/lib/sibling-external";
 
@@ -32,6 +32,16 @@ function LocationContent() {
   if (!floor) return null;
 
   const types = FLOOR_LOCATION_TYPES[floor];
+  // W56: types behind one card (Guardroom, Canteen & UGWT) show as that card, once.
+  const cards: { key: string; type: LocationType; label?: string; members: LocationType[] }[] = [];
+  for (const type of types) {
+    const card = locationCardFor(type);
+    if (!card) cards.push({ key: type, type, members: [type] });
+    else if (!cards.some((c) => c.key === card.label)) {
+      const members = types.filter((t) => locationCardFor(t) === card);
+      cards.push({ key: card.label, type, label: card.label, members });
+    }
+  }
   const onFloor = state.scoring.locations.filter((l) => l.floorLevel === floor).length;
 
   function leave() {
@@ -39,7 +49,11 @@ function LocationContent() {
     else router.push("/survey/locations");
   }
 
-  async function pick(type: LocationType) {
+  async function pick(type: LocationType, cardLabel?: string) {
+    if (cardLabel) {
+      router.push(`/survey/locations/location/name?floor=${encodeURIComponent(floor!)}&card=${encodeURIComponent(cardLabel)}`);
+      return;
+    }
     if (type === "Classroom") {
       router.push(`/survey/locations/location/classroom?floor=${encodeURIComponent(floor!)}`);
       return;
@@ -82,12 +96,13 @@ function LocationContent() {
       <p className="text-[12.5px] text-ink-soft leading-snug mb-3.5">Tap the type of location you&apos;re scoring.</p>
 
       <div className="grid grid-cols-2 gap-2.5">
-        {types.map((type) => (
+        {cards.map((c) => (
           <LocationTypeCard
-            key={type}
-            type={type}
-            count={state.scoring.locations.filter((l) => l.type === type).length}
-            onOpen={() => pick(type)}
+            key={c.key}
+            type={c.type}
+            label={c.label}
+            count={state.scoring.locations.filter((l) => c.members.includes(l.type)).length}
+            onOpen={() => pick(c.type, c.label)}
           />
         ))}
       </div>

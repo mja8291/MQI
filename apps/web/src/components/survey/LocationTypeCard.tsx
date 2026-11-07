@@ -3,11 +3,13 @@ import type { LocationType } from "@/lib/types";
 
 interface LocationTypeCardProps {
   type: LocationType;
+  /** W56: a card standing for several types, e.g. "Guardroom/Canteen & UGWT". */
+  label?: string;
   count: number;
   onOpen: () => void;
 }
 
-export function LocationTypeCard({ type, count, onOpen }: LocationTypeCardProps) {
+export function LocationTypeCard({ type, label, count, onOpen }: LocationTypeCardProps) {
   const Icon = LOCATION_ICONS[type];
   return (
     <button
@@ -27,7 +29,7 @@ export function LocationTypeCard({ type, count, onOpen }: LocationTypeCardProps)
           {count}
         </div>
       </div>
-      <div className="text-[12.5px] font-semibold text-ink mt-2 leading-tight">{type}</div>
+      <div className="text-[12.5px] font-semibold text-ink mt-2 leading-tight">{label ?? type}</div>
     </button>
   );
 }

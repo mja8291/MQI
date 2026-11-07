@@ -12,6 +12,7 @@ import {
   scoreSurveyFor,
   sha256,
   uuidv7,
+  withDerivedScores,
 } from '@mqi/shared';
 import type { ApiResponse, AttachmentMeta, School, SiblingExternalResult, SurveyLocation, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
@@ -101,10 +102,24 @@ function makeSurvey(overrides: Partial<SubmittedSurvey> = {}): { survey: Submitt
     updatedAt: '2026-10-28T05:00:00.000Z',
     ...overrides,
   };
+  const phone = asPhone(survey, Boolean(overrides.scores));
+  Object.assign(survey, phone);
   const attachments: AttachmentMeta[] = Object.values(locations)
     .flatMap((l) => Object.entries(l.photos).flatMap(([item, pids]) => pids.map((pid) => ({ pid, item, l }))))
     .map(({ pid, item, l }) => ({ id: pid, surveyId: id, itemName: item, locationName: l.name, location: { floorLevel: l.floorLevel, type: l.type, name: l.name }, mimeType: 'image/jpeg' as const, size: 1000 }));
   return { survey, attachments };
+}
+
+/** W56: as the phone builds it — Roof locations carry the derived items, scores from the final locations. */
+function asPhone(s: SubmittedSurvey, keepScores: boolean): SubmittedSurvey {
+  const locations = withDerivedScores(s.locations, s.drillingCheck, s.siteChecks);
+  if (keepScores) return { ...s, locations };
+  const r = scoreSurveyFor(locations, s.rubricVersion);
+  return {
+    ...s,
+    locations,
+    scores: { overall: r.overall, functionality: r.categories.Functionality.score, safety: r.categories.Safety.score, aesthetics: r.categories.Aesthetics.score, major: r.major, minor: r.minor, criticalItems: r.criticalItems },
+  };
 }
 
 function push(session: string, ...items: { survey: SubmittedSurvey; attachments: AttachmentMeta[] }[]) {

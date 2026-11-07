@@ -192,6 +192,8 @@ export interface RubricItem {
   locationLabels?: Partial<Record<LocationType, string>>;
   /** v2 (W12): an instruction shown under the item name, e.g. how to test it on site. */
   guidance?: string;
+  /** v2 (W56): scored from another answer in the survey (see derivedScores), never picked at a location. */
+  derived?: boolean;
   /** Drops N/A from the picker entirely — for an item where "not applicable" never makes sense (e.g. "Access to roof area /tanks": you're standing at the roof access, so it's either there or it isn't). */
   hideNA?: boolean;
 }
@@ -216,7 +218,9 @@ export type LocationType =
   | "External Development"
   | "Roof"
   | "Other Room (Staff, Principal, Admin, Store etc.)"
-  | "Lab (Wet/Dry/DLP)";
+  | "Lab (Wet/Dry/DLP)"
+  | "Guardroom"
+  | "Canteen & UGWT";
 
 /** The first pick — which floor the location being scored is on. */
 export type FloorLevel = "External" | "Ground" | "First" | "Second" | "Third" | "Fourth" | "Roof";

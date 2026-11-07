@@ -6,7 +6,10 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type ExcelJS from 'exceljs';
 import { PDFArray, PDFDocument, decodePDFRawStream } from 'pdf-lib';
 import type { PDFRawStream } from 'pdf-lib';
-import { API_VERSION, RESPONSES_TAB, RUBRIC_VERSION, buildDashboard, foundSurveyFromRows, scoreSurveyFor, uuidv7 } from '@mqi/shared';
+import { API_VERSION, RESPONSES_TAB, buildDashboard, foundSurveyFromRows, scoreSurveyFor, uuidv7 } from '@mqi/shared';
+
+/** The last rubric version v1 (reference/ at 0a4a75c) knows; W56's 2026-11-07 list is v2-only. */
+const V1_RUBRIC = '2026-10-28';
 import type { SurveyLocation, SheetRow, SubmittedSurvey, WhoAmI } from '@mqi/shared';
 import { createMemoryEnv } from '../../../apps/gas/src/adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../../../apps/gas/src/dev/server';
@@ -65,10 +68,10 @@ function v2WrittenRows(): SheetRow[] {
       Plaster: 'Good',
     }),
   ];
-  const r = scoreSurveyFor(locations as SurveyLocation[], RUBRIC_VERSION);
+  const r = scoreSurveyFor(locations as SurveyLocation[], V1_RUBRIC);
   const survey: SubmittedSurvey = {
     id: uuidv7(rnd),
-    rubricVersion: RUBRIC_VERSION,
+    rubricVersion: V1_RUBRIC,
     school: { schoolId: '947', name: 'OGS Trust Campus', region: 'South West', area: 'Gadap West I' },
     asm: 'A',
     apm: 'B',
@@ -156,7 +159,10 @@ async function pdfText(bytes: Uint8Array): Promise<string[]> {
 
 /** v1's PDF text with v2's deliberate changes applied: D15 (no "Method 2 · "), W11 labels, W17 row. */
 function v1TextAsV2(text: string[]): string[] {
-  const label: Record<string, string> = { 'Accompanying APM': 'Engineering Staff', 'Responding ASM': 'ASM', 'School Principal': 'Principal' };
+  const label: Record<string, string> = { 'Accompanying APM': 'Engineering Staff', 'Responding ASM': 'ASM', 'School Principal': 'Principal',
+    // W56: renamed on the drilling card.
+    'Slab thickness assessment': 'Slab + Screeding/Waterproofing thickness assessment',
+  };
   const out: string[] = [];
   for (let i = 0; i < text.length; i++) {
     const t = text[i]!;
@@ -288,9 +294,10 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
     const { getDashboardData } = await import('../../../reference/src/lib/sheets/dashboard');
     const v1 = await getDashboardData();
     const built = buildDashboard(SCHOOLS.length, ALL_M2);
+    // v2 (W56) also flags Unsafe surveys (unsafeItems).
     // v2 (W53) adds who submitted each survey and the campus's earlier surveys to the list; the
     // figures are v1's. Those two list fields are set aside for the comparison.
-    const v2 = { ...built, schools: built.schools.map(({ submittedBy: _by, earlier: _earlier, ...rest }) => rest) };
+    const v2 = { ...built, schools: built.schools.map(({ submittedBy: _by, earlier: _earlier, unsafeItems: _unsafe, ...rest }) => rest) };
     expect(built.schools.find((s) => s.schoolId === '947')!.earlier).toHaveLength(2); // 947's three surveys: all listed
     // v1 tags each campus with its method; v2 has no methods (D15).
     expect(v2).toEqual({ ...v1, schools: v1.schools.map(({ method: _method, ...rest }: { method: number }) => rest) });

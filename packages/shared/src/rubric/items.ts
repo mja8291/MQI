@@ -1,9 +1,9 @@
 import type { Category, Condition, FloorLevel, LocationType, RubricGroup, RubricItem } from "../types";
-import { OK_UNSAFE, ROOF_ACCESS, SOUNDNESS_GUIDANCE, WALL_COLUMN_GUIDANCE } from "./condition-overrides";
+import { OK_UNSAFE, ROOF_ACCESS, SOUNDNESS_GUIDANCE, WALL_COLUMN_GUIDANCE, YES_NO } from "./condition-overrides";
 
 /**
- * The survey rubric — 31 item groups (Safety 9 / Functionality 15 / Aesthetics 7),
- * rubric version 2026-10-28, read from the item-group tab of the revised rubric workbook: names, order, "Category Weightage"
+ * The survey rubric — 33 item groups (Safety 11 / Functionality 15 / Aesthetics 7),
+ * rubric version 2026-11-07, read from the item-group tab of the revised rubric workbook: names, order, "Category Weightage"
  * and the per-group Location column come straight from it, and each
  * division's weights sum to 100. This is the app's only rubric.
  *
@@ -12,13 +12,21 @@ import { OK_UNSAFE, ROOF_ACCESS, SOUNDNESS_GUIDANCE, WALL_COLUMN_GUIDANCE } from
  *   - 2026-10-27   30 groups (items-v20261027.ts)
  *   - 2026-10-27.2 31 groups (items-v20261027-2.ts)
  *   - 2026-10-27.3 33 groups (items-v20261027-3.ts)
- *   - 2026-10-28   this list: + Window Shades (Safety); Taps + Wash Basin
+ *   - 2026-10-28   31 groups (items-v20261028.ts): + Window Shades (Safety); Taps + Wash Basin
  *                  merged into "Wash Basin/Taps"; Electrical Fixtures +
  *                  Switch/Dimmer Sheet merged; W.Cs/Commodes and Plaque
  *                  dropped; "Plaster/Masonry" split into Plaster and
  *                  Masonry; "Roof Access" renamed "Access to roof area
  *                  /tanks"; "Internal Flooring" renamed "Internal Flooring
  *                  condition"; most weights and several locations changed.
+ *   - 2026-11-07   this list (W56): + "Slab + Screeding/Waterproofing
+ *                  thickness assessment" (10) and "Proper Overflow Disposal
+ *                  System" (4) in Safety, both at Roof and scored from answers
+ *                  the surveyor already gives (drilling card, Review page) —
+ *                  see derivedScores; Boundary wall 8→7, Concrete/Plaster
+ *                  Soundness 15→12, Ceiling 20→16, Roof Screeding 15→10,
+ *                  Distribution Board 8→7. Guardroom (Toilet's items) and
+ *                  Canteen & UGWT (Other Room's items) added on External.
  * All of it replaced the original 45-item / 6-work-category version (frozen
  * in items-legacy.ts): this list scores whole item *groups* per
  * location, and has no Work Category column, so a location's groups are
@@ -61,10 +69,17 @@ const EXT_DEV: LocationType = "External Development";
 const ROOF: LocationType = "Roof";
 const OTHER_ROOM: LocationType = "Other Room (Staff, Principal, Admin, Store etc.)";
 const LAB: LocationType = "Lab (Wet/Dry/DLP)";
+/** v2 (W56): on the External floor, behind one "Guardroom/Canteen & UGWT" card. */
+const GUARDROOM: LocationType = "Guardroom";
+const CANTEEN: LocationType = "Canteen & UGWT";
 
-export const RUBRIC_GROUPS: RubricGroup[] = [
-  // Safety — 25% of overall, 9 groups
-  worst({ name: "Boundary wall", category: "Safety", weight: 8, locations: [EXT_DEV] }),
+/** v2 (W56): scored from the drilling card and the Review page, not picked at the Roof location. */
+export const SLAB_ASSESSMENT_ITEM = "Slab + Screeding/Waterproofing thickness assessment";
+export const OVERFLOW_ITEM = "Proper Overflow Disposal System";
+
+const SHEET_GROUPS: RubricGroup[] = [
+  // Safety — 25% of overall, 11 groups
+  worst({ name: "Boundary wall", category: "Safety", weight: 7, locations: [EXT_DEV] }),
   worst({ name: "Main Gate", category: "Safety", weight: 7, locations: [EXT_DEV] }),
   worst({
     name: "Access to roof area /tanks",
@@ -77,7 +92,7 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
   worst({
     name: "Concrete/Plaster Soundness",
     category: "Safety",
-    weight: 15,
+    weight: 12,
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM, LAB, FACADE],
     conditionOverride: OK_UNSAFE,
     guidance: SOUNDNESS_GUIDANCE,
@@ -85,7 +100,7 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
   worst({
     name: "Ceiling Condition i.e. cracks & seepage",
     category: "Safety",
-    weight: 20,
+    weight: 16,
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM, LAB],
     conditionOverride: OK_UNSAFE,
   }),
@@ -101,7 +116,7 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
   worst({
     name: "Roof Screeding/roof drainage",
     category: "Safety",
-    weight: 15,
+    weight: 10,
     locations: [ROOF],
     conditionOverride: OK_UNSAFE,
   }),
@@ -113,7 +128,23 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
     locations: [FACADE],
     conditionOverride: OK_UNSAFE,
   }),
-  worst({ name: "Distribution Board", category: "Safety", weight: 8, locations: [CORRIDOR] }),
+  worst({
+    name: SLAB_ASSESSMENT_ITEM,
+    category: "Safety",
+    weight: 10,
+    locations: [ROOF],
+    conditionOverride: OK_UNSAFE,
+    derived: true,
+  }),
+  worst({
+    name: OVERFLOW_ITEM,
+    category: "Safety",
+    weight: 4,
+    locations: [ROOF],
+    conditionOverride: YES_NO,
+    derived: true,
+  }),
+  worst({ name: "Distribution Board", category: "Safety", weight: 7, locations: [CORRIDOR] }),
 
   // Functionality — 45% of overall, 15 groups
   average({
@@ -242,6 +273,19 @@ export const RUBRIC_GROUPS: RubricGroup[] = [
   average({ name: "CC Jali", category: "Aesthetics", weight: 9, locations: [CORRIDOR, FACADE] }),
 ];
 
+/**
+ * v2 (W56): Guardroom is scored on every item a Toilet is; Canteen & UGWT on every item an Other
+ * Room is (requested 2026-11-07; the sheet's Location column doesn't list them).
+ */
+export const RUBRIC_GROUPS: RubricGroup[] = SHEET_GROUPS.map((g) => ({
+  ...g,
+  locations: [
+    ...g.locations,
+    ...(g.locations.includes(TOILET) ? [GUARDROOM] : []),
+    ...(g.locations.includes(OTHER_ROOM) ? [CANTEEN] : []),
+  ],
+}));
+
 /** Display order of a location's scoring sections. */
 export const RUBRIC_SECTIONS: Category[] = ["Safety", "Functionality", "Aesthetics"];
 
@@ -254,6 +298,8 @@ export const LOCATION_TYPES: LocationType[] = [
   ROOF,
   OTHER_ROOM,
   LAB,
+  GUARDROOM,
+  CANTEEN,
 ];
 
 export const FLOOR_LEVELS: FloorLevel[] = ["External", "Ground", "First", "Second", "Third", "Fourth", "Roof"];
@@ -284,7 +330,7 @@ const GROUND_LIKE_TYPES: LocationType[] = [CLASSROOM, CORRIDOR, TOILET, OTHER_RO
 
 /** Which location types are offered on a given floor. Empty = skip the Location page (Roof floor only). */
 export const FLOOR_LOCATION_TYPES: Record<FloorLevel, LocationType[]> = {
-  External: [FACADE, EXT_DEV],
+  External: [FACADE, EXT_DEV, GUARDROOM, CANTEEN],
   Ground: GROUND_LIKE_TYPES,
   First: GROUND_LIKE_TYPES,
   Second: GROUND_LIKE_TYPES,
@@ -341,8 +387,20 @@ export const CLASSROOM_GRADES_WITH_OPTIONAL_SECTION = ["Library", "Art Room/Libr
 /** Campuses use either lettered or coloured sections — offer both, ASM picks whichever applies. */
 export const CLASSROOM_SECTIONS = ["A", "B", "C", "D", "E", "Red", "Yellow", "Green", "Blue"];
 
+/** The groups the surveyor scores at a location of this type (W56: not those scored from other answers). */
 export function rubricGroupsForLocation(type: LocationType): RubricGroup[] {
-  return RUBRIC_GROUPS.filter((g) => g.locations.includes(type));
+  return RUBRIC_GROUPS.filter((g) => g.locations.includes(type) && !g.derived);
+}
+
+/**
+ * v2 (W56): location types offered together behind one card, the name picked deciding the type.
+ * On the External floor: "Guardroom/Canteen & UGWT" → Guardroom, Canteen or UGWT.
+ */
+export const LOCATION_CARDS: { label: string; names: Record<string, LocationType> }[] = [
+  { label: "Guardroom/Canteen & UGWT", names: { Guardroom: GUARDROOM, Canteen: CANTEEN, UGWT: CANTEEN } },
+];
+export function locationCardFor(type: LocationType): (typeof LOCATION_CARDS)[number] | undefined {
+  return LOCATION_CARDS.find((c) => Object.values(c.names).includes(type));
 }
 
 /** True once every item group applicable to this location has a score — the same completeness rule the scoring page enforces, applied to a whole recorded location at once. */
@@ -354,10 +412,11 @@ export function isUnsafe(item: Pick<RubricItem, "conditionOverride">, value: Con
 /** Items marked Unsafe at this location with no photo attached (W47: except those whose photo the app lost). */
 export function unsafeWithoutPhoto(
   location: { type: LocationType; scores: Record<string, Condition>; photos: Record<string, readonly unknown[]>; photoLost?: readonly string[] },
-  groups: readonly Pick<RubricItem, "name" | "conditionOverride">[] = rubricGroupsForLocation(location.type)
+  groups: readonly Pick<RubricItem, "name" | "conditionOverride" | "derived">[] = rubricGroupsForLocation(location.type)
 ): string[] {
   return groups
-    .filter((g) => isUnsafe(g, location.scores[g.name]) && !(location.photos[g.name]?.length) && !location.photoLost?.includes(g.name))
+    // W56: a derived item's evidence is its own question's photo (drilling card, Review page).
+    .filter((g) => !g.derived && isUnsafe(g, location.scores[g.name]) && !(location.photos[g.name]?.length) && !location.photoLost?.includes(g.name))
     .map((g) => g.name);
 }
 

@@ -224,6 +224,8 @@ export interface CapturedSchool {
    * campus once (its latest survey, FR-DASH-2); the list shows every survey so none looks lost.
    */
   earlier?: EarlierSurvey[];
+  /** v2 (W56): items marked Unsafe anywhere in the survey (Wall Unsafe alone doesn't count), e.g. ["Column"]. */
+  unsafeItems?: string[];
 }
 
 export interface EarlierSurvey {
@@ -232,6 +234,8 @@ export interface EarlierSurvey {
   overall: number;
   band: RatingBand;
   submittedBy: string;
+  /** v2 (W56): as CapturedSchool.unsafeItems. */
+  unsafeItems?: string[];
 }
 
 /** v1 DashboardData (src/lib/sheets/dashboard.ts). */

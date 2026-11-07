@@ -1,4 +1,4 @@
-import { RUBRIC_VERSION, columnCheckApplies, submissionIssues, submittedSurveySchema, unsafeWithoutPhoto } from '@mqi/shared';
+import { RUBRIC_VERSION, columnCheckApplies, scoreSurveyFor, submissionIssues, submittedSurveySchema, unsafeWithoutPhoto, withDerivedScores } from '@mqi/shared';
 import type { AttachmentMeta, RuleIssue, ScoreResult, SubmittedSurvey } from '@mqi/shared';
 import { getPhoto } from './offline/db';
 import type { SurveyState } from './survey-context';
@@ -21,7 +21,8 @@ type SubmitState = SurveyState & { reviewPhotos: Record<string, PhotoAsset[]> };
 /** W47: the note recorded on an item whose photo the app lost and that was not retaken. */
 export const PHOTO_LOST_NOTE = 'Photo lost on the phone by an app fault (W46) and not retaken; rating kept.';
 
-export async function buildSubmission(state: SubmitState, result: ScoreResult): Promise<Submission> {
+/** W56: `_screenResult` is what the screen showed; the survey is scored here, with the items derived from the drilling and overflow answers. */
+export async function buildSubmission(state: SubmitState, _screenResult?: ScoreResult): Promise<Submission> {
   if (!state.school || !state.surveyId) throw new Error('No survey in progress');
   const endTime = new Date().toISOString();
   const endMs = Date.parse(endTime);
@@ -82,6 +83,10 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
     if (ids.length) reviewPhotos[itemName] = ids;
   }
 
+  // W56: Roof locations carry the items scored from the drilling card and the overflow answer.
+  const scoredLocations = withDerivedScores(locations, state.drillingCheck, state.siteChecks);
+  const result = scoreSurveyFor(scoredLocations, RUBRIC_VERSION);
+
   const survey: SubmittedSurvey = {
     id: state.surveyId,
     rubricVersion: RUBRIC_VERSION,
@@ -99,7 +104,7 @@ export async function buildSubmission(state: SubmitState, result: ScoreResult): 
     complaints: state.complaints,
     declaration: true,
     ...(state.levels ? { levels: state.levels } : {}),
-    locations,
+    locations: scoredLocations,
     reviewPhotos,
     startTime: state.startTime,
     endTime,

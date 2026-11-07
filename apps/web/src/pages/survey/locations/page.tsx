@@ -10,7 +10,7 @@ import { BottomBar } from "@/components/ui/BottomBar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useSurvey } from "@/lib/survey-context";
 import { applicableLevels, isLocationComplete } from "@/lib/data/items";
-import { scoreSurvey } from "@/lib/scoring";
+import { scoreSurvey, withDerivedScores } from "@/lib/scoring";
 import type { FloorLevel } from "@/lib/types";
 
 /** v2 (W25): fewer locations than this asks for confirmation before Review and submit. */
@@ -30,7 +30,8 @@ export default function FloorPage() {
 
   if (!state.school) return null;
 
-  const result = scoreSurvey(state.scoring.locations);
+  // W56: with the items scored from the drilling card and the overflow answer.
+  const result = scoreSurvey(withDerivedScores(state.scoring.locations, state.drillingCheck, state.siteChecks));
   const totalLocations = state.scoring.locations.length;
   const incompleteLocations = state.scoring.locations.filter((l) => !isLocationComplete(l));
   const canSubmit = totalLocations > 0 && incompleteLocations.length === 0;

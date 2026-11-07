@@ -17,10 +17,10 @@ test('W44/W45: Roof shows Solar Panels; total depth comes first with its guidanc
 
   await page.locator('select').first().selectOption('YES');
   await field(page, 'Drilling point marked').selectOption('YES');
-  await expect(page.getByText('If the total depth is more than 260 mm (10.2 in), remove the roof screed and inspect it.')).toBeVisible();
+  await expect(page.getByText('In case of roof screed (not tassu waterproofing) if the total depth is more than 260 mm (10.2 in) or damaged ceiling concrete/plaster, remove the roof screed and inspect it.')).toBeVisible();
   await field(page, 'Total depth of slab + roof screed/waterproofing (mm)').fill('300');
   await field(page, 'Slab thickness recorded (mm)').fill('150');
-  await field(page, 'Slab thickness assessment').selectOption('Ok');
+  await field(page, 'Slab + Screeding/Waterproofing thickness assessment').selectOption('Ok');
   await page.getByRole('button', { name: /^Safety/ }).click(); // Roof Screeding is a Safety item
   const screed = page.locator('div.py-2\\.5', { hasText: 'Roof Screeding/roof drainage' });
   await expect(screed.getByText(/Marked Unsafe/)).toHaveCount(0);

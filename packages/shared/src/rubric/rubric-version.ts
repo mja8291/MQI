@@ -6,8 +6,9 @@
  *   - "2026-10-27"   items-v20261027.ts
  *   - "2026-10-27.2" items-v20261027-2.ts
  *   - "2026-10-27.3" items-v20261027-3.ts
- *   - "2026-10-28"   current list (31 groups)
+ *   - "2026-10-28"   items-v20261028.ts
+ *   - "2026-11-07"   current list (33 groups)
  * Bump this (and freeze a snapshot of whatever list changed) the next time
  * item names or weights change.
  */
-export const RUBRIC_VERSION = "2026-10-28";
+export const RUBRIC_VERSION = "2026-11-07";

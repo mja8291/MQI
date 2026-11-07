@@ -38,7 +38,7 @@ test('W55: levels need a building level; inches are saved as mm; soffit risk fac
   await field(page, 'Total depth of slab + roof screed/waterproofing (in)').fill('10');
   await expect(page.getByText('= 254 mm')).toBeVisible();
   await field(page, 'Slab thickness recorded (in)').fill('5.5');
-  await field(page, 'Slab thickness assessment').selectOption('Ok');
+  await field(page, 'Slab + Screeding/Waterproofing thickness assessment').selectOption('Ok');
   await field(page, 'Roof screeding thickness recorded (in)').fill('4.5');
   await expect(page.getByText(/110 mm \(4\.3 in\) or more/)).toBeVisible(); // 114.3 mm
   // Back to mm shows the saved mm values.

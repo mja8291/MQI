@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { FileGetResult, FoundSurvey, RubricItem } from "@mqi/shared";
-import { itemLabel } from "@mqi/shared";
+import { SLAB_ASSESSMENT_QUESTION, itemLabel } from "@mqi/shared";
 import { ScreenShell } from "@/components/ui/ScreenShell";
 import { TopBar } from "@/components/ui/TopBar";
 import { api } from "@/lib/api";
@@ -135,7 +135,7 @@ function AssessmentContent() {
             <Row label="Drilling point marked" value={d.pointMarked} />
             <Row label="Total depth" value={d.totalDepthMm ? `${d.totalDepthMm} mm` : ""} />
             <Row label="Slab thickness" value={d.slabThicknessMm ? `${d.slabThicknessMm} mm` : ""} />
-            <Row label="Slab thickness assessment" value={d.slabAssessment} />
+            <Row label={SLAB_ASSESSMENT_QUESTION} value={d.slabAssessment} />
             <Row label="Roof screeding thickness" value={d.screedThicknessMm ? `${d.screedThicknessMm} mm` : ""} />
             <Row label="Hole repaired" value={d.holeRepaired} />
             <Row label="Additional drill holes" value={survey.additionalDrillHoles} />

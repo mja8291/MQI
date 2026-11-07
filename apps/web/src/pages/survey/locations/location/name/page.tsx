@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
 import { uniqueLocationName } from "@mqi/shared";
-import { FLOOR_LEVELS, LOCATION_NAME_OPTIONS, LOCATION_TYPES } from "@/lib/data/items";
+import { FLOOR_LEVELS, LOCATION_CARDS, LOCATION_NAME_OPTIONS, LOCATION_TYPES } from "@/lib/data/items";
 import type { FloorLevel, LocationType } from "@/lib/types";
 
 function isFloorLevel(v: string | null): v is FloorLevel {
@@ -26,26 +26,28 @@ function LocationNameContent() {
   const typeParam = params.get("type");
   const floor = isFloorLevel(floorParam) ? floorParam : null;
   const type = isLocationType(typeParam) ? typeParam : null;
+  // W56: a card standing for several types; the name picked decides the type.
+  const card = LOCATION_CARDS.find((c) => c.label === params.get("card")) ?? null;
   const [name, setName] = useState("");
 
   useEffect(() => {
-    if (!floor || !type) router.replace("/survey/locations");
+    if (!floor || (!type && !card)) router.replace("/survey/locations");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [floor, type]);
+  }, [floor, type, card]);
 
-  if (!floor || !type) return null;
+  if (!floor || (!type && !card)) return null;
 
-  const options = LOCATION_NAME_OPTIONS[type] ?? [];
+  const options = card ? Object.keys(card.names) : (LOCATION_NAME_OPTIONS[type!] ?? []);
 
   function start() {
-    locSetLocationType(floor!, type!);
+    locSetLocationType(floor!, card ? card.names[name]! : type!);
     locSetLocationName(name);
     router.push("/survey/locations/category");
   }
 
   return (
     <ScreenShell>
-      <TopBar title={type} onBack={() => router.push(`/survey/locations/location?floor=${encodeURIComponent(floor)}`)} />
+      <TopBar title={card ? card.label : type!} onBack={() => router.push(`/survey/locations/location?floor=${encodeURIComponent(floor)}`)} />
       <Field label="Location">
         <select
           value={name}

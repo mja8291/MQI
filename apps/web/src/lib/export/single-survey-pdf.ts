@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { CATEGORY_WEIGHT } from "@/lib/scoring";
 import { formatDurationFriendly } from "@/lib/format-duration";
 import type { Category, DrillingCheck, RubricItem, SiteChecks } from "@/lib/types";
+import { SLAB_ASSESSMENT_QUESTION } from "@mqi/shared";
 
 export interface SingleSurveyPdfInput {
   surveyId: string;
@@ -119,7 +120,7 @@ export async function buildSingleSurveyPdf(input: SingleSurveyPdfInput): Promise
     ["Drilling point marked", input.drillingCheck.pointMarked || "—"],
     ...(input.drillingCheck.totalDepthMm ? ([["Total depth (slab + screed)", `${input.drillingCheck.totalDepthMm} mm`]] as [string, string][]) : []),
     ["Slab thickness", input.drillingCheck.slabThicknessMm ? `${input.drillingCheck.slabThicknessMm} mm` : "—"],
-    ["Slab thickness assessment", input.drillingCheck.slabAssessment || "—"],
+    [SLAB_ASSESSMENT_QUESTION, input.drillingCheck.slabAssessment || "—"],
     ["Roof screeding thickness", input.drillingCheck.screedThicknessMm ? `${input.drillingCheck.screedThicknessMm} mm` : "—"],
     ["Hole repaired (grout/epoxy)", input.drillingCheck.holeRepaired || "—"],
     ...(input.additionalDrillHoles ? ([["Additional drill holes", input.additionalDrillHoles]] as [string, string][]) : []),

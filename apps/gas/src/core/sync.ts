@@ -17,6 +17,7 @@ import type { Ctx } from './context';
 import { AppError, fail } from './errors';
 import { withLock } from './lock';
 import { appendByHeader, findRows } from './responses';
+import { forgetDashboard } from './reads';
 import { Table } from './system';
 
 /**
@@ -139,6 +140,7 @@ function pushOne(ctx: Ctx, item: PushItem): PushResult {
       const already = recovering && findRows(ctx.env, RESPONSES_TAB, 'Survey ID', idSet).length > 0;
       if (!already) appendByHeader(ctx.env, RESPONSES_TAB, RESPONSES_HEADER, responseRows(s, { name: me.name, email: me.email }, ctx.nowIso));
       row = ledger.update(s.id, { rowsWritten: 'TRUE', updatedAt: ctx.nowIso });
+      forgetDashboard(ctx.env);
     }
     if (row.notesWritten !== 'TRUE') {
       const notes = noteRows(s);

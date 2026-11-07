@@ -1,8 +1,8 @@
 import type { CapturedSchool, DashboardData, FoundSurvey } from './api';
 import { CRITICAL_ITEMS, aggregateLocations, ratingBand } from './scoring';
 import { criticalColumn } from './sheets';
-import { rubricGroupsFor } from './rubric/versions';
-import { cellCondition } from './rubric/items';
+import { KNOWN_RUBRIC_VERSIONS, rubricGroupsFor } from './rubric/versions';
+import { cellCondition, isUnsafe } from './rubric/items';
 import type { Condition, DrillingCheck, SurveyLocation, RatingBand, School, SiteChecks } from './types';
 
 /**
@@ -110,6 +110,32 @@ function num(v: string | undefined): number | null {
 }
 
 /** The only columns buildDashboard reads, so the server can fetch these instead of whole rows. */
+/** v2 (W56): items whose picker has an "Unsafe" button, in a given rubric version. */
+function unsafeCapable(version: string | null | undefined) {
+  return rubricGroupsFor(version).filter((g) => g.conditionOverride?.some((o) => o.label === 'Unsafe'));
+}
+/** Every column, across rubric versions, that can hold an Unsafe answer. */
+export const UNSAFE_ITEM_COLUMNS: readonly string[] = [...new Set(KNOWN_RUBRIC_VERSIONS.flatMap((v) => unsafeCapable(v).map((g) => g.name)))];
+
+/**
+ * v2 (W56): the items marked Unsafe on one response row (one location). "Wall Unsafe" alone
+ * doesn't make a campus Unsafe (requested 2026-11-07); "Column Unsafe" does.
+ */
+export function unsafeItemsInRow(r: SheetRow): string[] {
+  const out: string[] = [];
+  for (const g of unsafeCapable(r['Rubric Version'])) {
+    const cell = (r[g.name] ?? '').trim();
+    if (!cell) continue;
+    if (g.unsafeParts && /\bUnsafe\b/.test(cell)) {
+      // "Column Unsafe, Wall Unsafe" (W21)
+      for (const part of cell.split(',').map((p) => p.trim().replace(/\s*Unsafe$/, ''))) if (part && part !== 'Wall') out.push(part);
+      continue;
+    }
+    if (isUnsafe(g, cellCondition(cell))) out.push(g.label ?? g.name);
+  }
+  return out;
+}
+
 export const DASHBOARD_COLUMNS: readonly string[] = [
   'Survey ID',
   'School ID',
@@ -123,6 +149,9 @@ export const DASHBOARD_COLUMNS: readonly string[] = [
   'Minor Score',
   'Submitted By',
   ...CRITICAL_ITEMS.map(criticalColumn),
+  // W56: to flag Unsafe campuses.
+  'Rubric Version',
+  ...UNSAFE_ITEM_COLUMNS,
 ];
 
 function rowToCaptured(r: SheetRow): CapturedSchool | null {
@@ -156,19 +185,40 @@ export function buildDashboard(totalSchools: number, rows: readonly SheetRow[]):
   // Every location row repeats the campus scores: one row per Survey ID is the rollup.
   const seenSurveyIds = new Set<string>();
   const surveys: CapturedSchool[] = [];
+  // W56: Unsafe items over every location row of a survey.
+  const unsafeBySurvey = new Map<string, Set<string>>();
   for (const r of rows) {
     const surveyId = r['Survey ID'];
+    if (surveyId) {
+      const found = unsafeItemsInRow(r);
+      if (found.length) {
+        const set = unsafeBySurvey.get(surveyId) ?? new Set<string>();
+        for (const item of found) set.add(item);
+        unsafeBySurvey.set(surveyId, set);
+      }
+    }
     if (surveyId && seenSurveyIds.has(surveyId)) continue;
     if (surveyId) seenSurveyIds.add(surveyId);
     const s = rowToCaptured(r);
     if (s) surveys.push(s);
+  }
+  for (const s of surveys) {
+    const unsafe = unsafeBySurvey.get(s.surveyId);
+    if (unsafe) s.unsafeItems = [...unsafe];
   }
   // Latest submission per school (FR-DASH-2) carries the figures; W53: the others ride along.
   const bySchool = new Map<string, CapturedSchool[]>();
   for (const s of surveys) bySchool.set(s.schoolId, [...(bySchool.get(s.schoolId) ?? []), s]);
   const captured = [...bySchool.values()].map((list) => {
     const [latest, ...rest] = [...list].sort((a, b) => b.date.localeCompare(a.date));
-    const earlier = rest.map((s) => ({ surveyId: s.surveyId, date: s.date, overall: s.overall, band: s.band, submittedBy: s.submittedBy ?? '' }));
+    const earlier = rest.map((s) => ({
+      surveyId: s.surveyId,
+      date: s.date,
+      overall: s.overall,
+      band: s.band,
+      submittedBy: s.submittedBy ?? '',
+      ...(s.unsafeItems ? { unsafeItems: s.unsafeItems } : {}),
+    }));
     return earlier.length ? { ...latest!, earlier } : latest!;
   });
 

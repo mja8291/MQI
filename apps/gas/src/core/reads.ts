@@ -37,6 +37,11 @@ const SCHOOLS_TTL = 30 * 60;
 /** FR-DASH-3: the dashboard is cached on the server for 5 minutes. */
 const DASHBOARD_TTL = 5 * 60;
 
+/** W56: a newly written survey shows on the dashboard at once (the cached copy is dropped). */
+export function forgetDashboard(env: Env): void {
+  env.cache.remove('dashboard');
+}
+
 export function schools(ctx: Ctx): SchoolsResult {
   // 'schools.v2': the list now carries campus details; the key change drops lists cached before.
   return cached(ctx.env, 'schools.v2', SCHOOLS_TTL, () => ({ schools: parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()) }));

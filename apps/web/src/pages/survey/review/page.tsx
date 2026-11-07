@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
 import { useAuth } from "@/lib/auth/client";
-import { RUBRIC_VERSION, itemsCovered } from "@mqi/shared";
+import { RUBRIC_VERSION, itemsCovered, withDerivedScores } from "@mqi/shared";
 import { CATEGORIES, CRITICAL_ITEMS, ratingBand, scoreSurvey } from "@/lib/scoring";
 import { isLocationComplete } from "@/lib/data/items";
 import {
@@ -129,11 +129,14 @@ export default function ReviewPage() {
   }, [hydrated, state.school, state.started, state.scoring.locations, router]);
 
   // v2 (W22): rubric groups scored at least once.
-  const coverage = itemsCovered(state.scoring.locations, RUBRIC_VERSION);
-  const result = useMemo(
-    () => scoreSurvey(state.scoring.locations),
-    [state.scoring.locations]
+  // W56: with the items scored from the drilling card and the overflow answer on this page.
+  const scoredLocations = useMemo(
+    () => withDerivedScores(state.scoring.locations, drilling, site),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.scoring.locations, drilling.done, drilling.slabAssessment, drilling.extraHoles, site.overflowDisposal]
   );
+  const coverage = itemsCovered(scoredLocations, RUBRIC_VERSION);
+  const result = useMemo(() => scoreSurvey(scoredLocations), [scoredLocations]);
 
   // A snapshot, not a live tick — Date.now() can't be called during render
   // (react-hooks/purity), and setState can't be called synchronously in an

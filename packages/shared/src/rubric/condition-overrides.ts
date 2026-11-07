@@ -21,6 +21,12 @@ export const SOUNDNESS_GUIDANCE =
 export const WALL_COLUMN_GUIDANCE =
   "Consider minor surface cracks (one sided, crazing, shrinkage, hairline cracks) in plaster item rating.";
 
+/** v2 (W56): "Proper Overflow Disposal System" — YES = Good (100%), NO = Very Poor (25%), like OK/Unsafe. */
+export const YES_NO: NonNullable<RubricItem["conditionOverride"]> = [
+  { condition: "Good", label: "YES" },
+  { condition: "Very Poor", label: "NO" },
+];
+
 export const ROOF_ACCESS: NonNullable<RubricItem["conditionOverride"]> = [
   { condition: "Good", label: "Roof Access Available" },
   { condition: "Very Poor", label: "Roof Access Not Available" },

@@ -1,4 +1,4 @@
-import { RUBRIC_VERSION, columnCheckApplies, columnCheckLine, drillHolesText, itemsCovered } from "@mqi/shared";
+import { RUBRIC_VERSION, columnCheckApplies, columnCheckLine, drillHolesText, itemsCovered, withDerivedScores } from "@mqi/shared";
 
 import { buildSingleSurveyWorkbook } from "./single-survey-workbook";
 import { buildSingleSurveyPdf } from "./single-survey-pdf";
@@ -6,6 +6,10 @@ import { aggregateLocations, ratingBand } from "@/lib/scoring";
 import { RUBRIC_GROUPS } from "@/lib/data/items";
 import type { SurveyState } from "@/lib/survey-context";
 import type { DrillingCheck, ScoreResult, SiteChecks } from "@/lib/types";
+
+/** W56: the draft's locations with the items scored from the drilling and overflow answers. */
+const scored = (state: SurveyState, drilling: DrillingCheck = state.drillingCheck, site: SiteChecks = state.siteChecks) =>
+  withDerivedScores(state.scoring.locations, drilling, site);
 
 /**
  * Pre-submission export fallback (Round 3 Task 9): if submission is
@@ -69,9 +73,9 @@ export async function buildDraftExcelBlob({ state }: DraftExportParams): Promise
     startTime: state.startTime ?? "",
     endTime: "",
     timeTakenSeconds: liveElapsedSeconds(state),
-    itemsCoveredPercent: itemsCovered(state.scoring.locations, RUBRIC_VERSION).percent,
+    itemsCoveredPercent: itemsCovered(scored(state), RUBRIC_VERSION).percent,
     conditions: {},
-    aggregatedScores: aggregateLocations(state.scoring.locations),
+    aggregatedScores: aggregateLocations(scored(state)),
     items: RUBRIC_GROUPS,
   });
 
@@ -111,7 +115,7 @@ export async function buildDraftPdfBlob({
 }: DraftExportParams): Promise<Blob> {
   const items = RUBRIC_GROUPS;
   const itemValues: Record<string, string> = Object.fromEntries(
-    Object.entries(aggregateLocations(state.scoring.locations)).map(([name, score]) => [
+    Object.entries(aggregateLocations(scored(state, drillingCheck, siteChecks))).map(([name, score]) => [
       name,
       `Aggregated (${Math.round(score)}%)`,
     ])
@@ -126,7 +130,7 @@ export async function buildDraftPdfBlob({
     startTime: state.startTime ?? "",
     endTime: "",
     timeTakenSeconds: liveElapsedSeconds(state),
-    itemsCoveredPercent: itemsCovered(state.scoring.locations, RUBRIC_VERSION).percent,
+    itemsCoveredPercent: itemsCovered(scored(state, drillingCheck, siteChecks), RUBRIC_VERSION).percent,
     apm: state.apm,
     asm: state.asm,
     principal: state.principal,

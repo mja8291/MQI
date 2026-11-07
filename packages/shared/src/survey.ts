@@ -2,6 +2,8 @@ import { z } from 'zod';
 import { RISK_FACTOR_OPTIONS } from './rubric/content';
 import { FLOOR_LEVELS, LOCATION_TYPES, isLocationComplete, unsafeWithoutPhoto } from './rubric/items';
 import { rubricGroupsFor } from './rubric/versions';
+import { DERIVED_ITEMS, derivedScores } from './rubric/derived';
+import { RUBRIC_VERSION } from './rubric/rubric-version';
 import {
   SITE_PHOTO_DRILLING_POINT,
   SITE_PHOTO_RAIN_SPOUTS,
@@ -177,7 +179,14 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
   const groups = rubricGroupsFor(s.rubricVersion);
   const groupNames = new Set(groups.map((g) => g.name));
   const names = new Set<string>();
+  // W56: items scored from the drilling card and the overflow answer must match those answers.
+  const derived = s.rubricVersion === RUBRIC_VERSION ? derivedScores(s.drillingCheck, s.siteChecks) : null;
   s.locations.forEach((loc, i) => {
+    if (derived)
+      for (const item of DERIVED_ITEMS) {
+        const expected = loc.type === 'Roof' ? derived[item] : undefined;
+        need(loc.scores[item] === expected, `locations.${i}.scores`, `${loc.name}: "${item}" does not match the survey answers. Update the app and submit again.`);
+      }
     need(!names.has(loc.name), `locations.${i}.name`, `Two locations are both named "${loc.name}".`);
     names.add(loc.name);
     need(isLocationComplete(loc), `locations.${i}`, `Score every item at ${loc.name}.`);

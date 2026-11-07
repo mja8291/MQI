@@ -42,8 +42,22 @@ import {
   uniqueLocationName,
   buildDashboard,
   DASHBOARD_COLUMNS,
+  withDerivedScores,
 } from './index';
 import type { SurveyLocation, SubmittedSurvey } from './index';
+
+/** W56: as the phone builds it — Roof locations carry the derived items, scores from the final locations. */
+function asPhone(s: SubmittedSurvey, keepScores: boolean): SubmittedSurvey {
+  const locations = withDerivedScores(s.locations, s.drillingCheck, s.siteChecks);
+  if (keepScores) return { ...s, locations };
+  const r = scoreSurveyFor(locations, s.rubricVersion);
+  return {
+    ...s,
+    locations,
+    scores: { overall: r.overall, functionality: r.categories.Functionality.score, safety: r.categories.Safety.score, aesthetics: r.categories.Aesthetics.score, major: r.major, minor: r.minor, criticalItems: r.criticalItems },
+  };
+}
+
 
 const rnd = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 37 + 11) % 256);
 
@@ -59,9 +73,9 @@ describe('rubric data', () => {
     }
   });
 
-  test('current list matches TRD Appendix A (31 groups: Safety 9, Functionality 15, Aesthetics 7)', () => {
-    expect(RUBRIC_GROUPS).toHaveLength(31);
-    expect(RUBRIC_GROUPS.filter((g) => g.category === 'Safety')).toHaveLength(9);
+  test('current list matches the 2026-11-07 rubric sheet (33 groups: Safety 11, Functionality 15, Aesthetics 7)', () => {
+    expect(RUBRIC_GROUPS).toHaveLength(33);
+    expect(RUBRIC_GROUPS.filter((g) => g.category === 'Safety')).toHaveLength(11);
     expect(RUBRIC_GROUPS.filter((g) => g.category === 'Functionality')).toHaveLength(15);
     expect(RUBRIC_GROUPS.filter((g) => g.category === 'Aesthetics')).toHaveLength(7);
     expect(RUBRIC_GROUPS.every((g) => (g.category === 'Safety') === (g.aggregation === 'worst'))).toBe(true);
@@ -109,6 +123,9 @@ describe('scoring (unchanged v1 formulas)', () => {
 });
 
 function survey(overrides: Partial<SubmittedSurvey> = {}): SubmittedSurvey {
+  return asPhone(rawSurvey(overrides), Boolean(overrides.scores));
+}
+function rawSurvey(overrides: Partial<SubmittedSurvey> = {}): SubmittedSurvey {
   const locations = [
     loc('Roof', 'Roof 1', {
       'Access to roof area /tanks': 'Good',
@@ -289,7 +306,7 @@ describe('submission rules (Appendix C)', () => {
   test('W22: items covered = groups scored (not N/A) at least once / all groups', () => {
     const s = survey();
     const c = itemsCovered(s.locations, RUBRIC_VERSION);
-    expect(c.total).toBe(31);
+    expect(c.total).toBe(33);
     expect(c.covered).toBe(Object.values(s.locations[0]!.scores).filter((v) => v !== 'N/A').length);
     const row = responseRows(s, { name: 'S', email: 's@tcf.test' }, '2026-10-28T05:00:00.000Z')[0]!;
     expect(row['Items Covered (%)']).toBe(String(Math.round(c.percent)));
