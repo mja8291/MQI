@@ -24,4 +24,6 @@ export const LOCATION_ICONS: Record<LocationType, LucideIcon> = {
   // W56: the External floor shows both behind one "Guardroom/Canteen & UGWT" card.
   Guardroom: ShieldCheck,
   "Canteen & UGWT": ShieldCheck,
+  Canteen: ShieldCheck,
+  UGWT: ShieldCheck,
 };

@@ -71,7 +71,11 @@ const OTHER_ROOM: LocationType = "Other Room (Staff, Principal, Admin, Store etc
 const LAB: LocationType = "Lab (Wet/Dry/DLP)";
 /** v2 (W56): on the External floor, behind one "Guardroom/Canteen & UGWT" card. */
 const GUARDROOM: LocationType = "Guardroom";
-const CANTEEN: LocationType = "Canteen & UGWT";
+/** W56's single type for both; kept so its surveys (and phones not yet updated) still check out. */
+const CANTEEN_UGWT_W56: LocationType = "Canteen & UGWT";
+/** v2 (W58): Canteen = Other Room's items less Green board; UGWT = Other Room's Safety items, External Plumbing and Plaster. */
+const CANTEEN: LocationType = "Canteen";
+const UGWT: LocationType = "UGWT";
 
 /** v2 (W56): scored from the drilling card and the Review page, not picked at the Roof location. */
 export const SLAB_ASSESSMENT_ITEM = "Slab + Screeding/Waterproofing thickness assessment";
@@ -277,14 +281,21 @@ const SHEET_GROUPS: RubricGroup[] = [
  * v2 (W56): Guardroom is scored on every item a Toilet is; Canteen & UGWT on every item an Other
  * Room is (requested 2026-11-07; the sheet's Location column doesn't list them).
  */
-export const RUBRIC_GROUPS: RubricGroup[] = SHEET_GROUPS.map((g) => ({
-  ...g,
-  locations: [
-    ...g.locations,
-    ...(g.locations.includes(TOILET) ? [GUARDROOM] : []),
-    ...(g.locations.includes(OTHER_ROOM) ? [CANTEEN] : []),
-  ],
-}));
+export const RUBRIC_GROUPS: RubricGroup[] = SHEET_GROUPS.map((g) => {
+  const otherRoom = g.locations.includes(OTHER_ROOM);
+  return {
+    ...g,
+    locations: [
+      ...g.locations,
+      ...(g.locations.includes(TOILET) ? [GUARDROOM] : []),
+      ...(otherRoom ? [CANTEEN_UGWT_W56] : []),
+      // W58 (2026-11-07): Canteen has no Green board/Softboard/Cabinet.
+      ...(otherRoom && g.name !== "Green board/Softboard/Cabinet" ? [CANTEEN] : []),
+      // W58: UGWT keeps Other Room's Safety items and Plaster; its only Functionality item is External Plumbing; no Paint.
+      ...((otherRoom && (g.category === "Safety" || g.name === "Plaster")) || g.name === "External Plumbing" ? [UGWT] : []),
+    ],
+  };
+});
 
 /** Display order of a location's scoring sections. */
 export const RUBRIC_SECTIONS: Category[] = ["Safety", "Functionality", "Aesthetics"];
@@ -299,7 +310,9 @@ export const LOCATION_TYPES: LocationType[] = [
   OTHER_ROOM,
   LAB,
   GUARDROOM,
+  CANTEEN_UGWT_W56,
   CANTEEN,
+  UGWT,
 ];
 
 export const FLOOR_LEVELS: FloorLevel[] = ["External", "Ground", "First", "Second", "Third", "Fourth", "Roof"];
@@ -330,7 +343,7 @@ const GROUND_LIKE_TYPES: LocationType[] = [CLASSROOM, CORRIDOR, TOILET, OTHER_RO
 
 /** Which location types are offered on a given floor. Empty = skip the Location page (Roof floor only). */
 export const FLOOR_LOCATION_TYPES: Record<FloorLevel, LocationType[]> = {
-  External: [FACADE, EXT_DEV, GUARDROOM, CANTEEN],
+  External: [FACADE, EXT_DEV, GUARDROOM, CANTEEN, UGWT],
   Ground: GROUND_LIKE_TYPES,
   First: GROUND_LIKE_TYPES,
   Second: GROUND_LIKE_TYPES,
@@ -396,11 +409,22 @@ export function rubricGroupsForLocation(type: LocationType): RubricGroup[] {
  * v2 (W56): location types offered together behind one card, the name picked deciding the type.
  * On the External floor: "Guardroom/Canteen & UGWT" → Guardroom, Canteen or UGWT.
  */
-export const LOCATION_CARDS: { label: string; names: Record<string, LocationType> }[] = [
-  { label: "Guardroom/Canteen & UGWT", names: { Guardroom: GUARDROOM, Canteen: CANTEEN, UGWT: CANTEEN } },
+export const LOCATION_CARDS: { label: string; names: Record<string, LocationType>; legacy?: LocationType[] }[] = [
+  { label: "Guardroom/Canteen & UGWT", names: { Guardroom: GUARDROOM, Canteen: CANTEEN, UGWT: UGWT }, legacy: [CANTEEN_UGWT_W56] },
 ];
 export function locationCardFor(type: LocationType): (typeof LOCATION_CARDS)[number] | undefined {
-  return LOCATION_CARDS.find((c) => Object.values(c.names).includes(type));
+  return LOCATION_CARDS.find((c) => Object.values(c.names).includes(type) || c.legacy?.includes(type));
+}
+
+/**
+ * v2 (W58): a draft location of W56's "Canteen & UGWT" type becomes Canteen or UGWT by its name,
+ * keeping only the scores that type has (the rest is scored again where needed). Photos and notes stay.
+ */
+export function migrateLocationType<L extends { type: LocationType; name: string; scores: Record<string, Condition> }>(loc: L): L {
+  if (loc.type !== CANTEEN_UGWT_W56) return loc;
+  const type: LocationType = /^UGWT\b/i.test(loc.name) ? UGWT : CANTEEN;
+  const keep = new Set(rubricGroupsForLocation(type).map((g) => g.name));
+  return { ...loc, type, scores: Object.fromEntries(Object.entries(loc.scores).filter(([name]) => keep.has(name))) as Record<string, Condition> };
 }
 
 /** True once every item group applicable to this location has a score — the same completeness rule the scoring page enforces, applied to a whole recorded location at once. */

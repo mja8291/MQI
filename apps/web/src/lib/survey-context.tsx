@@ -17,7 +17,7 @@ import type {
 } from "@/lib/types";
 import type { ColumnCheck } from "@mqi/shared";
 import { UNNAMED_LOCATION_TYPES } from "@/lib/data/items";
-import { uuidv7, repairLocations, uniqueLocationName } from "@mqi/shared";
+import { uuidv7, migrateLocationType, repairLocations, uniqueLocationName } from "@mqi/shared";
 
 interface CurrentLocation {
   floorLevel: FloorLevel;
@@ -457,8 +457,12 @@ function reducer(state: SurveyState, action: Action): SurveyState {
         // W52: surveys saved before names were numbered may list two locations with one name (or
         // the same location twice); Submit refused them with no way to fix it. Repaired here.
         const loaded = { ...initialState(), ...action.state };
-        const locations = repairLocations(loaded.scoring.locations);
-        return locations === loaded.scoring.locations ? loaded : { ...loaded, scoring: { ...loaded.scoring, locations } };
+        // W58: W56's "Canteen & UGWT" locations become Canteen or UGWT, with only that type's items.
+        const migrated = loaded.scoring.locations.map(migrateLocationType);
+        const current = loaded.scoring.current && loaded.scoring.current.type ? migrateLocationType(loaded.scoring.current as typeof loaded.scoring.current & { type: LocationType }) : loaded.scoring.current;
+        const changedType = current !== loaded.scoring.current || migrated.some((l, i) => l !== loaded.scoring.locations[i]);
+        const locations = repairLocations(migrated);
+        return locations === loaded.scoring.locations && !changedType ? loaded : { ...loaded, scoring: { ...loaded.scoring, locations, current } };
       }
     case "PRUNE_PHOTOS": {
       const gone = new Set(action.ids);

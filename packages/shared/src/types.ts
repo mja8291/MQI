@@ -220,7 +220,9 @@ export type LocationType =
   | "Other Room (Staff, Principal, Admin, Store etc.)"
   | "Lab (Wet/Dry/DLP)"
   | "Guardroom"
-  | "Canteen & UGWT";
+  | "Canteen & UGWT"
+  | "Canteen"
+  | "UGWT";
 
 /** The first pick — which floor the location being scored is on. */
 export type FloorLevel = "External" | "Ground" | "First" | "Second" | "Third" | "Fourth" | "Roof";

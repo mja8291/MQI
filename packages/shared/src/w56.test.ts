@@ -77,9 +77,10 @@ describe('W56 rubric', () => {
 });
 
 describe('W56 Guardroom / Canteen & UGWT', () => {
-  test('on External behind one card; Guardroom has Toilet items, Canteen & UGWT has Other Room items', () => {
-    expect(FLOOR_LOCATION_TYPES.External).toEqual(expect.arrayContaining(['Guardroom', 'Canteen & UGWT']));
-    expect(LOCATION_CARDS[0]).toEqual({ label: 'Guardroom/Canteen & UGWT', names: { Guardroom: 'Guardroom', Canteen: 'Canteen & UGWT', UGWT: 'Canteen & UGWT' } });
+  test('on External behind one card; Guardroom has Toilet items; the W56 type "Canteen & UGWT" (kept for its surveys) has Other Room items', () => {
+    expect(FLOOR_LOCATION_TYPES.External).toEqual(expect.arrayContaining(['Guardroom', 'Canteen', 'UGWT']));
+    expect(FLOOR_LOCATION_TYPES.External).not.toContain('Canteen & UGWT');
+    expect(LOCATION_CARDS[0]).toEqual({ label: 'Guardroom/Canteen & UGWT', names: { Guardroom: 'Guardroom', Canteen: 'Canteen', UGWT: 'UGWT' }, legacy: ['Canteen & UGWT'] });
     const names = (t: Parameters<typeof rubricGroupsForLocation>[0]) => rubricGroupsForLocation(t).map((g) => g.name);
     expect(names('Guardroom')).toEqual(names('Toilet'));
     expect(names('Canteen & UGWT')).toEqual(names('Other Room (Staff, Principal, Admin, Store etc.)'));
