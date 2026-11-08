@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { migrateLocationType, rubricGroupsForLocation } from './index';
+import { ADDED_LATER, isLocationComplete, migrateLocationType, rubricGroupsForLocation } from './index';
 import type { Condition, LocationType } from './index';
 
 const OTHER: LocationType = 'Other Room (Staff, Principal, Admin, Store etc.)';
@@ -28,5 +28,17 @@ describe('W58 Canteen / UGWT', () => {
     expect(canteen.scores['Green board/Softboard/Cabinet']).toBeUndefined();
     const room = { type: OTHER, name: 'Staff room', scores };
     expect(migrateLocationType(room)).toBe(room);
+  });
+});
+
+/** W59 (2026-11-08): Distribution Board at Guardroom. */
+describe('W59 Guardroom Distribution Board', () => {
+  test('the phone asks for it; the server accepts a Guardroom from a phone not yet updated', () => {
+    expect(names('Guardroom')).toContain('Distribution Board');
+    expect(rubricGroupsForLocation('Guardroom').find((g) => g.name === 'Distribution Board')!.category).toBe('Safety');
+    const old = Object.fromEntries(names('Toilet').map((n) => [n, 'Good'])) as Record<string, Condition>;
+    expect(isLocationComplete({ type: 'Guardroom', scores: old })).toBe(false);
+    expect(isLocationComplete({ type: 'Guardroom', scores: old }, ADDED_LATER)).toBe(true);
+    expect(isLocationComplete({ type: 'Guardroom', scores: { ...old, 'Distribution Board': 'Good' } })).toBe(true);
   });
 });

@@ -53,6 +53,7 @@ test('W56: Guardroom card, derived Roof items in the sheet, Unsafe on the dashbo
   expect([roof[SLAB], roof[OVERFLOW]]).toEqual(['Very Poor', 'Good']);
   expect(guard['Location Name']).toBe('Guardroom');
   expect(guard['Flush Tanks']).toBe('Good');
+  expect(guard['Distribution Board']).toBe('Good'); // W59
   expect(guard[SLAB]).toBe('');
 
   await page.goto('/');

@@ -641,3 +641,17 @@ describe('W57 dashboard read', () => {
     expect(blocks.mock.calls.length).toBeGreaterThan(1);
   });
 });
+
+describe('W59 Guardroom Distribution Board', () => {
+  test('a Guardroom without Distribution Board (phone not yet updated) is accepted; with it, it is written', () => {
+    const t = login('surveyor@tcf.test');
+    const roof = makeSurvey().survey.locations[0]!;
+    const toiletItems = Object.fromEntries(rubricGroupsForLocation('Toilet').map((g) => [g.name, 'Good'])) as SurveyLocation['scores'];
+    const guard = (scores: SurveyLocation['scores']) => ({ id: 'g', floorLevel: 'External' as const, type: 'Guardroom' as const, name: 'Guardroom', photos: {}, notes: {}, scores });
+    const old = makeSurvey({ locations: [roof, guard(toiletItems)] });
+    expect(ok(push(t, old)).results[0]).toMatchObject({ status: 'ok' });
+    const now = makeSurvey({ locations: [roof, guard({ ...toiletItems, 'Distribution Board': 'Good' })] });
+    expect(ok(push(t, now)).results[0]).toMatchObject({ status: 'ok' });
+    expect(rowsFor(now.survey.id).find((r) => r['Location Type'] === 'Guardroom')!['Distribution Board']).toBe('Good');
+  });
+});

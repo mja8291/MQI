@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { RISK_FACTOR_OPTIONS } from './rubric/content';
-import { FLOOR_LEVELS, LOCATION_TYPES, isLocationComplete, unsafeWithoutPhoto } from './rubric/items';
+import { ADDED_LATER, FLOOR_LEVELS, LOCATION_TYPES, isLocationComplete, unsafeWithoutPhoto } from './rubric/items';
 import { rubricGroupsFor } from './rubric/versions';
 import { DERIVED_ITEMS, derivedScores } from './rubric/derived';
 import { RUBRIC_VERSION } from './rubric/rubric-version';
@@ -189,7 +189,8 @@ export function submissionIssues(s: SubmittedSurvey, attachmentIds?: ReadonlySet
       }
     need(!names.has(loc.name), `locations.${i}.name`, `Two locations are both named "${loc.name}".`);
     names.add(loc.name);
-    need(isLocationComplete(loc), `locations.${i}`, `Score every item at ${loc.name}.`);
+    // W59: an item added to a type later is not required here (phones not yet updated); the phone asks for it.
+    need(isLocationComplete(loc, ADDED_LATER), `locations.${i}`, `Score every item at ${loc.name}.`);
     for (const message of columnCheckIssues(loc)) need(false, `locations.${i}.columnCheck`, `${loc.name}: ${message}`);
     for (const item of unsafeWithoutPhoto(loc, groups))
       need(false, `locations.${i}.photos`, `Attach a photo of "${item}" at ${loc.name}: it is marked Unsafe.`);

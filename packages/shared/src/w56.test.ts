@@ -82,7 +82,8 @@ describe('W56 Guardroom / Canteen & UGWT', () => {
     expect(FLOOR_LOCATION_TYPES.External).not.toContain('Canteen & UGWT');
     expect(LOCATION_CARDS[0]).toEqual({ label: 'Guardroom/Canteen & UGWT', names: { Guardroom: 'Guardroom', Canteen: 'Canteen', UGWT: 'UGWT' }, legacy: ['Canteen & UGWT'] });
     const names = (t: Parameters<typeof rubricGroupsForLocation>[0]) => rubricGroupsForLocation(t).map((g) => g.name);
-    expect(names('Guardroom')).toEqual(names('Toilet'));
+    // W59: plus Distribution Board.
+    expect(names('Guardroom')).toEqual(names('Toilet').concat('Distribution Board').sort((a, b) => names('Guardroom').indexOf(a) - names('Guardroom').indexOf(b)));
     expect(names('Canteen & UGWT')).toEqual(names('Other Room (Staff, Principal, Admin, Store etc.)'));
   });
 });

@@ -287,7 +287,8 @@ export const RUBRIC_GROUPS: RubricGroup[] = SHEET_GROUPS.map((g) => {
     ...g,
     locations: [
       ...g.locations,
-      ...(g.locations.includes(TOILET) ? [GUARDROOM] : []),
+      // W59 (2026-11-08): Guardroom also has Distribution Board.
+      ...(g.locations.includes(TOILET) || g.name === "Distribution Board" ? [GUARDROOM] : []),
       ...(otherRoom ? [CANTEEN_UGWT_W56] : []),
       // W58 (2026-11-07): Canteen has no Green board/Softboard/Cabinet.
       ...(otherRoom && g.name !== "Green board/Softboard/Cabinet" ? [CANTEEN] : []),
@@ -444,9 +445,21 @@ export function unsafeWithoutPhoto(
     .map((g) => g.name);
 }
 
-export function isLocationComplete(location: { type: LocationType; scores: Record<string, Condition> }): boolean {
-  return rubricGroupsForLocation(location.type).every((g) => Boolean(location.scores[g.name]));
+export function isLocationComplete(
+  location: { type: LocationType; scores: Record<string, Condition> },
+  /** W59: items the server doesn't require yet (see ADDED_LATER). */
+  excused: Partial<Record<LocationType, readonly string[]>> = {}
+): boolean {
+  return rubricGroupsForLocation(location.type).every((g) => Boolean(location.scores[g.name]) || Boolean(excused[location.type]?.includes(g.name)));
 }
+
+/**
+ * v2 (W59): items added to a location type after it went live. The phone asks for them; the server
+ * accepts a location without them, so a survey from a phone not yet updated isn't refused.
+ */
+export const ADDED_LATER: Partial<Record<LocationType, readonly string[]>> = {
+  Guardroom: ["Distribution Board"],
+};
 
 export function rubricGroupsForLocationAndSection(type: LocationType, section: Category): RubricGroup[] {
   return rubricGroupsForLocation(type).filter((g) => g.category === section);
