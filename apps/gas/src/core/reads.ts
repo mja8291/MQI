@@ -1,5 +1,5 @@
-import { RESPONSES_TAB, cellCondition, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
-import type { DashboardData, ExportRowsResult, FoundSurvey, SchoolsResult, SiblingExternalResult } from '@mqi/shared';
+import { RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import type { Condition, DashboardData, ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import { Table } from './system';
@@ -85,11 +85,12 @@ export function siblingExternal(ctx: Ctx, raw: unknown): SiblingExternalResult {
   if (!me?.eCompoundNo) return { found: null };
   const siblings = new Set(list.filter((s) => s.eCompoundNo === me.eCompoundNo && s.schoolId !== schoolId).map((s) => s.schoolId));
   if (!siblings.size) return { found: null };
-  const rows = rowsAt(ctx.env, RESPONSES_TAB, findRows(ctx.env, RESPONSES_TAB, 'School ID', siblings)).filter(
-    (row) => row['Location Type'] === 'External Development',
+  const all = rowsAt(ctx.env, RESPONSES_TAB, findRows(ctx.env, RESPONSES_TAB, 'School ID', siblings)).sort((a, b) =>
+    (b['Timestamp'] ?? '').localeCompare(a['Timestamp'] ?? ''),
   );
-  const latest = rows.sort((a, b) => (b['Timestamp'] ?? '').localeCompare(a['Timestamp'] ?? ''))[0];
-  if (!latest) return { found: null };
+  const shared = sharedLocations(all);
+  const latest = all.find((row) => row['Location Type'] === 'External Development');
+  if (!latest) return { found: null, shared };
   const groups = rubricGroupsForLocation('External Development').map((g) => g.name);
   const scores: Record<string, string> = {};
   for (const name of groups) {
@@ -104,5 +105,38 @@ export function siblingExternal(ctx: Ctx, raw: unknown): SiblingExternalResult {
       date: latest['Timestamp'] ?? '',
       scores,
     },
+    shared,
   };
+}
+
+/**
+ * v2 (W60): the latest sibling Guardroom / Canteen / UGWT, one per type and name (rows newest first).
+ * W56's "Canteen & UGWT" rows count as Canteen or UGWT by their name. Unsafe answers are not copied.
+ */
+function sharedLocations(rows: readonly Record<string, string>[]): SharedLocation[] {
+  const out = new Map<string, SharedLocation>();
+  for (const row of rows) {
+    const rowType = row['Location Type'] as LocationType;
+    if (!SHARED_LOCATION_TYPES.includes(rowType)) continue;
+    const name = (row['Location Name'] ?? '').trim();
+    const raw: Record<string, Condition> = {};
+    for (const g of rubricGroupsForLocation(rowType)) {
+      const value = cellCondition(row[g.name] ?? '');
+      if (value) raw[g.name] = value;
+    }
+    const { type, scores: all } = migrateLocationType({ type: rowType, name, scores: raw });
+    const key = `${type}|${name.toLowerCase()}`;
+    if (out.has(key)) continue;
+    const groups = rubricGroupsForLocation(type);
+    const scores: Record<string, string> = {};
+    const unsafeThere: string[] = [];
+    for (const [item, value] of Object.entries(all)) {
+      const g = groups.find((x) => x.name === item);
+      if (!g) continue;
+      if (isUnsafe(g, value) || /\bUnsafe\b/.test(row[item] ?? '')) unsafeThere.push(item);
+      else scores[item] = value;
+    }
+    out.set(key, { type, name, campusName: row['Campus Name'] ?? '', date: row['Timestamp'] ?? '', scores, unsafeThere });
+  }
+  return [...out.values()];
 }

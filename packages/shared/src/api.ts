@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Role } from './permissions';
 import { ROLES } from './permissions';
 import { attachmentSchema, submittedSurveySchema } from './survey';
-import type { RatingBand, RubricItem, School } from './types';
+import type { LocationType, RatingBand, RubricItem, School } from './types';
 import type { DrillingCheck, SiteChecks } from './types';
 
 /**
@@ -262,7 +262,22 @@ export type SchoolsResult = { schools: School[] };
 export const siblingExternalPayload = z.object({ schoolId: z.string().min(1).max(64) });
 export type SiblingExternalResult = {
   found: { campusName: string; schoolId: string; surveyId: string; date: string; scores: Record<string, string> } | null;
+  /**
+   * v2 (W60): Guardroom, Canteen and UGWT are shared by an e-compound too: the latest of each
+   * (by type and name) recorded for a sibling campus. Unsafe answers are left out (they need this
+   * campus's own photo). Absent from servers before W60.
+   */
+  shared?: SharedLocation[];
 };
+export interface SharedLocation {
+  type: LocationType;
+  name: string;
+  campusName: string;
+  date: string;
+  scores: Record<string, string>;
+  /** Items answered Unsafe at the sibling, left for the surveyor to check here. */
+  unsafeThere: string[];
+}
 
 // ---- admin ----
 

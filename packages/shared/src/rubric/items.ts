@@ -413,6 +413,9 @@ export function rubricGroupsForLocation(type: LocationType): RubricGroup[] {
 export const LOCATION_CARDS: { label: string; names: Record<string, LocationType>; legacy?: LocationType[] }[] = [
   { label: "Guardroom/Canteen & UGWT", names: { Guardroom: GUARDROOM, Canteen: CANTEEN, UGWT: UGWT }, legacy: [CANTEEN_UGWT_W56] },
 ];
+/** v2 (W60): location types an e-compound's campuses share; a sibling campus's latest one pre-fills. */
+export const SHARED_LOCATION_TYPES: readonly LocationType[] = [GUARDROOM, CANTEEN, UGWT, CANTEEN_UGWT_W56];
+
 export function locationCardFor(type: LocationType): (typeof LOCATION_CARDS)[number] | undefined {
   return LOCATION_CARDS.find((c) => Object.values(c.names).includes(type) || c.legacy?.includes(type));
 }

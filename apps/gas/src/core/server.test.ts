@@ -655,3 +655,31 @@ describe('W59 Guardroom Distribution Board', () => {
     expect(rowsFor(now.survey.id).find((r) => r['Location Type'] === 'Guardroom')!['Distribution Board']).toBe('Good');
   });
 });
+
+describe('W60 sibling Guardroom / Canteen / UGWT', () => {
+  test('the latest of each by name comes with the sibling answer; Unsafe answers are left out; W56 rows count by name', () => {
+    const surveyor = login('surveyor@tcf.test');
+    const sibling = () => ok(call<SiblingExternalResult>('schools.siblingExternal', { schoolId: '948' }, surveyor));
+    expect(sibling().shared).toEqual([]);
+    const roof = makeSurvey().survey.locations[0]!;
+    const all = (t: SurveyLocation['type']) => Object.fromEntries(rubricGroupsForLocation(t).map((g) => [g.name, 'Good'])) as SurveyLocation['scores'];
+    const loc = (type: SurveyLocation['type'], name: string, scores: SurveyLocation['scores'], photos: Loc['photos'] = {}) =>
+      ({ id: name, floorLevel: 'External' as const, type, name, scores, photos, notes: {} });
+    const photoId = ids();
+    const guard = loc('Guardroom', 'Guardroom', { ...all('Guardroom'), 'Ceiling Condition i.e. cracks & seepage': 'Very Poor' }, { 'Ceiling Condition i.e. cracks & seepage': [photoId] });
+    const first = makeSurvey({ locations: [roof, guard, loc('Canteen & UGWT', 'UGWT', all('Canteen & UGWT'))] });
+    ok(push(surveyor, first));
+    const later = makeSurvey({ locations: [roof, loc('Canteen', 'Canteen', { ...all('Canteen'), Paint: 'Poor' })] });
+    ok(push(surveyor, later));
+    const shared = sibling().shared!;
+    const by = (type: string) => shared.find((s) => s.type === type)!;
+    expect(shared.map((s) => s.type).sort()).toEqual(['Canteen', 'Guardroom', 'UGWT']);
+    expect(by('Guardroom').scores['Ceiling Condition i.e. cracks & seepage']).toBeUndefined();
+    expect(by('Guardroom').unsafeThere).toEqual(['Ceiling Condition i.e. cracks & seepage']);
+    expect(by('Guardroom').scores['Flush Tanks']).toBe('Good');
+    expect(by('Canteen').scores['Paint']).toBe('Poor');
+    // The W56 "Canteen & UGWT" row named UGWT arrives as UGWT, with UGWT's items only.
+    expect(Object.keys(by('UGWT').scores).sort()).toEqual(rubricGroupsForLocation('UGWT').map((g) => g.name).filter((n) => n !== 'External Plumbing').sort());
+    expect(by('Guardroom').campusName).toBe('OGS Trust Campus');
+  });
+});
