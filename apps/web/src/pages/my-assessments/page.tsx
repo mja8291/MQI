@@ -117,6 +117,7 @@ function AssessmentContent() {
           <Row label="Accompanying engineering staff" value={survey.apm} />
           <Row label="ASM" value={survey.asm} />
           <Row label="School principal" value={survey.principal} />
+          <Row label="Purpose" value={survey.purpose || "Actual assessment"} />
         </Section>
         <Section title="Building and site">
           <Row label="Power supply" value={survey.powerSupply} />

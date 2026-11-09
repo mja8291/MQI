@@ -97,6 +97,8 @@ export const submittedSurveySchema = z.object({
   asm: text(120),
   apm: text(600),
   principal: text(120),
+  /** v2 (W62): absent on surveys from before it existed (an actual assessment). */
+  purpose: z.enum(['Assessment', 'Training']).optional(),
   powerSupply: blankOr(['Grid (Wapda/K.E/LESCO etc.)', 'Solar', 'Hybrid (Both Grid & Solar)', 'No Power', 'Other']),
   structuralConcern: blankOr(['YES', 'NO']),
   buildingStructure: blankOr(['Load-Bearing', 'RCC', 'Precast', 'Hybrid (RCC+Precast)', 'Hybrid (Load-Bearing+RCC)', 'Unknown']),

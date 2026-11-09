@@ -18,6 +18,7 @@ import type {
 import type { ColumnCheck } from "@mqi/shared";
 import { UNNAMED_LOCATION_TYPES } from "@/lib/data/items";
 import { uuidv7, migrateLocationType, repairLocations, uniqueLocationName } from "@mqi/shared";
+import type { SurveyPurpose } from "@mqi/shared";
 
 interface CurrentLocation {
   floorLevel: FloorLevel;
@@ -44,6 +45,8 @@ export interface SurveyState {
   asm: string;
   apm: string;
   principal: string;
+  /** v2 (W62): actual assessment or checking/training. */
+  purpose: SurveyPurpose;
   powerSupply: PowerSupply | "";
   structuralConcern: StructuralConcern | "";
   buildingStructure: BuildingStructure | "";
@@ -145,6 +148,7 @@ function initialState(): SurveyState {
     asm: "",
     apm: "",
     principal: "",
+    purpose: "Assessment",
     powerSupply: "",
     structuralConcern: "",
     buildingStructure: "",
@@ -191,6 +195,7 @@ type Action =
   | { type: "SET_SCHOOL"; school: School }
   | { type: "START_SURVEY" }
   | { type: "SET_RESPONDENT"; asm: string; apm: string; principal: string }
+  | { type: "SET_PURPOSE"; purpose: SurveyPurpose }
   | { type: "SET_LEVELS"; levels: FloorLevel[] }
   | { type: "SET_POWER_SUPPLY"; value: PowerSupply }
   | { type: "SET_STRUCTURAL_CONCERN"; value: StructuralConcern }
@@ -277,6 +282,8 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       return { ...state, levels: action.levels };
     case "SET_RESPONDENT":
       return { ...state, asm: action.asm, apm: action.apm, principal: action.principal };
+    case "SET_PURPOSE":
+      return { ...state, purpose: action.purpose };
     case "SET_POWER_SUPPLY":
       return { ...state, powerSupply: action.value };
     case "SET_STRUCTURAL_CONCERN":
@@ -530,6 +537,7 @@ interface SurveyContextValue {
   setSchool: (school: School) => void;
   startSurvey: () => void;
   setRespondent: (asm: string, apm: string, principal: string) => void;
+  setPurpose: (purpose: SurveyPurpose) => void;
   setLevels: (levels: FloorLevel[]) => void;
   setPowerSupply: (value: PowerSupply) => void;
   setStructuralConcern: (value: StructuralConcern) => void;
@@ -674,6 +682,7 @@ export function SurveyProvider({ children }: { children: React.ReactNode }) {
       setSchool: (school) => dispatch({ type: "SET_SCHOOL", school }),
       startSurvey: () => dispatch({ type: "START_SURVEY" }),
       setRespondent: (asm, apm, principal) => dispatch({ type: "SET_RESPONDENT", asm, apm, principal }),
+      setPurpose: (purpose) => dispatch({ type: "SET_PURPOSE", purpose }),
       setLevels: (levels) => dispatch({ type: "SET_LEVELS", levels }),
       setPowerSupply: (value) => dispatch({ type: "SET_POWER_SUPPLY", value }),
       setStructuralConcern: (value) => dispatch({ type: "SET_STRUCTURAL_CONCERN", value }),

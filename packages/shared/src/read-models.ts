@@ -3,6 +3,7 @@ import { CRITICAL_ITEMS, aggregateLocations, ratingBand } from './scoring';
 import { criticalColumn } from './sheets';
 import { KNOWN_RUBRIC_VERSIONS, rubricGroupsFor } from './rubric/versions';
 import { cellCondition, isUnsafe } from './rubric/items';
+import { isTrainingPurposeText } from './rubric/content';
 import type { Condition, DrillingCheck, SurveyLocation, RatingBand, School, SiteChecks } from './types';
 
 /**
@@ -149,6 +150,8 @@ export const DASHBOARD_COLUMNS: readonly string[] = [
   'Minor Score',
   'Submitted By',
   ...CRITICAL_ITEMS.map(criticalColumn),
+  // W62: training surveys are left out.
+  'Survey Purpose',
   // W56: to flag Unsafe campuses.
   'Rubric Version',
   ...UNSAFE_ITEM_COLUMNS,
@@ -188,6 +191,8 @@ export function buildDashboard(totalSchools: number, rows: readonly SheetRow[]):
   // W56: Unsafe items over every location row of a survey.
   const unsafeBySurvey = new Map<string, Set<string>>();
   for (const r of rows) {
+    // W62: checking/training surveys don't count on the dashboard.
+    if (isTrainingPurposeText(r['Survey Purpose'])) continue;
     const surveyId = r['Survey ID'];
     if (surveyId) {
       const found = unsafeItemsInRow(r);
@@ -291,6 +296,7 @@ function common(surveyId: string, first: SheetRow): Omit<FoundSurvey, 'rubricVer
     apm: first['Accompanying Engineering Staff'] ?? first['Accompanying APM'] ?? '',
     asm: first['Responding ASM'] ?? '',
     principal: first['School Principal'] ?? '',
+    purpose: first['Survey Purpose'] ?? '',
     powerSupply: first['Power Supply'] ?? '',
     structuralConcern: first['Structural Concern Observed'] ?? '',
     buildingStructure: first['Suggested Structural Type'] ?? '',

@@ -187,6 +187,7 @@ describe('sheet rows (v1 responses.ts parity)', () => {
     expect(row['Rating Band']).toBeTruthy();
     expect(row['Oath']).toBe('Affirm');
     expect(row['Source App']).toBe('v2');
+    expect(row['Survey Purpose']).toBe('Actual assessment'); // W62: no purpose given = an actual assessment
     expect(row['Submitter Email']).toBe('sam@tcf.org.pk');
     expect(row['Roof Screeding/roof drainage']).toBe('Good');
   });

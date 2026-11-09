@@ -1,3 +1,4 @@
+import { surveyPurposeText } from './rubric/content';
 import { CRITICAL_ITEMS, ratingBand } from './scoring';
 import { FLOOR_LEVELS, LOCATION_TYPES, RUBRIC_GROUPS, unsafePartsText } from './rubric/items';
 import { itemsCovered } from './rubric/versions';
@@ -82,6 +83,8 @@ const TRAILING_HEADER = [
   'Additional Drill Holes',
   // v2 (W45): first reading of the first hole (later holes: in Additional Drill Holes).
   'Total Depth (mm)',
+  // v2 (W62): Actual assessment / Checking/Training.
+  'Survey Purpose',
   // v2 (W41): Column Unsafe follow-up, per location row.
   'Column Crack > 3 mm',
   'Schmidt Hammer Available',
@@ -148,6 +151,7 @@ function commonFields(s: SubmittedSurvey, submitter: Submitter, timestamp: strin
     'Responding ASM': s.asm,
     'Accompanying Engineering Staff': s.apm,
     'School Principal': s.principal,
+    'Survey Purpose': surveyPurposeText(s.purpose),
     'Power Supply': s.powerSupply,
     'Structural Concern Observed': s.structuralConcern,
     'Suggested Structural Type': s.buildingStructure,

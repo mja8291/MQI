@@ -149,6 +149,8 @@ export const surveyGetPayload = z.object({ surveyId: z.string().min(1).max(80) }
 /** v1 FoundSurvey (src/lib/export/find-survey.ts): what the Excel/PDF builders read. */
 export interface FoundSurvey {
   surveyId: string;
+  /** v2 (W62): the sheet's "Survey Purpose" ("" before it existed). */
+  purpose?: string;
   rubricVersion: string;
   campusName: string;
   region: string;

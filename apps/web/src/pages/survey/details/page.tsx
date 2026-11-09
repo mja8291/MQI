@@ -1,5 +1,7 @@
 
 import { useEffect, useState } from "react";
+import { SURVEY_PURPOSE_OPTIONS, SURVEY_PURPOSE_QUESTION } from "@mqi/shared";
+import type { SurveyPurpose } from "@mqi/shared";
 import { useRouter } from "next/navigation";
 import { ScreenShell } from "@/components/ui/ScreenShell";
 import { TopBar } from "@/components/ui/TopBar";
@@ -20,13 +22,15 @@ import { joinStaff, splitStaff } from "@mqi/shared";
 export default function SurveyDetailsPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { state, hydrated, setRespondent, startSurvey } = useSurvey();
+  const { state, hydrated, setRespondent, setPurpose, startSurvey } = useSurvey();
   const [staff, setStaff] = useState<string[]>(() => {
     const saved = splitStaff(state.apm);
     return saved.length ? saved : [user?.name ?? ""];
   });
   const [asm, setAsm] = useState(state.asm);
   const [principal, setPrincipal] = useState(state.principal);
+  // W62: an actual assessment unless the surveyor says it is for checking or training.
+  const [purpose, setLocalPurpose] = useState<SurveyPurpose>(state.purpose ?? "Assessment");
 
   useEffect(() => {
     // See survey/locations/page.tsx's matching effect for why this waits.
@@ -43,6 +47,7 @@ export default function SurveyDetailsPage() {
   function start() {
     if (!detailsComplete) return;
     setRespondent(asm.trim(), joinStaff(staff), principal.trim());
+    setPurpose(purpose);
     startSurvey();
     // W49: the survey's answers and photos are about to live only on this phone — ask the browser
     // to keep this app's storage through low-space clean-ups (a tap, as browsers prefer).
@@ -99,6 +104,24 @@ export default function SurveyDetailsPage() {
       </Field>
       <Field label="Principal (if present)">
         <TextInput placeholder="School principal's name" maxLength={120} value={principal} onChange={(e) => setPrincipal(e.target.value)} />
+      </Field>
+
+      <Field label={SURVEY_PURPOSE_QUESTION}>
+        <div role="radiogroup" aria-label={SURVEY_PURPOSE_QUESTION} className="space-y-2">
+          {SURVEY_PURPOSE_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={purpose === o.value}
+              onClick={() => setLocalPurpose(o.value)}
+              className={`w-full rounded-xl border px-3.5 py-2.5 text-left ${purpose === o.value ? "border-brand bg-brand-tint/50" : "border-border bg-card"}`}
+            >
+              <div className="text-[13.5px] font-semibold text-ink">{o.label}</div>
+              <div className="text-[11.5px] text-ink-soft">{o.hint}</div>
+            </button>
+          ))}
+        </div>
       </Field>
 
       {!detailsComplete ? (

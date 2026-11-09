@@ -66,6 +66,24 @@ export const OVERFLOW_QUESTION = "Proper overflow disposal system";
 export const OVERFLOW_HINT = "Proper disposal of overflow water off the roof (not spilled over the roof area).";
 export const OVERFLOW_OPTIONS: OverflowDisposal[] = ["Provided", "Not provided"];
 export const YES_NO_OPTIONS = ["Yes", "No"] as const;
+/**
+ * v2 (W62, 2026-11-09): whether a survey is a real assessment or done to check the app or train
+ * surveyors. Training surveys are marked in the sheet ("Survey Purpose") and left out of the dashboard.
+ */
+export type SurveyPurpose = "Assessment" | "Training";
+export const SURVEY_PURPOSE_QUESTION = "Purpose of this survey";
+export const SURVEY_PURPOSE_OPTIONS: { value: SurveyPurpose; label: string; hint: string }[] = [
+  { value: "Assessment", label: "Actual assessment", hint: "Counts on the dashboard and in reports." },
+  { value: "Training", label: "Checking or training", hint: "Marked as training in the data; not counted on the dashboard." },
+];
+/** The sheet's "Survey Purpose" text (blank, on surveys from before W62, means an actual assessment). */
+export function surveyPurposeText(purpose: SurveyPurpose | undefined): string {
+  return purpose === "Training" ? "Checking/Training" : "Actual assessment";
+}
+export function isTrainingPurposeText(text: string | undefined): boolean {
+  return /training|checking/i.test(text ?? "");
+}
+
 export const RISK_FACTOR_QUESTION = "Building and area features: risk factors (mark any that apply)";
 export const RISK_FACTOR_OTHER = "Any other";
 export const RISK_FACTOR_OPTIONS = [

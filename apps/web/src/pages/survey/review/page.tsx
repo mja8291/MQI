@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
 import { useAuth } from "@/lib/auth/client";
-import { RUBRIC_VERSION, itemsCovered, withDerivedScores } from "@mqi/shared";
+import { RUBRIC_VERSION, itemsCovered, surveyPurposeText, withDerivedScores } from "@mqi/shared";
 import { CATEGORIES, CRITICAL_ITEMS, ratingBand, scoreSurvey } from "@/lib/scoring";
 import { isLocationComplete } from "@/lib/data/items";
 import {
@@ -336,6 +336,7 @@ export default function ReviewPage() {
         <RecapRow k="Engineering Staff" v={state.apm || "—"} />
         <RecapRow k="ASM" v={state.asm || "—"} />
         <RecapRow k="Principal" v={state.principal || "—"} />
+        <RecapRow k="Purpose" v={surveyPurposeText(state.purpose)} />
         <RecapRow k="Locations recorded" v={String(state.scoring.locations.length)} />
         <RecapRow k="Items covered" v={`${coverage.covered} of ${coverage.total} (${Math.round(coverage.percent)}%)`} />
         {elapsedSeconds !== null ? <RecapRow k="Time on assessment" v={formatDuration(elapsedSeconds)} /> : null}

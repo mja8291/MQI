@@ -94,6 +94,7 @@ export async function buildSubmission(state: SubmitState, _screenResult?: ScoreR
     asm: state.asm,
     apm: state.apm,
     principal: state.principal,
+    purpose: state.purpose ?? "Assessment",
     powerSupply: state.powerSupply,
     structuralConcern: state.structuralConcern,
     buildingStructure: state.buildingStructure,
