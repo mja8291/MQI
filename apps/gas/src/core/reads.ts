@@ -1,10 +1,10 @@
-import { RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import { PLAN_TAB, campusBreakup, parsePlan, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
 import type { Condition, DashboardData, ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import { Table } from './system';
 import type { Env } from './ports';
-import { columnRows, findRows, rowsAt } from './responses';
+import { columnRows, findRows, rowsAt, toRow } from './responses';
 
 /** CacheService holds at most 100 KB per value: big JSON is split into ≤ 90 KB shards. */
 const SHARD = 90_000;
@@ -47,9 +47,19 @@ export function schools(ctx: Ctx): SchoolsResult {
   return cached(ctx.env, 'schools.v2', SCHOOLS_TTL, () => ({ schools: parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()) }));
 }
 
+/** v2 (W63): the campus breakup, from the Campus Survey Plan tab (none while the tab is missing or empty). */
+function withBreakup(ctx: Ctx, d: DashboardData): DashboardData {
+  const header = ctx.env.responses.header(PLAN_TAB);
+  const last = ctx.env.responses.lastRow(PLAN_TAB);
+  if (!header || last < 2) return d;
+  const rows = ctx.env.responses.readRows(PLAN_TAB, 2, last - 1).map((cells) => toRow(header, cells));
+  const plan = parsePlan(rows);
+  return plan.length ? { ...d, breakup: campusBreakup(plan, d.schools, schools(ctx).schools) } : d;
+}
+
 export function dashboard(ctx: Ctx): DashboardData {
   return cached(ctx.env, 'dashboard', DASHBOARD_TTL, () =>
-    buildDashboard(schools(ctx).schools.length, columnRows(ctx.env, RESPONSES_TAB, DASHBOARD_COLUMNS)),
+    withBreakup(ctx, buildDashboard(schools(ctx).schools.length, columnRows(ctx.env, RESPONSES_TAB, DASHBOARD_COLUMNS))),
   );
 }
 

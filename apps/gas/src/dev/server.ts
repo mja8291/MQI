@@ -4,7 +4,7 @@
  * and by the Playwright suite. State lives in memory and resets on restart.
  */
 import { createServer } from 'node:http';
-import { API_VERSION, ATTACHMENTS_HEADER, RESPONSES_HEADER, RESPONSES_TAB } from '@mqi/shared';
+import { API_VERSION, ATTACHMENTS_HEADER, PLAN_HEADER, PLAN_TAB, RESPONSES_HEADER, RESPONSES_TAB } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { ensureAdmin, hashPassword } from '../core/auth';
@@ -25,6 +25,17 @@ export function seedDevEnv(env: MemoryEnv): void {
   // v1's tabs exist before v2 ever runs; Source App is added by v2 itself.
   env.responses.createTab(RESPONSES_TAB, RESPONSES_HEADER.filter((h) => h !== 'Source App'));
   env.responses.createTab('MQI Survey Attachments', [...ATTACHMENTS_HEADER]);
+  // W63: a small Campus Survey Plan, one campus per category (the live tab holds the R&M master sheet).
+  env.responses.createTab(PLAN_TAB, [...PLAN_HEADER]);
+  env.responses.appendRaw(PLAN_TAB, [
+    ["947", "S/1/10", "OGS Trust Campus", "South West", "Survey with App", ""],
+    ["948", "S/1/10", "OGS Trust Campus II", "South West", "Survey with App", ""],
+    ["107", "SW/6/99", "Fazalillahi Campus-I", "South West", "Done without App", "Unsafe"],
+    ["1306", "N/9/09", "Zia & Faiza Bhutta Family Foundation Campus", "North", "Done without App", "Safe"],
+    ["499", "LS/1/05", "Alfalah Campus", "Lower Sindh", "Last 5 Year Exemption", ""],
+    ["5001", "GPC/1/24", "GGPS Sample", "GP Central Punjab", "PSSP/PSRP Deduction", ""],
+    ["5002", "N/77/20", "Campus Not In The App List", "North", "Survey with App", ""],
+  ]);
   env.props.set('PBKDF2_ITERATIONS', '1000');
   setupCore(env);
   const ctx = new Ctx(env, 'seed', 'seed');

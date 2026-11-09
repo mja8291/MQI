@@ -253,6 +253,44 @@ export interface DashboardData {
   distribution: Record<RatingBand, number>;
   byRegion: { region: string; average: number; count: number }[];
   schools: CapturedSchool[];
+  /** v2 (W63): the campus breakup from the Campus Survey Plan tab; absent when the tab is missing. */
+  breakup?: CampusBreakup;
+}
+
+export interface CampusBreakupCount {
+  campuses: number;
+  eCompounds: number;
+}
+export interface CampusBreakupRegion {
+  region: string;
+  total: number;
+  pssp: number;
+  doneWithoutApp: number;
+  safe: number;
+  unsafe: number;
+  last5: number;
+  withApp: number;
+  surveyed: number;
+  surveyedUnsafe: number;
+  remaining: number;
+}
+export interface CampusBreakup {
+  total: CampusBreakupCount;
+  pssp: CampusBreakupCount;
+  doneWithoutApp: CampusBreakupCount & { safe: number; unsafe: number };
+  last5: CampusBreakupCount;
+  withApp: CampusBreakupCount & {
+    surveyed: number;
+    surveyedSafe: number;
+    surveyedUnsafe: number;
+    remaining: number;
+    eCompoundsVisited: number;
+    /** Campuses to survey that the app's campus list doesn't have, so they can't be picked yet. */
+    notInAppList: number;
+  };
+  /** Campuses surveyed with the app that the plan puts in another category, or doesn't list. */
+  surveyedOutsidePlan: number;
+  byRegion: CampusBreakupRegion[];
 }
 
 export type SchoolsResult = { schools: School[] };

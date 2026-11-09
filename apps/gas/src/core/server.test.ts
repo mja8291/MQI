@@ -15,7 +15,7 @@ import {
   uuidv7,
   withDerivedScores,
 } from '@mqi/shared';
-import type { ApiResponse, AttachmentMeta, School, SiblingExternalResult, SurveyLocation, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
+import type { ApiResponse, AttachmentMeta, DashboardData, School, SiblingExternalResult, SurveyLocation, PushResult, SubmittedSurvey, UploadResult, WhoAmI } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../dev/server';
@@ -681,5 +681,15 @@ describe('W60 sibling Guardroom / Canteen / UGWT', () => {
     // The W56 "Canteen & UGWT" row named UGWT arrives as UGWT, with UGWT's items only.
     expect(Object.keys(by('UGWT').scores).sort()).toEqual(rubricGroupsForLocation('UGWT').map((g) => g.name).filter((n) => n !== 'External Plumbing').sort());
     expect(by('Guardroom').campusName).toBe('OGS Trust Campus');
+  });
+});
+
+describe('W63 campus breakup', () => {
+  test('the dashboard carries the breakup from the Campus Survey Plan tab', () => {
+    ok(push(login('surveyor@tcf.test'), makeSurvey())); // campus 947, Roof Screeding Unsafe
+    const d = ok(call<DashboardData>('dashboard.get', {}, login('reviewer@tcf.test')));
+    expect(d.breakup?.total.campuses).toBe(7);
+    expect(d.breakup?.withApp).toMatchObject({ campuses: 3, surveyed: 1, surveyedUnsafe: 1, remaining: 2, notInAppList: 1 });
+    expect(d.breakup?.doneWithoutApp).toMatchObject({ campuses: 2, safe: 1, unsafe: 1 });
   });
 });
