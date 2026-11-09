@@ -10,7 +10,7 @@
       ],
       "rewrites": [
         {
-          "source": "**",
+          "source": "!/assets/**",
           "destination": "/index.html"
         }
       ],
@@ -26,6 +26,33 @@
         },
         {
           "source": "**/@(index.html|sw.js|manifest.webmanifest)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**/!(*.*)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/boot.@(js|css)",
           "headers": [
             {
               "key": "Cache-Control",
@@ -87,7 +114,7 @@
       ],
       "rewrites": [
         {
-          "source": "**",
+          "source": "!/assets/**",
           "destination": "/index.html"
         }
       ],
@@ -103,6 +130,33 @@
         },
         {
           "source": "**/@(index.html|sw.js|manifest.webmanifest)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "**/!(*.*)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        {
+          "source": "/boot.@(js|css)",
           "headers": [
             {
               "key": "Cache-Control",

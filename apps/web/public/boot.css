@@ -1,0 +1,55 @@
+/* v2 (W61): the start screen (see boot.js). Kept outside the app's CSS so it shows even when that can't load. */
+#boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  background: #f1f4ee;
+  color: #1d2b26;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  text-align: center;
+}
+#boot img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+#boot .boot-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #0e5c4d;
+}
+#boot .boot-sub {
+  font-size: 13px;
+  color: #5b6b65;
+}
+#boot-stuck {
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #5b6b65;
+}
+#boot-stuck[hidden] {
+  display: none;
+}
+#boot-stuck button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  border-radius: 12px;
+  border: 1px solid #0e5c4d;
+  font-size: 14px;
+  font-weight: 600;
+  background: #0e5c4d;
+  color: #fff;
+}
+#boot-stuck button.boot-secondary {
+  background: #fff;
+  color: #0e5c4d;
+}

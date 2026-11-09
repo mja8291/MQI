@@ -5,6 +5,7 @@ import { AuthGate, AuthProvider } from '@/lib/auth/client';
 import { SurveyProvider } from '@/lib/survey-context';
 import SurveyLayout from '@/pages/survey/layout';
 import { ErrorBoundary } from './ErrorBoundary';
+import { BootDone } from '@/lib/boot';
 
 // Lazy routes (v1's App Router pages, one chunk each). The service worker precaches them all,
 // so every page opens offline after the first visit (FR-OFF-1).
@@ -42,6 +43,8 @@ export function App() {
           <SurveyProvider>
             <AuthGate>
               <Suspense fallback={null}>
+                {/* W61: commits with the first screen, then removes the start screen. */}
+                <BootDone />
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/signin" element={<SignIn />} />

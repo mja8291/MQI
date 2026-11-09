@@ -8,9 +8,23 @@
     <link rel="icon" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <link rel="preload" href="/fonts/SpaceGrotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <!-- W61: the start screen shows before the app's code loads (see public/boot.js). -->
+    <link rel="stylesheet" href="/boot.css" />
+    <script src="/boot.js"></script>
     <title>TCF MQI Survey</title>
   </head>
   <body>
+    <div id="boot">
+      <img src="/icons/icon-192.png" alt="" />
+      <div class="boot-title">MQI Survey</div>
+      <div class="boot-sub">Opening…</div>
+      <div id="boot-stuck" hidden>
+        <p id="boot-message">The app is taking long to open.</p>
+        <p>Your drafts and unsent surveys are kept on this phone either way.</p>
+        <button type="button" id="boot-retry">Try again</button>
+        <button type="button" id="boot-repair" class="boot-secondary">Repair the app (needs internet)</button>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,6 +1,7 @@
 import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { reportError } from '@/lib/observability';
+import { isStaleCodeError, reloadForNewVersion } from '@/lib/boot';
 
 /** Last line of defence: a crash shows a recoverable screen (drafts are safe in IndexedDB) and is logged. */
 export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -11,6 +12,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
+    // W61: a screen whose code a newer version replaced: reload once to the current version.
+    if (isStaleCodeError(error) && reloadForNewVersion()) return;
     void reportError(Object.assign(error, { stack: `${error.stack ?? ''}\n${info.componentStack ?? ''}` }));
   }
 
