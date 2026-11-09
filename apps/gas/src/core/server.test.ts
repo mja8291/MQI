@@ -693,3 +693,11 @@ describe('W63 campus breakup', () => {
     expect(d.breakup?.doneWithoutApp).toMatchObject({ campuses: 2, safe: 1, unsafe: 1 });
   });
 });
+
+describe('W64 R&M Plan 2026-27', () => {
+  test('the campus list marks campuses in the R&M Plan 2026-27 tab', () => {
+    const list = ok(call<{ schools: School[] }>('schools.list', {}, login('surveyor@tcf.test'))).schools;
+    expect(list.find((s) => s.schoolId === '948')?.rmPlanned).toBe(true);
+    expect(list.find((s) => s.schoolId === '947')?.rmPlanned).toBeUndefined();
+  });
+});

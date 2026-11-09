@@ -1,4 +1,5 @@
 
+import { RmPlanReminder } from "@/components/survey/RmPlanReminder";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ScreenShell } from "@/components/ui/ScreenShell";
@@ -293,7 +294,8 @@ export default function ReviewPage() {
     }
     await clearDraft();
     scheduleSync(0);
-    router.push(`/survey/done?queued=1&id=${encodeURIComponent(submission.survey.id)}`);
+    // W64: the Done screen repeats the R&M Plan 2026-27 reminder.
+    router.push(`/survey/done?queued=1&id=${encodeURIComponent(submission.survey.id)}${state.school?.rmPlanned ? "&rm=1" : ""}`);
   }
 
   // Round 3 Task 9 — a fallback for when Submit itself is failing: an
@@ -627,6 +629,8 @@ export default function ReviewPage() {
             </span>
           </Button>
         </div>
+        {/* W64: a campus in the R&M Plan 2026-27 also needs its BOQ. */}
+        {state.school?.rmPlanned ? <RmPlanReminder className="mb-2.5" /> : null}
         <Button disabled={!canSubmit || photoSaving} onClick={submit}>
           {photoSaving ? "Saving photo…" : submitting ? "Submitting…" : "Submit survey"}
         </Button>

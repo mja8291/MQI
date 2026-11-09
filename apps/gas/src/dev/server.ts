@@ -4,7 +4,7 @@
  * and by the Playwright suite. State lives in memory and resets on restart.
  */
 import { createServer } from 'node:http';
-import { API_VERSION, ATTACHMENTS_HEADER, PLAN_HEADER, PLAN_TAB, RESPONSES_HEADER, RESPONSES_TAB } from '@mqi/shared';
+import { API_VERSION, ATTACHMENTS_HEADER, PLAN_HEADER, PLAN_TAB, RM_PLAN_HEADER, RM_PLAN_TAB, RESPONSES_HEADER, RESPONSES_TAB } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { ensureAdmin, hashPassword } from '../core/auth';
@@ -25,6 +25,9 @@ export function seedDevEnv(env: MemoryEnv): void {
   // v1's tabs exist before v2 ever runs; Source App is added by v2 itself.
   env.responses.createTab(RESPONSES_TAB, RESPONSES_HEADER.filter((h) => h !== 'Source App'));
   env.responses.createTab('MQI Survey Attachments', [...ATTACHMENTS_HEADER]);
+  // W64: one campus in the R&M Plan 2026-27.
+  env.responses.createTab(RM_PLAN_TAB, [...RM_PLAN_HEADER]);
+  env.responses.appendRaw(RM_PLAN_TAB, [["948", "OGS Trust Campus II", "S/1/10", "South West"]]);
   // W63: a small Campus Survey Plan, one campus per category (the live tab holds the R&M master sheet).
   env.responses.createTab(PLAN_TAB, [...PLAN_HEADER]);
   env.responses.appendRaw(PLAN_TAB, [

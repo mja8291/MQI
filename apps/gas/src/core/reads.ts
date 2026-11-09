@@ -1,4 +1,4 @@
-import { PLAN_TAB, campusBreakup, parsePlan, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import { PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
 import type { Condition, DashboardData, ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
@@ -42,9 +42,19 @@ export function forgetDashboard(env: Env): void {
   env.cache.remove('dashboard');
 }
 
+/** v2 (W64): School IDs in the R&M Plan 2026-27 tab (none while the tab is missing). */
+function rmPlannedIds(ctx: Ctx): Set<string> {
+  const header = ctx.env.responses.header(RM_PLAN_TAB);
+  const last = ctx.env.responses.lastRow(RM_PLAN_TAB);
+  if (!header || last < 2) return new Set();
+  return rmPlanIds(ctx.env.responses.readRows(RM_PLAN_TAB, 2, last - 1).map((cells) => toRow(header, cells)));
+}
+
 export function schools(ctx: Ctx): SchoolsResult {
-  // 'schools.v2': the list now carries campus details; the key change drops lists cached before.
-  return cached(ctx.env, 'schools.v2', SCHOOLS_TTL, () => ({ schools: parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()) }));
+  // 'schools.v3' (W64): the list now marks R&M Plan 2026-27 campuses; the key change drops lists cached before.
+  return cached(ctx.env, 'schools.v3', SCHOOLS_TTL, () => ({
+    schools: markRmPlanned(parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()), rmPlannedIds(ctx)),
+  }));
 }
 
 /** v2 (W63): the campus breakup, from the Campus Survey Plan tab (none while the tab is missing or empty). */

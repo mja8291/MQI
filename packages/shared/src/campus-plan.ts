@@ -16,6 +16,26 @@ import type { School } from './types';
 export const PLAN_TAB = 'Campus Survey Plan';
 export const PLAN_HEADER = ['School IDs', 'E Compound No', 'Campus', 'Region', 'Survey Category', 'Assessment'] as const;
 
+/**
+ * v2 (W64, 2026-11-09): campuses in the R&M Plan 2026-27 — "Planned in this year" in the
+ * Structural Condition Assessment sheet. Surveying one of them comes with a second activity:
+ * preparing its BOQ. The tab holds School ID, Campus, E-Compound and Region only.
+ */
+export const RM_PLAN_TAB = 'R&M Plan 2026-27';
+export const RM_PLAN_HEADER = ['School ID', 'Campus', 'E-Compound', 'Region'] as const;
+export const RM_PLAN_REMINDER = 'This campus is in the R&M Plan 2026-27. Remember to prepare its BOQ as well (a separate activity).';
+
+/** School IDs of the planned campuses (each cell may list several, e.g. "1784 | 2211"). */
+export function rmPlanIds(rows: readonly Record<string, string>[]): Set<string> {
+  return new Set(rows.flatMap((r) => splitIds(r['School ID'])));
+}
+
+/** Marks the schools whose School ID is in the plan. */
+export function markRmPlanned<S extends { schoolId: string }>(schools: readonly S[], ids: ReadonlySet<string>): (S & { rmPlanned?: boolean })[] {
+  if (!ids.size) return [...schools];
+  return schools.map((s) => (splitIds(s.schoolId).some((id) => ids.has(id)) ? { ...s, rmPlanned: true } : s));
+}
+
 export const PLAN_CATEGORIES = ['PSSP/PSRP Deduction', 'Done without App', 'Last 5 Year Exemption', 'Survey with App'] as const;
 export type PlanCategory = (typeof PLAN_CATEGORIES)[number];
 

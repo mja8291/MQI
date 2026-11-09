@@ -358,6 +358,8 @@ export interface School {
   eCompoundNo?: string;
   /** Name from the E-Compound Spreadsheet, e.g. "102 RB Budha Chak (N/124/12)". */
   eCompoundName?: string;
+  /** v2 (W64): in the R&M Plan 2026-27 ("Planned in this year"): a BOQ is to be prepared too. */
+  rmPlanned?: boolean;
 }
 
 export interface RespondentDetails {

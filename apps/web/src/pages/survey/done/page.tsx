@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { RmPlanReminder } from "@/components/survey/RmPlanReminder";
 import { Check, CloudOff, Download, FileText, Loader2 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import Link from "next/link";
@@ -18,6 +19,8 @@ export default function DonePage() {
   const { reset } = useSurvey();
   const params = useSearchParams();
   const surveyId = params.get("id");
+  // W64: the campus is in the R&M Plan 2026-27 (passed on by the Review screen).
+  const rmPlanned = params.get("rm") === "1";
   const record = useLiveQuery(() => (surveyId ? db.surveys.get(surveyId) : undefined), [surveyId]);
   // W54: once the server has everything, the phone keeps only a "sent" marker.
   const sent = useLiveQuery(() => (surveyId ? db.sent.get(surveyId) : undefined), [surveyId]);
@@ -80,6 +83,8 @@ export default function DonePage() {
             ? "Your survey is saved on this phone and is being sent now."
             : "No connection right now — this survey is saved on your device and will sync automatically the next time you're online."}
       </p>
+
+      {rmPlanned ? <RmPlanReminder className="mb-5" /> : null}
 
       {onServer && surveyId ? (
         <>

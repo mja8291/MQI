@@ -1,5 +1,6 @@
 
 import { useEffect, useMemo, useState } from "react";
+import { RmPlanReminder } from "@/components/survey/RmPlanReminder";
 import { useRouter } from "next/navigation";
 import { ScreenShell } from "@/components/ui/ScreenShell";
 import { TopBar } from "@/components/ui/TopBar";
@@ -93,7 +94,8 @@ export default function FindSchoolPage() {
   function continueToDetails() {
     if (!selected) return;
     // Only the four survey fields travel with the survey; the details are for this screen.
-    setSchool({ schoolId: selected.schoolId, name: selected.name, region: selected.region, area: selected.area });
+    // W64: rmPlanned travels with the survey so Review and Done can repeat the BOQ reminder.
+    setSchool({ schoolId: selected.schoolId, name: selected.name, region: selected.region, area: selected.area, ...(selected.rmPlanned ? { rmPlanned: true } : {}) });
     if (details?.eCompoundNo) prefetchSiblingExternal(selected.schoolId);
     router.push("/survey/details");
   }
@@ -233,6 +235,8 @@ function CampusCard({ school, siblings, onPick }: { school: School; siblings: Sc
   return (
     <div className="rounded-[10px] border border-border bg-brand-tint/40 px-3 py-2.5 mt-1">
       <div className="text-[14px] font-semibold text-brand-deep mb-1">{school.name}</div>
+      {/* W64: a campus in the R&M Plan 2026-27 also needs its BOQ. */}
+      {school.rmPlanned ? <RmPlanReminder /> : null}
       <DetailRow label="E-compound">
         {school.eCompoundName || school.eCompoundNo || "—"}
         {school.eCompoundName && school.eCompoundNo && !school.eCompoundName.includes(school.eCompoundNo) ? ` (${school.eCompoundNo})` : ""}
