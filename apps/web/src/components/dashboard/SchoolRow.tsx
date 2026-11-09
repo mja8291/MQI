@@ -43,15 +43,33 @@ function Downloads({ surveyId, name }: { surveyId: string; name: string }) {
 }
 
 /** v2 (W56): a survey with any item marked Unsafe (Wall Unsafe alone excepted) shows in red as Unsafe. */
-function UnsafeBadge({ items }: { items?: string[] }) {
-  if (!items?.length) return null;
+/** v2 (W65): Safe or Unsafe beside the MQI score, green or red. */
+function SafetyBadge({ items }: { items?: string[] }) {
+  const unsafe = Boolean(items?.length);
   return (
     <span
-      title={`Unsafe: ${items.join(", ")}`}
-      className="text-[10.5px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-band-poor text-white"
+      title={unsafe ? `Unsafe: ${items!.join(", ")}` : "No unsafe item"}
+      className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full shrink-0 text-white ${unsafe ? "bg-band-poor" : "bg-band-good"}`}
     >
-      Unsafe
+      {unsafe ? "Unsafe" : "Safe"}
     </span>
+  );
+}
+
+/** v2 (W65): the unsafe reasons in red, two lines at most until "more" is tapped. */
+function UnsafeReasons({ items }: { items?: string[] }) {
+  const [open, setOpen] = useState(false);
+  if (!items?.length) return null;
+  const text = items.join(", ");
+  return (
+    <div className="text-[11px] font-semibold text-band-poor leading-snug">
+      <span className={open ? "" : "line-clamp-2"}>Unsafe: {text}</span>
+      {text.length > 70 ? (
+        <button type="button" onClick={() => setOpen((o) => !o)} className="underline font-semibold">
+          {open ? "less" : "more"}
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -89,13 +107,9 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
               <ChevronDown size={13} className={open ? "rotate-180" : ""} />
             </button>
           ) : null}
-          {school.unsafeItems?.length ? (
-            <div className="text-[11px] font-semibold text-band-poor leading-snug">
-              Unsafe: {school.unsafeItems.join(", ")}
-            </div>
-          ) : null}
+          <UnsafeReasons items={school.unsafeItems} />
         </div>
-        <UnsafeBadge items={school.unsafeItems} />
+        
         <span
           className="text-[10.5px] font-semibold px-2.5 py-1 rounded-full shrink-0"
           style={{
@@ -105,6 +119,7 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
         >
           {Math.round(school.overall)}% · {school.band}
         </span>
+        <SafetyBadge items={school.unsafeItems} />
         {school.surveyId ? (
           <Downloads surveyId={school.surveyId} name={school.name} />
         ) : null}
@@ -118,11 +133,9 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
               <div className="flex-1 min-w-0 text-[11.5px] text-ink-soft">
                 {when(e.date)}
                 {e.submittedBy ? ` · ${e.submittedBy}` : ""}
-                {e.unsafeItems?.length ? (
-                  <div className="font-semibold text-band-poor">Unsafe: {e.unsafeItems.join(", ")}</div>
-                ) : null}
+                <UnsafeReasons items={e.unsafeItems} />
               </div>
-              <UnsafeBadge items={e.unsafeItems} />
+              
               <span
                 className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full shrink-0"
                 style={{
@@ -132,6 +145,7 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
               >
                 {Math.round(e.overall)}% · {e.band}
               </span>
+              <SafetyBadge items={e.unsafeItems} />
               <Downloads
                 surveyId={e.surveyId}
                 name={`${school.name} (${when(e.date)})`}

@@ -1,4 +1,4 @@
-import type { CampusBreakup, CampusBreakupCount, CampusBreakupRegion, CapturedSchool } from './api';
+import type { CampusBreakup, CampusBreakupCore, CampusBreakupCount, CampusBreakupRegion, CapturedSchool, OutsideScopeCampus } from './api';
 import type { School } from './types';
 
 /**
@@ -102,8 +102,41 @@ const count = (campuses: number, eCompounds: number): CampusBreakupCount => ({ c
  * The breakup, in the master sheet's numbers. E-compounds follow the master's own rule: an
  * e-compound drops out at the first step that leaves it with no campus still in scope, so the
  * e-compound column adds up to the total too.
+ * v2 (W65): the same breakup for each region (the dashboard's region filter), and the campuses
+ * behind the two notes (not in the app's list; surveyed outside the Survey with App list).
  */
 export function campusBreakup(plan: readonly PlanCampus[], captured: readonly CapturedSchool[], appSchools: readonly School[] = []): CampusBreakup {
+  const find = planIndex(plan);
+  const regionOf = (s: CapturedSchool) => find({ schoolId: s.schoolId, name: s.name })?.region || s.region;
+  const regions = [...new Set(plan.map((c) => c.region).filter(Boolean))].sort();
+  const core = breakupCore(plan, captured, appSchools);
+  const perRegion: Record<string, CampusBreakupCore> = {};
+  for (const region of regions)
+    perRegion[region] = breakupCore(
+      plan.filter((c) => c.region === region),
+      captured.filter((s) => regionOf(s) === region),
+      appSchools,
+    );
+  const byRegion: CampusBreakupRegion[] = regions.map((region) => {
+    const r = perRegion[region]!;
+    return {
+      region,
+      total: r.total.campuses,
+      pssp: r.pssp.campuses,
+      doneWithoutApp: r.doneWithoutApp.campuses,
+      safe: r.doneWithoutApp.safe,
+      unsafe: r.doneWithoutApp.unsafe,
+      last5: r.last5.campuses,
+      withApp: r.withApp.campuses,
+      surveyed: r.withApp.surveyed,
+      surveyedUnsafe: r.withApp.surveyedUnsafe,
+      remaining: r.withApp.remaining,
+    };
+  });
+  return { ...core, byRegion, regions: perRegion };
+}
+
+function breakupCore(plan: readonly PlanCampus[], captured: readonly CapturedSchool[], appSchools: readonly School[]): CampusBreakupCore {
   const find = planIndex(plan);
   const ecosWith = (cats: readonly PlanCategory[]) => new Set(plan.filter((c) => c.eCompoundNo && cats.includes(c.category as PlanCategory)).map((c) => c.eCompoundNo));
   const allEcos = new Set(plan.map((c) => c.eCompoundNo).filter(Boolean)).size;
@@ -116,12 +149,12 @@ export function campusBreakup(plan: readonly PlanCampus[], captured: readonly Ca
 
   // Surveyed with the app: the dashboard's campuses (latest real survey each), matched to the plan.
   const surveyed = new Map<PlanCampus, CapturedSchool>();
-  let outsidePlan = 0;
+  const outside: OutsideScopeCampus[] = [];
   for (const s of captured) {
     const c = find({ schoolId: s.schoolId, name: s.name });
     if (c && c.category === 'Survey with App') {
       if (!surveyed.has(c)) surveyed.set(c, s);
-    } else outsidePlan++;
+    } else outside.push({ name: s.name, schoolId: s.schoolId, region: c?.region || s.region, category: c?.category || 'Not in the plan' });
   }
   const appUnsafe = (c: PlanCampus) => Boolean(surveyed.get(c)?.unsafeItems?.length);
   const withApp = of('Survey with App');
@@ -132,27 +165,6 @@ export function campusBreakup(plan: readonly PlanCampus[], captured: readonly Ca
     appSchools.map((s) => ({ ids: splitIds(s.schoolId), eCompoundNo: '', name: s.name, region: '', category: '' as const, assessment: '' })),
   );
   const notInAppList = appSchools.length ? withApp.filter((c) => !c.ids.some((id) => appFind({ schoolId: id, name: '' })) && !appFind({ schoolId: '', name: c.name })) : [];
-
-  const regions = [...new Set(plan.map((c) => c.region).filter(Boolean))].sort();
-  const byRegion: CampusBreakupRegion[] = regions.map((region) => {
-    const r = plan.filter((c) => c.region === region);
-    const app = r.filter((c) => c.category === 'Survey with App');
-    const done = r.filter((c) => c.category === 'Done without App');
-    const sv = app.filter((c) => surveyed.has(c));
-    return {
-      region,
-      total: r.length,
-      pssp: r.filter((c) => c.category === 'PSSP/PSRP Deduction').length,
-      doneWithoutApp: done.length,
-      safe: done.filter(isSafe).length,
-      unsafe: done.filter(isUnsafe).length,
-      last5: r.filter((c) => c.category === 'Last 5 Year Exemption').length,
-      withApp: app.length,
-      surveyed: sv.length,
-      surveyedUnsafe: sv.filter(appUnsafe).length,
-      remaining: app.length - sv.length,
-    };
-  });
 
   const done = of('Done without App');
   return {
@@ -168,8 +180,60 @@ export function campusBreakup(plan: readonly PlanCampus[], captured: readonly Ca
       remaining: withApp.length - surveyedList.length,
       eCompoundsVisited: new Set(surveyedList.map((c) => c.eCompoundNo).filter(Boolean)).size,
       notInAppList: notInAppList.length,
+      notInAppListCampuses: notInAppList.map((c) => ({ name: c.name, region: c.region, eCompoundNo: c.eCompoundNo })),
     },
-    surveyedOutsidePlan: outsidePlan,
-    byRegion,
+    surveyedOutsidePlan: outside.length,
+    outsidePlanCampuses: outside,
+  };
+}
+
+/**
+ * v2 (W65): the dashboard's hierarchy, by the owner's rules:
+ *   Total = Exempted (PSSP/PSRP + Last 5 yr) + In scope (Done without App + Survey with App)
+ *   In scope = Assessed (Done without App + captured from the list) + Pending (list, not yet surveyed)
+ *   Assessed = Safe + Unsafe, each Without App / With App.
+ * Surveys outside the Survey with App list are in no total. `checks` names any rule that fails.
+ */
+export interface BreakupView {
+  total: number;
+  totalEco: number;
+  exempted: number;
+  exemptedEco: number;
+  scope: number;
+  assessed: number;
+  assessedWithout: number;
+  assessedWith: number;
+  pending: number;
+  pendingVisits: number;
+  safe: { without: number; with: number; total: number };
+  unsafe: { without: number; with: number; total: number };
+  failed: string[];
+}
+
+export function breakupView(b: CampusBreakupCore): BreakupView {
+  const exempted = b.pssp.campuses + b.last5.campuses;
+  const scope = b.doneWithoutApp.campuses + b.withApp.campuses;
+  const assessed = b.doneWithoutApp.campuses + b.withApp.surveyed;
+  const pending = b.withApp.remaining;
+  const safe = { without: b.doneWithoutApp.safe, with: b.withApp.surveyedSafe, total: b.doneWithoutApp.safe + b.withApp.surveyedSafe };
+  const unsafe = { without: b.doneWithoutApp.unsafe, with: b.withApp.surveyedUnsafe, total: b.doneWithoutApp.unsafe + b.withApp.surveyedUnsafe };
+  const failed: string[] = [];
+  if (exempted + scope !== b.total.campuses) failed.push('Exempted + In scope ≠ Total');
+  if (assessed + pending !== scope) failed.push('Assessed + Pending ≠ In scope');
+  if (safe.total + unsafe.total !== assessed) failed.push('Safe + Unsafe ≠ Assessed');
+  return {
+    total: b.total.campuses,
+    totalEco: b.total.eCompounds,
+    exempted,
+    exemptedEco: b.pssp.eCompounds + b.last5.eCompounds,
+    scope,
+    assessed,
+    assessedWithout: b.doneWithoutApp.campuses,
+    assessedWith: b.withApp.surveyed,
+    pending,
+    pendingVisits: b.withApp.eCompounds - b.withApp.eCompoundsVisited,
+    safe,
+    unsafe,
+    failed,
   };
 }

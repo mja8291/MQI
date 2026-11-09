@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { campusBreakup, parsePlan } from './index';
+import { breakupView, campusBreakup, parsePlan } from './index';
 import type { CapturedSchool, School } from './index';
 
 /** W63 (2026-11-09): the campus breakup follows the R&M master sheet. */
@@ -52,5 +52,33 @@ describe('W63 campus breakup', () => {
     const p = parsePlan([row('1', 'E1', 'A', 'S', 'survey WITH app'), row('2', 'E1', 'B', 'S', 'Something else')]);
     expect(campusBreakup(p, []).withApp.campuses).toBe(1);
     expect(campusBreakup(p, []).total.campuses).toBe(2);
+  });
+});
+
+/** W65 (2026-11-09): the dashboard hierarchy and its checks. */
+describe('W65 breakup view', () => {
+  test('Total = Exempted + In scope; In scope = Assessed + Pending; Assessed = Safe + Unsafe', () => {
+    const b = campusBreakup(plan, [captured('1', 'Alpha', true), captured('42', 'Elsewhere')]);
+    const v = breakupView(b);
+    expect(v).toMatchObject({ total: 7, exempted: 3, scope: 4, assessed: 3, assessedWithout: 2, assessedWith: 1, pending: 1 });
+    expect(v.safe).toEqual({ without: 1, with: 0, total: 1 });
+    expect(v.unsafe).toEqual({ without: 1, with: 1, total: 2 });
+    expect(v.failed).toEqual([]);
+    // Outside the list: in no total, listed separately.
+    expect(b.outsidePlanCampuses).toEqual([{ name: 'Elsewhere', schoolId: '42', region: undefined, category: 'Not in the plan' }]);
+  });
+
+  test('a Done without App campus with no Safe/Unsafe result fails the check', () => {
+    const p = parsePlan([row('1', 'E1', 'A', 'S', 'Done without App', '')]);
+    expect(breakupView(campusBreakup(p, [])).failed).toEqual(['Safe + Unsafe ≠ Assessed']);
+  });
+
+  test('each region has its own breakup, adding up to the whole', () => {
+    const b = campusBreakup(plan, [captured('1', 'Alpha')]);
+    const regions = Object.values(b.regions ?? {});
+    expect(Object.keys(b.regions ?? {}).sort()).toEqual(['North', 'South']);
+    expect(regions.reduce((a, r) => a + r.total.campuses, 0)).toBe(b.total.campuses);
+    expect(b.regions!.South!.withApp.surveyed).toBe(1);
+    expect(b.regions!.North!.withApp.surveyed).toBe(0);
   });
 });

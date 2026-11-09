@@ -255,6 +255,8 @@ export interface DashboardData {
   schools: CapturedSchool[];
   /** v2 (W63): the campus breakup from the Campus Survey Plan tab; absent when the tab is missing. */
   breakup?: CampusBreakup;
+  /** v2 (W65): when the server built these figures (the dashboard is cached for up to 5 minutes). */
+  generatedAt?: string;
 }
 
 export interface CampusBreakupCount {
@@ -274,7 +276,8 @@ export interface CampusBreakupRegion {
   surveyedUnsafe: number;
   remaining: number;
 }
-export interface CampusBreakup {
+/** v2 (W65): the breakup of one set of campuses (all, or one region). */
+export interface CampusBreakupCore {
   total: CampusBreakupCount;
   pssp: CampusBreakupCount;
   doneWithoutApp: CampusBreakupCount & { safe: number; unsafe: number };
@@ -287,10 +290,25 @@ export interface CampusBreakup {
     eCompoundsVisited: number;
     /** Campuses to survey that the app's campus list doesn't have, so they can't be picked yet. */
     notInAppList: number;
+    /** v2 (W65): those campuses. */
+    notInAppListCampuses?: { name: string; region: string; eCompoundNo: string }[];
   };
   /** Campuses surveyed with the app that the plan puts in another category, or doesn't list. */
   surveyedOutsidePlan: number;
+  /** v2 (W65): those campuses; they are in no total. */
+  outsidePlanCampuses?: OutsideScopeCampus[];
+}
+export interface OutsideScopeCampus {
+  name: string;
+  schoolId: string;
+  region: string;
+  /** The plan category it is in, or "Not in the plan". */
+  category: string;
+}
+export interface CampusBreakup extends CampusBreakupCore {
   byRegion: CampusBreakupRegion[];
+  /** v2 (W65): the same breakup for each region (the dashboard region filter). */
+  regions?: Record<string, CampusBreakupCore>;
 }
 
 export type SchoolsResult = { schools: School[] };

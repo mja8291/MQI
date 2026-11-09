@@ -69,7 +69,7 @@ function withBreakup(ctx: Ctx, d: DashboardData): DashboardData {
 
 export function dashboard(ctx: Ctx): DashboardData {
   return cached(ctx.env, 'dashboard', DASHBOARD_TTL, () =>
-    withBreakup(ctx, buildDashboard(schools(ctx).schools.length, columnRows(ctx.env, RESPONSES_TAB, DASHBOARD_COLUMNS))),
+    withBreakup(ctx, { ...buildDashboard(schools(ctx).schools.length, columnRows(ctx.env, RESPONSES_TAB, DASHBOARD_COLUMNS)), generatedAt: ctx.nowIso }),
   );
 }
 
