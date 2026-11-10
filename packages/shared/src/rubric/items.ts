@@ -480,6 +480,11 @@ export function unsafePartsText(parts: readonly string[]): string {
   return parts.map((p) => `${p} Unsafe`).join(", ");
 }
 
+/** v2 (W66): "Column Unsafe, Wall Unsafe" → ["Column", "Wall"]. */
+export function unsafePartsFromCell(value: string): string[] {
+  return [...value.matchAll(/(\w+) Unsafe\b/g)].map((m) => m[1]!);
+}
+
 /** Reads a response cell back as a condition: "… Unsafe" text (W21) is that item's Unsafe score. */
 export function cellCondition(value: string): Condition | undefined {
   if (!value) return undefined;

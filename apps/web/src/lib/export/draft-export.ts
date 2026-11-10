@@ -1,11 +1,11 @@
-import { RUBRIC_VERSION, columnCheckApplies, columnCheckLine, drillHolesText, itemsCovered, withDerivedScores } from "@mqi/shared";
+import { RUBRIC_VERSION, columnCheckApplies, itemsCovered, surveyPurposeText, withDerivedScores, type ReportSource } from "@mqi/shared";
 
 import { buildSingleSurveyWorkbook } from "./single-survey-workbook";
-import { buildSingleSurveyPdf } from "./single-survey-pdf";
-import { aggregateLocations, ratingBand } from "@/lib/scoring";
+import { buildReportPdf, phonePhoto } from "./report";
+import { aggregateLocations } from "@/lib/scoring";
 import { RUBRIC_GROUPS } from "@/lib/data/items";
 import type { SurveyState } from "@/lib/survey-context";
-import type { DrillingCheck, ScoreResult, SiteChecks } from "@/lib/types";
+import type { DrillingCheck, PhotoAsset, ScoreResult, SiteChecks } from "@/lib/types";
 
 /** W56: the draft's locations with the items scored from the drilling and overflow answers. */
 const scored = (state: SurveyState, drilling: DrillingCheck = state.drillingCheck, site: SiteChecks = state.siteChecks) =>
@@ -113,15 +113,9 @@ export async function buildDraftPdfBlob({
   siteChecks,
   complaints,
 }: DraftExportParams): Promise<Blob> {
-  const items = RUBRIC_GROUPS;
-  const itemValues: Record<string, string> = Object.fromEntries(
-    Object.entries(aggregateLocations(scored(state, drillingCheck, siteChecks))).map(([name, score]) => [
-      name,
-      `Aggregated (${Math.round(score)}%)`,
-    ])
-  );
-
-  const bytes = await buildSingleSurveyPdf({
+  // W66: the same campus report as a submitted survey, from the phone's own data (works offline).
+  void result;
+  const source: ReportSource = {
     surveyId: state.surveyId ?? "draft",
     campusName: state.school?.name ?? "",
     region: state.school?.region ?? "",
@@ -130,7 +124,6 @@ export async function buildDraftPdfBlob({
     startTime: state.startTime ?? "",
     endTime: "",
     timeTakenSeconds: liveElapsedSeconds(state),
-    itemsCoveredPercent: itemsCovered(scored(state, drillingCheck, siteChecks), RUBRIC_VERSION).percent,
     apm: state.apm,
     asm: state.asm,
     principal: state.principal,
@@ -140,22 +133,27 @@ export async function buildDraftPdfBlob({
     typeOfStructure,
     centerBeam,
     drillingCheck,
-    additionalDrillHoles: drillHolesText(drillingCheck.extraHoles),
-    columnChecks: state.scoring.locations
-      .filter((l) => columnCheckApplies(l) && l.columnCheck)
-      .map((l) => columnCheckLine(l.name, l.columnCheck!.crackOver3mm, l.columnCheck!.hammerAvailable, l.columnCheck!.reading))
-      .filter(Boolean)
-      .join("; "),
     siteChecks,
     complaints,
-    overall: result.overall,
-    functionality: result.categories.Functionality.score,
-    safety: result.categories.Safety.score,
-    aesthetics: result.categories.Aesthetics.score,
-    ratingBand: ratingBand(result.overall) ?? "",
-    itemValues,
-    items,
-  });
+    purpose: surveyPurposeText(state.purpose),
+    submittedRubricVersion: RUBRIC_VERSION,
+    draft: true,
+    locations: state.scoring.locations.map((l) => ({
+      floorLevel: l.floorLevel,
+      type: l.type,
+      name: l.name,
+      scores: l.scores,
+      unsafeParts: l.unsafeParts,
+      columnCheck: columnCheckApplies(l) ? l.columnCheck : undefined,
+    })),
+    photos: [
+      ...state.scoring.locations.flatMap((l) =>
+        Object.entries(l.photos).flatMap(([itemName, assets]) => (assets as PhotoAsset[]).map((a) => ({ id: a.id, itemName, locationName: l.name }))),
+      ),
+      ...Object.entries(state.reviewPhotos).flatMap(([itemName, assets]) => assets.map((a) => ({ id: a.id, itemName, locationName: "" }))),
+    ],
+  };
+  const bytes = await buildReportPdf(source, (id) => phonePhoto(id).catch(() => null));
   // pdf-lib's Uint8Array<ArrayBufferLike> doesn't structurally satisfy
   // BlobPart's stricter Uint8Array<ArrayBuffer> under this TS lib version —
   // a runtime no-op, just a type mismatch between two otherwise-identical shapes.

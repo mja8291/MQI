@@ -188,6 +188,8 @@ export interface FoundSurvey {
     type: string;
     name: string;
     scores: Record<string, string>;
+    /** v2 (W66): parts marked unsafe per item, e.g. { "Wall/Column Condition i.e. cracks": ["Column"] }. */
+    unsafeParts?: Record<string, string[]>;
     /** v2 (W41): Column Unsafe follow-up as written; blank when not asked. */
     columnCrackOver3mm?: string;
     schmidtAvailable?: string;

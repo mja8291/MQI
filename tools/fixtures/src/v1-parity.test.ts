@@ -4,8 +4,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type ExcelJS from 'exceljs';
-import { PDFArray, PDFDocument, decodePDFRawStream } from 'pdf-lib';
-import type { PDFRawStream } from 'pdf-lib';
 import { API_VERSION, RESPONSES_TAB, buildDashboard, foundSurveyFromRows, scoreSurveyFor, uuidv7 } from '@mqi/shared';
 
 /** The last rubric version v1 (reference/ at 0a4a75c) knows; W56's 2026-11-07 list is v2-only. */
@@ -16,8 +14,7 @@ import { DEV_PASSWORD, seedDevEnv } from '../../../apps/gas/src/dev/server';
 import { handleRequest } from '../../../apps/gas/src/core/router';
 // v2 (the web app's builders and its surveys.get → builder mapping)
 import { buildSingleSurveyWorkbook as v2Workbook } from '../../../apps/web/src/lib/export/single-survey-workbook';
-import { buildSingleSurveyPdf as v2Pdf } from '../../../apps/web/src/lib/export/single-survey-pdf';
-import { pdfInput, workbookInput } from '../../../apps/web/src/lib/export/submitted';
+import { workbookInput } from '../../../apps/web/src/lib/export/submitted';
 
 /**
  * Phase 5 exit: v2's downloads and dashboard equal v1's, except that v2 no longer shows a survey
@@ -149,47 +146,6 @@ function withoutMethodRow(v1: Record<string, unknown>): Record<string, unknown> 
   return out;
 }
 
-/**
- * The text a PDF draws, in order. Positions are left out: v2 drops a row v1 drew (W17), which
- * moves everything below it, while every remaining string must match.
- */
-async function pdfText(bytes: Uint8Array): Promise<string[]> {
-  return [...(await pdfContent(bytes)).matchAll(/\((.*?)\) Tj/g)].map((m) => m[1]!);
-}
-
-/** v1's PDF text with v2's deliberate changes applied: D15 (no "Method 2 · "), W11 labels, W17 row. */
-function v1TextAsV2(text: string[]): string[] {
-  const label: Record<string, string> = { 'Accompanying APM': 'Engineering Staff', 'Responding ASM': 'ASM', 'School Principal': 'Principal',
-    // W56: renamed on the drilling card.
-    'Slab thickness assessment': 'Slab + Screeding/Waterproofing thickness assessment',
-  };
-  const out: string[] = [];
-  for (let i = 0; i < text.length; i++) {
-    const t = text[i]!;
-    // "—" is 0x97 in the PDF's WinAnsi text.
-    if (t === 'Type of structure (visual)' && text[i + 1] === '\u0097') {
-      i++;
-      continue;
-    }
-    out.push(label[t] ?? t.replace(/^Method 2 \u00b7 /, ''));
-  }
-  return out;
-}
-
-/** A PDF's page content with every text string decoded, so two PDFs can be compared by what they draw. */
-async function pdfContent(bytes: Uint8Array): Promise<string> {
-  const doc = await PDFDocument.load(bytes);
-  return doc
-    .getPages()
-    .map((page) => {
-      const contents = page.node.Contents()!;
-      const streams = contents instanceof PDFArray ? contents.asArray().map((ref) => doc.context.lookup(ref)) : [contents];
-      return streams.map((st) => Buffer.from(decodePDFRawStream(st as PDFRawStream).decode()).toString('latin1')).join('\n');
-    })
-    .join('\f')
-    .replace(/<([0-9A-Fa-f]*)>/g, (_m, hex: string) => `(${Buffer.from(hex, 'hex').toString('latin1')})`);
-}
-
 /** Every cell of every sheet: address → value (formulas included). */
 function cells(wb: ExcelJS.Workbook): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -233,53 +189,8 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
     expect(cells(v2Workbook(workbookInput({ ...v2Found, itemsCoveredPercent: null })))).toEqual(withoutMethodRow(cells(v1)));
   });
 
-  test.each(surveyIds.map((id) => [id]))('PDF for %s: draws the same text as v1 (less D15/W11/W17 changes)', async (id) => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-10-28T06:00:00.000Z'));
-    const { findSurvey } = await import('../../../reference/src/lib/export/find-survey');
-    const { buildSingleSurveyPdf: v1Pdf } = await import('../../../reference/src/lib/export/single-survey-pdf');
-    const found = (await findSurvey('parity', id))!;
-    // v1 /api/export/survey/[surveyId]/pdf route, verbatim.
-    const itemValues: Record<string, string> =
-      found.method === 1
-        ? found.conditions
-        : Object.fromEntries(Object.entries(found.aggregatedScores ?? {}).map(([name, score]) => [name, `Aggregated (${Math.round(score)}%)`]));
-    const v1 = await v1Pdf({
-      surveyId: id,
-      campusName: found.campusName,
-      region: found.region,
-      area: found.area,
-      method: found.method,
-      submittedAt: found.submittedAt,
-      startTime: found.startTime,
-      endTime: found.endTime,
-      timeTakenSeconds: found.timeTakenSeconds,
-      apm: found.apm,
-      asm: found.asm,
-      principal: found.principal,
-      powerSupply: found.powerSupply,
-      structuralConcern: found.structuralConcern,
-      buildingStructure: found.buildingStructure,
-      typeOfStructure: found.typeOfStructure,
-      centerBeam: found.centerBeam,
-      drillingCheck: found.drillingCheck,
-      siteChecks: found.siteChecks,
-      complaints: found.complaints,
-      overall: found.overall,
-      functionality: found.functionality,
-      safety: found.safety,
-      aesthetics: found.aesthetics,
-      ratingBand: found.ratingBandLabel,
-      itemValues,
-      items: found.items,
-    });
-    const v2Found = foundSurveyFromRows(id, ALL_M2.filter((r) => r['Survey ID'] === id))!;
-    const v2 = await v2Pdf(pdfInput({ ...v2Found, itemsCoveredPercent: null }));
-    vi.useRealTimers();
-    const v1Text = await pdfText(v1);
-    expect(v1Text.some((t) => t.startsWith('Method 2 \u00b7 '))).toBe(true);
-    expect(await pdfText(v2)).toEqual(v1TextAsV2(v1Text));
-  });
+  // W66 (2026-11-10): the PDF is the redesigned campus report (packages/shared/src/report), no longer
+  // v1's field list, so it has no v1 counterpart to match; its tests are apps/web report-pdf.test.ts and shared w66.test.ts.
 
   test('W22: v2 downloads add Items covered for surveys that recorded it', async () => {
     const id = writtenRows[0]!['Survey ID']!;
@@ -287,7 +198,6 @@ describe.skipIf(!V1_PRESENT)('v1 ⇄ v2 parity (exports and dashboard)', () => {
     expect(v2Found.itemsCoveredPercent).toBeGreaterThan(0);
     const c = cells(v2Workbook(workbookInput(v2Found)));
     expect(Object.entries(c).find(([, v]) => v === 'Items Covered (%)')).toBeTruthy();
-    expect(await pdfText(await v2Pdf(pdfInput(v2Found)))).toContain('Items covered');
   });
 
   test('dashboard figures match v1', async () => {

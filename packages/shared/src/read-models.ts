@@ -2,7 +2,7 @@ import type { CapturedSchool, DashboardData, FoundSurvey } from './api';
 import { CRITICAL_ITEMS, aggregateLocations, ratingBand } from './scoring';
 import { criticalColumn } from './sheets';
 import { KNOWN_RUBRIC_VERSIONS, rubricGroupsFor } from './rubric/versions';
-import { cellCondition, isUnsafe } from './rubric/items';
+import { RUBRIC_GROUPS, cellCondition, isUnsafe, unsafePartsFromCell } from './rubric/items';
 import { isTrainingPurposeText } from './rubric/content';
 import type { Condition, DrillingCheck, SurveyLocation, RatingBand, School, SiteChecks } from './types';
 
@@ -324,12 +324,21 @@ export function foundSurveyFromRows(surveyId: string, rows: readonly SheetRow[])
   if (!first) return null;
   const version = first['Rubric Version'] ?? '';
   const groups = rubricGroupsFor(version);
+  // W66: the current rubric's columns too, so the PDF report can re-score an older survey with it.
+  const names = [...new Set([...groups.map((g) => g.name), ...RUBRIC_GROUPS.map((g) => g.name)])];
+  const parts: Record<string, string[]>[] = [];
   const locations: SurveyLocation[] = rows.map((row, i) => {
     const scores: Record<string, Condition> = {};
-    for (const group of groups) {
-      const value = cellCondition(row[group.name] ?? '');
-      if (value) scores[group.name] = value;
+    const unsafe: Record<string, string[]> = {};
+    for (const name of names) {
+      const cell = row[name] ?? '';
+      const value = cellCondition(cell);
+      if (value) scores[name] = value;
+      // W66: "Column Unsafe, Wall Unsafe" keeps which parts were unsafe.
+      const p = unsafePartsFromCell(cell);
+      if (p.length) unsafe[name] = p;
     }
+    parts[i] = unsafe;
     return {
       id: String(i),
       floorLevel: (row['Floor Level'] || 'Ground') as SurveyLocation['floorLevel'],
@@ -351,6 +360,7 @@ export function foundSurveyFromRows(surveyId: string, rows: readonly SheetRow[])
       type: l.type,
       name: l.name,
       scores: l.scores,
+      ...(Object.keys(parts[i] ?? {}).length ? { unsafeParts: parts[i] } : {}),
       columnCrackOver3mm: rows[i]?.['Column Crack > 3 mm'] ?? '',
       schmidtAvailable: rows[i]?.['Schmidt Hammer Available'] ?? '',
       schmidtReading: rows[i]?.['Schmidt Hammer Reading'] ?? '',

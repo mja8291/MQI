@@ -1,8 +1,7 @@
-import { columnCheckLine } from '@mqi/shared';
+import { reportSourceFromFound } from '@mqi/shared';
 import type { ExportRowsResult, FoundSurvey } from '@mqi/shared';
 import { api } from '@/lib/api';
 import type { SingleSurveyExportInput } from './single-survey-workbook';
-import type { SingleSurveyPdfInput } from './single-survey-pdf';
 
 /**
  * Downloads of submitted surveys, built in the browser from surveys.get (v1 built the same
@@ -26,46 +25,6 @@ export function workbookInput(found: FoundSurvey): SingleSurveyExportInput {
   };
 }
 
-export function pdfInput(found: FoundSurvey): SingleSurveyPdfInput {
-  const itemValues: Record<string, string> = Object.fromEntries(
-    Object.entries(found.aggregatedScores ?? {}).map(([name, score]) => [name, `Aggregated (${Math.round(score)}%)`]),
-  );
-  return {
-    surveyId: found.surveyId,
-    campusName: found.campusName,
-    region: found.region,
-    area: found.area,
-    submittedAt: found.submittedAt,
-    startTime: found.startTime,
-    endTime: found.endTime,
-    timeTakenSeconds: found.timeTakenSeconds,
-    itemsCoveredPercent: found.itemsCoveredPercent,
-    apm: found.apm,
-    asm: found.asm,
-    principal: found.principal,
-    powerSupply: found.powerSupply,
-    structuralConcern: found.structuralConcern,
-    buildingStructure: found.buildingStructure,
-    typeOfStructure: found.typeOfStructure,
-    centerBeam: found.centerBeam,
-    drillingCheck: found.drillingCheck,
-    additionalDrillHoles: found.additionalDrillHoles,
-    columnChecks: (found.locations ?? [])
-      .map((l) => columnCheckLine(l.name, l.columnCrackOver3mm ?? "", l.schmidtAvailable ?? "", l.schmidtReading ?? ""))
-      .filter(Boolean)
-      .join("; "),
-    siteChecks: found.siteChecks,
-    complaints: found.complaints,
-    overall: found.overall,
-    functionality: found.functionality,
-    safety: found.safety,
-    aesthetics: found.aesthetics,
-    ratingBand: found.ratingBandLabel,
-    itemValues,
-    items: found.items,
-  } as SingleSurveyPdfInput;
-}
-
 export function save(data: BlobPart, type: string, filename: string): void {
   const url = URL.createObjectURL(new Blob([data], { type }));
   const a = document.createElement('a');
@@ -85,9 +44,10 @@ export async function downloadSurveyExcel(surveyId: string): Promise<void> {
   save(buf, XLSX, `mqi-survey-${surveyId}.xlsx`);
 }
 
+/** W66: the campus report (packages/shared/src/report), with the survey's photos. */
 export async function downloadSurveyPdf(surveyId: string): Promise<void> {
-  const [found, { buildSingleSurveyPdf }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./single-survey-pdf')]);
-  const bytes = await buildSingleSurveyPdf(pdfInput(found));
+  const [found, { buildReportPdf, serverPhoto }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
+  const bytes = await buildReportPdf(reportSourceFromFound(found), (id) => serverPhoto(id).catch(() => null));
   save(bytes as BlobPart, 'application/pdf', `mqi-survey-${surveyId}.pdf`);
 }
 

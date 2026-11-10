@@ -21,3 +21,5 @@ export * from './lib/encoding';
 export * from './lib/sha256';
 export * from './read-models';
 export * from './campus-plan';
+export * from './report/config';
+export * from './report/model';
