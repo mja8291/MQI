@@ -37,3 +37,26 @@ export function withDerivedScores<L extends { type: LocationType; scores: Record
     return { ...loc, scores: loc.type === "Roof" ? { ...scores, ...derived } : scores };
   });
 }
+
+/** W68: the item at the Roof location whose answer also fills the Review page's roof-access question. */
+export const ROOF_ACCESS_ITEM = "Access to roof area /tanks";
+const ROOF_ACCESS_BY_CONDITION: Partial<Record<Condition, "Proper staircase" | "Ladder" | "None" | "N/A">> = {
+  Good: "Proper staircase",
+  Poor: "Ladder",
+  "Very Poor": "None",
+  "N/A": "N/A",
+};
+
+/**
+ * W68 (2026-11-11): roof access is asked at the Roof location; the Review page shows that answer
+ * already filled in (the first Roof location with an answer). "" when no Roof location has one.
+ */
+export function roofAccessFromLocations(locations: readonly { type: LocationType; scores: Record<string, Condition> }[]): "Proper staircase" | "Ladder" | "None" | "N/A" | "" {
+  for (const l of locations) {
+    if (l.type !== "Roof") continue;
+    const c = l.scores[ROOF_ACCESS_ITEM];
+    const v = c ? ROOF_ACCESS_BY_CONDITION[c] : undefined;
+    if (v) return v;
+  }
+  return "";
+}

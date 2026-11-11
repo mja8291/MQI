@@ -4,7 +4,7 @@ import { withDerivedScores } from "../rubric/derived";
 import { FLOOR_LEVELS, LOCATION_TYPES, OVERFLOW_ITEM, RUBRIC_GROUPS, RUBRIC_SECTIONS, SLAB_ASSESSMENT_ITEM, cellCondition } from "../rubric/items";
 import { RUBRIC_VERSION } from "../rubric/rubric-version";
 import { rubricGroupsFor } from "../rubric/versions";
-import { CATEGORY_WEIGHT, CONDITION_SCORE, aggregateLocations, conditionToScore, ratingBand, scoreItemSet } from "../scoring";
+import { CATEGORY_WEIGHT, CONDITION_SCORE, aggregateLocations, groupConditionScore, ratingBand, scoreItemSet } from "../scoring";
 import {
   COLUMN_ITEM,
   SITE_PHOTO_RAIN_SPOUTS,
@@ -109,6 +109,46 @@ export interface ReportGroup {
   solidWhenUnsafe: boolean;
   /** Points of the overall score lost on this group (all groups' losses add up to 100 − overall). */
   pointsLost: number;
+  /** W68: a "*" item group — minor, maintained by the school itself (rubric principalMaintained). */
+  minor: boolean;
+}
+
+/** W68: how one rating of a minor item reads in the report (worst first). */
+export type MinorLevel = "veryPoor" | "poor" | "ok" | "good" | "na" | "unrecorded";
+export interface ReportMinor {
+  /** Major (Engineering) and minor (school) scores, same formula restricted to each set. */
+  major: { score: number | null; band: RatingBand | null };
+  minor: { score: number | null; band: RatingBand | null };
+  /** Every minor group with its campus score and how many locations got each rating. */
+  groups: { name: string; label: string; category: Category; weight: number; score: number | null; band: RatingBand | null; counts: Record<MinorLevel, number> }[];
+  /** Every location that has minor items, with each item's rating. */
+  byLocation: { label: string; score: number | null; items: { label: string; rating: string; level: MinorLevel }[] }[];
+  /** Ratings of Poor or worse across all locations. */
+  shortcomings: number;
+}
+
+/** W68: the legacy "ACM individual form" table — one row per item group, per division. */
+export interface QuestionnaireRow {
+  division: Category;
+  sno: number;
+  label: string;
+  minor: boolean;
+  /** The campus rating ticked: the condition nearest the combined score; null when not scored. */
+  tick: Exclude<Condition, "N/A"> | null;
+  score: number | null;
+  /** Division (category) weight, %. */
+  divisionWeight: number;
+  /** Weight within the division, %. */
+  groupWeight: number;
+  /** Division weight × group weight, % of the whole. */
+  cumulative: number;
+  /** Cumulative weight × score; null when not scored. */
+  scored: number | null;
+}
+export interface ReportQuestionnaire {
+  rows: QuestionnaireRow[];
+  divisions: { division: Category; weight: number; score: number | null; contribution: number | null }[];
+  total: number | null;
 }
 
 export type CellKind = "condition" | "binaryOk" | "binaryUnsafe" | "na" | "unrecorded" | "blank";
@@ -200,6 +240,10 @@ export interface ReportModel {
   photos: ReportPhoto[];
   complaints: string;
   flags: string[];
+  /** W68: major vs minor ("*", school-maintained) items. */
+  minor: ReportMinor;
+  /** W68: the legacy-format questionnaire and scoring table. */
+  questionnaire: ReportQuestionnaire;
 }
 
 // ---------- helpers ----------
@@ -223,6 +267,11 @@ const isBinary = (g: Pick<RubricGroup, "conditionOverride">) => (g.conditionOver
 function binaryLabel(g: RubricGroup, c: Condition): string {
   const label = g.conditionOverride?.find((o) => o.condition === c)?.label ?? c;
   return label.replace(/^Roof Access /, "").replace("Not Available", "Not available");
+}
+
+/** W68: a rating as the surveyor saw it ("Ladder" for Access to roof area), else the rating itself. */
+export function optionLabel(g: Pick<RubricGroup, "conditionOverride">, c: Condition): string {
+  return g.conditionOverride?.find((o) => o.condition === c)?.label ?? c;
 }
 
 function num(text: string | undefined): number | null {
@@ -309,6 +358,7 @@ export function buildReportModel(src: ReportSource): ReportModel {
       unsafe,
       solidWhenUnsafe: UNSAFE_SOLID_EXCEPTIONS.includes(g.name),
       pointsLost: score === null || scoredWeight === 0 ? 0 : (effective(g) / scoredWeight) * (100 - score),
+      minor: Boolean(g.principalMaintained),
     };
   });
 
@@ -327,7 +377,7 @@ export function buildReportModel(src: ReportSource): ReportModel {
     .map(({ l }) => l);
   const columns: ReportColumn[] = ordered.map((l, i) => {
     const here = new Set(groups.filter((g) => g.locations.includes(l.type)).map((g) => g.name));
-    const score = scoreItemSet(groups, (g) => (here.has(g.name) ? conditionToScore(l.scores[g.name]) : undefined)).overall;
+    const score = scoreItemSet(groups, (g) => (here.has(g.name) ? groupConditionScore(g, l.scores[g.name]) : undefined)).overall;
     return {
       key: `${i}`,
       floor: l.floorLevel,
@@ -354,7 +404,7 @@ export function buildReportModel(src: ReportSource): ReportModel {
           const bad = c === "Very Poor";
           return { kind: bad ? "binaryUnsafe" : "binaryOk", condition: c, text: `${binaryLabel(g, c)}${bad && parts.length ? ` (${parts.join(", ")})` : ""}` };
         }
-        return { kind: "condition", condition: c, text: c };
+        return { kind: "condition", condition: c, text: optionLabel(g, c) };
       }),
     };
   });
@@ -510,7 +560,7 @@ export function buildReportModel(src: ReportSource): ReportModel {
           rating = binaryLabel(g, c);
           severity = c === "Very Poor" ? 0 : 3;
         } else {
-          rating = c;
+          rating = optionLabel(g, c);
           severity = c === "Very Poor" ? 1 : c === "Poor" ? 2 : 3;
         }
       } else if (loc) severity = 3;
@@ -541,6 +591,53 @@ export function buildReportModel(src: ReportSource): ReportModel {
   if (unrecorded.length)
     flags.push(`${unrecorded.length} applicable item/location pair${unrecorded.length === 1 ? " was" : "s were"} left unrecorded: ${unrecorded.slice(0, 6).join("; ")}${unrecorded.length > 6 ? "; …" : ""}.`);
   flags.push(...rubricDifferences(src));
+
+  // ---- W68: minor ("*") items and the legacy questionnaire table ----
+  const levelOf = (c: Condition | undefined): MinorLevel => (!c ? "unrecorded" : c === "N/A" ? "na" : c === "Very Poor" ? "veryPoor" : c === "Poor" ? "poor" : c === "Ok" ? "ok" : "good");
+  const emptyCounts = (): Record<MinorLevel, number> => ({ veryPoor: 0, poor: 0, ok: 0, good: 0, na: 0, unrecorded: 0 });
+  const minorGroups = groups.filter((g) => g.principalMaintained);
+  const minorByLocation = ordered
+    .map((l, i) => ({
+      label: columns[i]!.label,
+      score: scoreItemSet(minorGroups, (g) => ((g as RubricGroup).locations.includes(l.type) ? groupConditionScore(g, l.scores[g.name]) : undefined)).overall,
+      items: minorGroups
+        .filter((g) => g.locations.includes(l.type))
+        .map((g) => {
+          const c = l.scores[g.name];
+          return { label: itemLabel(g, l.type), rating: !c ? "Not recorded" : c === "N/A" ? "N/A" : optionLabel(g, c), level: levelOf(c) };
+        }),
+    }))
+    .filter((x) => x.items.length);
+  const minorModel: ReportMinor = {
+    major: { score: result.major, band: ratingBand(result.major) },
+    minor: { score: result.minor, band: ratingBand(result.minor) },
+    groups: minorGroups.map((g) => {
+      const counts = emptyCounts();
+      for (const l of ordered) if (g.locations.includes(l.type)) counts[levelOf(l.scores[g.name])]++;
+      const score = aggregated[g.name] ?? null;
+      return { name: g.name, label: itemLabel(g), category: g.category, weight: g.weight, score, band: ratingBand(score), counts };
+    }),
+    byLocation: minorByLocation,
+    shortcomings: minorByLocation.reduce((n, l) => n + l.items.filter((it) => it.level === "poor" || it.level === "veryPoor").length, 0),
+  };
+  const nearest = (score: number): Exclude<Condition, "N/A"> => (score >= 87.5 ? "Good" : score >= 62.5 ? "Ok" : score >= 37.5 ? "Poor" : "Very Poor");
+  const LEGACY_ORDER: Category[] = ["Functionality", "Safety", "Aesthetics"];
+  const questionnaire: ReportQuestionnaire = {
+    rows: LEGACY_ORDER.flatMap((cat) =>
+      groups
+        .filter((g) => g.category === cat)
+        .map((g, i): QuestionnaireRow => {
+          const score = aggregated[g.name] ?? null;
+          const cumulative = (CATEGORY_WEIGHT[cat] * g.weight) / 100;
+          return { division: cat, sno: i + 1, label: itemLabel(g), minor: Boolean(g.principalMaintained), tick: score === null ? null : nearest(score), score, divisionWeight: CATEGORY_WEIGHT[cat], groupWeight: g.weight, cumulative, scored: score === null ? null : (cumulative * score) / 100 };
+        }),
+    ),
+    divisions: LEGACY_ORDER.map((cat) => {
+      const sc = result.categories[cat].score;
+      return { division: cat, weight: CATEGORY_WEIGHT[cat], score: sc, contribution: sc === null ? null : (sc * CATEGORY_WEIGHT[cat]) / 100 };
+    }),
+    total: overall,
+  };
 
   const dateIso = src.submittedAt && !Number.isNaN(new Date(src.submittedAt).getTime()) ? src.submittedAt : "";
   return {
@@ -574,6 +671,8 @@ export function buildReportModel(src: ReportSource): ReportModel {
     photos,
     complaints: src.complaints.trim(),
     flags,
+    minor: minorModel,
+    questionnaire,
   };
 }
 

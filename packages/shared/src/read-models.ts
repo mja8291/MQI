@@ -68,6 +68,8 @@ export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
   const latCol = col('latitude');
   const lngCol = col('longitude');
   const codeCol = col('ecompound no', 'ecompoundno', 'e-compound no');
+  // W68: the units' own School IDs (a different column from the Campus ID used as schoolId).
+  const unitIdCol = col('school id', 'schoolid') === idCol ? -1 : col('school id', 'schoolid');
   const names = eCompoundNames(eCompoundGrid);
 
   const byId = new Map<string, School>();
@@ -86,13 +88,16 @@ export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
       eCompoundNo: cell(codeCol),
     };
     const existing = byId.get(schoolId);
+    const unitId = cell(unitIdCol);
     if (existing) {
+      if (unitId && !existing.schoolIds?.includes(unitId)) existing.schoolIds = [...(existing.schoolIds ?? []), unitId];
       // A campus has one row per unit: fill any detail the first unit row left blank.
-      for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned'>, string][]) if (v && !existing[k]) existing[k] = v;
+      for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned' | 'schoolIds'>, string][]) if (v && !existing[k]) existing[k] = v;
       continue;
     }
     const school: School = { schoolId, name, region: cell(regionCol), area: cell(areaCol) };
-    for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned'>, string][]) if (v) school[k] = v;
+    for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned' | 'schoolIds'>, string][]) if (v) school[k] = v;
+    if (unitId) school.schoolIds = [unitId];
     byId.set(schoolId, school);
   }
   for (const school of byId.values()) {

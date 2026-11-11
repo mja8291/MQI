@@ -180,7 +180,7 @@ export interface RubricItem {
    * CONDITION_SCORE values and 0-100% scale as every other item, just a
    * narrower, relabeled set of buttons. N/A remains selectable regardless.
    */
-  conditionOverride?: { condition: Exclude<Condition, "N/A">; label: string }[];
+  conditionOverride?: { condition: Exclude<Condition, "N/A">; label: string; /** W68: score instead of the condition's usual one (e.g. None = 0%). */ score?: number }[];
   /**
    * v2 (W21): the item's Unsafe is split into parts that can be picked together, e.g. Column and
    * Wall. Any part scores as the item's Unsafe; the sheet shows "Column Unsafe, Wall Unsafe".
@@ -360,6 +360,11 @@ export interface School {
   eCompoundName?: string;
   /** v2 (W64): in the R&M Plan 2026-27 ("Planned in this year"): a BOQ is to be prepared too. */
   rmPlanned?: boolean;
+  /**
+   * W68: the School IDs of the campus's active units. `schoolId` is the Campus ID; the Campus
+   * Survey Plan and R&M Plan tabs list School IDs, so they are matched against these.
+   */
+  schoolIds?: string[];
 }
 
 export interface RespondentDetails {

@@ -27,6 +27,17 @@ export const YES_NO: NonNullable<RubricItem["conditionOverride"]> = [
   { condition: "Very Poor", label: "NO" },
 ];
 
+/**
+ * W68 (2026-11-11): Access to roof area /tanks at the Roof location takes the Review page's
+ * options. Owner's scores: Proper staircase 100%, Ladder 50%, None 0% (stored as Good / Poor /
+ * Very Poor; `score` overrides Very Poor's usual 25%). N/A stays available.
+ */
+export const ROOF_ACCESS_TYPES: NonNullable<RubricItem["conditionOverride"]> = [
+  { condition: "Good", label: "Proper staircase" },
+  { condition: "Poor", label: "Ladder" },
+  { condition: "Very Poor", label: "None", score: 0 },
+];
+
 export const ROOF_ACCESS: NonNullable<RubricItem["conditionOverride"]> = [
   { condition: "Good", label: "Roof Access Available" },
   { condition: "Very Poor", label: "Roof Access Not Available" },

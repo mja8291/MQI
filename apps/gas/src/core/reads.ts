@@ -51,8 +51,9 @@ function rmPlannedIds(ctx: Ctx): Set<string> {
 }
 
 export function schools(ctx: Ctx): SchoolsResult {
-  // 'schools.v3' (W64): the list now marks R&M Plan 2026-27 campuses; the key change drops lists cached before.
-  return cached(ctx.env, 'schools.v3', SCHOOLS_TTL, () => ({
+  // 'schools.v3' (W64): the list now marks R&M Plan 2026-27 campuses; 'schools.v4' (W68): each campus
+  // carries its units' School IDs. The key change drops lists cached before.
+  return cached(ctx.env, 'schools.v4', SCHOOLS_TTL, () => ({
     schools: markRmPlanned(parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()), rmPlannedIds(ctx)),
   }));
 }

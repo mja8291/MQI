@@ -37,7 +37,7 @@ describe("W66 report model — fixture 01a1911f", () => {
     expect(model.categories.map((c) => c.score)).toEqual([engine.categories.Functionality.score, engine.categories.Safety.score, engine.categories.Aesthetics.score]);
     // Re-scoring moved Safety off the stored 61 (the new derived groups count as Good here).
     expect(Math.round(model.categories[1]!.score!)).not.toBe(61);
-    expect(model.flags.some((f) => f.includes("re-scores it with the current rubric 2026-11-07"))).toBe(true);
+    expect(model.flags.some((f) => f.includes(`re-scores it with the current rubric ${RUBRIC_VERSION}`))).toBe(true);
     expect(model.flags.some((f) => f.includes("Concrete/Plaster Soundness 15→12") && f.includes("Ceiling Condition i.e. cracks & seepage 20→16"))).toBe(true);
     expect(model.flags.some((f) => f.includes("overall 76%") && f.includes("Safety 61%"))).toBe(true);
   });

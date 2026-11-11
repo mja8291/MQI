@@ -7,8 +7,9 @@
  *   - "2026-10-27.2" items-v20261027-2.ts
  *   - "2026-10-27.3" items-v20261027-3.ts
  *   - "2026-10-28"   items-v20261028.ts
- *   - "2026-11-07"   current list (33 groups)
+ *   - "2026-11-07"   items-v20261107.ts
+ *   - "2026-11-11"   current list (W68: "*" items as in the sheet; roof access staircase/ladder/none)
  * Bump this (and freeze a snapshot of whatever list changed) the next time
  * item names or weights change.
  */
-export const RUBRIC_VERSION = "2026-11-07";
+export const RUBRIC_VERSION = "2026-11-11";

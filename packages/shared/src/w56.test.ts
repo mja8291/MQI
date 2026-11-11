@@ -43,7 +43,7 @@ describe('W56 rubric', () => {
   });
 
   test('2026-10-28 surveys keep their own frozen list', () => {
-    expect(RUBRIC_VERSION).toBe('2026-11-07');
+    expect(RUBRIC_VERSION >= '2026-11-07').toBe(true); // W68 moved on to 2026-11-11
     expect(rubricGroupsFor('2026-10-28')).toBe(RUBRIC_GROUPS_20261028);
     expect(RUBRIC_GROUPS_20261028).toHaveLength(31);
     expect(RUBRIC_GROUPS_20261028.find((g) => g.name === 'Ceiling Condition i.e. cracks & seepage')!.weight).toBe(20);

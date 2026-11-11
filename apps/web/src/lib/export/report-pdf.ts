@@ -14,6 +14,7 @@ import {
   type ReportCell,
   type ReportGroup,
   type ReportModel,
+  type MinorLevel,
 } from "@mqi/shared";
 
 /**
@@ -890,6 +891,234 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
   }
 }
 
+// ---------- W68: major and minor items ----------
+
+const LEVEL_STYLE: Record<MinorLevel, { fill: RGB; text: RGB; label: string; strong: boolean }> = {
+  veryPoor: { fill: hex(REPORT_CELL["Very Poor"].fill), text: hex(REPORT_CELL["Very Poor"].text), label: "Very Poor", strong: true },
+  poor: { fill: hex(REPORT_CELL.Poor.fill), text: hex(REPORT_CELL.Poor.text), label: "Poor", strong: true },
+  ok: { fill: hex(REPORT_CELL.Ok.fill), text: hex(REPORT_CELL.Ok.text), label: "Ok", strong: false },
+  good: { fill: hex(REPORT_CELL.Good.fill), text: hex(REPORT_CELL.Good.text), label: "Good", strong: false },
+  na: { fill: hex(REPORT_CELL.na.fill), text: hex(REPORT_CELL.na.text), label: "N/A", strong: false },
+  unrecorded: { fill: C.white, text: C.faint, label: "Not recorded", strong: false },
+};
+const LEVEL_ORDER: MinorLevel[] = ["veryPoor", "poor", "ok", "good", "na"];
+const bandOf = (score: number | null): RatingBand | null =>
+  score === null ? null : ((REPORT_BAND_FLOORS.slice().reverse().find((f) => score >= f.from)?.band as RatingBand | undefined) ?? null);
+
+function scoreCard(p: PDFPage, ctx: Ctx, x: number, yTop: number, w: number, title: string, sub: string, score: number | null, band: RatingBand | null) {
+  const h = 74;
+  rect(p, x, yTop - h, w, h, { fill: C.panel, border: C.rule });
+  rect(p, x, yTop - h, 4, h, { fill: bandColor(band) });
+  text(p, ctx, title, x + 12, yTop - 16, 10, { bold: true, color: C.navy });
+  text(p, ctx, fit(ctx, sub, 7.5, w - 20), x + 12, yTop - 28, 7.5, { color: C.soft });
+  text(p, ctx, pct(score), x + 12, yTop - 58, 24, { bold: true, color: bandColor(band) });
+  text(p, ctx, band ?? "Not scored", x + 12 + width(ctx, pct(score), 24, true) + 8, yTop - 56, 10, { bold: true, color: bandColor(band) });
+}
+
+function legendWidth(ctx: Ctx): number {
+  return LEVEL_ORDER.reduce((w, lv) => w + 12 + width(ctx, LEVEL_STYLE[lv].label, 7.5) + 10, 0) - 10;
+}
+function legendLevels(p: PDFPage, ctx: Ctx, x: number, y: number) {
+  let lx = x;
+  for (const lv of LEVEL_ORDER) {
+    const s = LEVEL_STYLE[lv];
+    rect(p, lx, y - 2, 9, 9, { fill: s.fill, border: C.rule, bw: 0.4 });
+    text(p, ctx, s.label, lx + 12, y, 7.5, { color: C.soft });
+    lx += 12 + width(ctx, s.label, 7.5) + 10;
+  }
+}
+
+function minorPages(ctx: Ctx) {
+  const mi = ctx.model.minor;
+  if (!mi.groups.length) return;
+  let p = newPage(ctx, "Major and minor items");
+  heading(p, ctx, "Major and minor items", H - BAR - 30, "Minor (*) items are maintained by the school itself; major items by the Engineering Department. Same scoring, each set on its own.");
+  const top = H - BAR - 58;
+  scoreCard(p, ctx, M, top, 190, "Major items", "Engineering Department", mi.major.score, mi.major.band);
+  scoreCard(p, ctx, M, top - 86, 190, "Minor items (*)", "Maintained by the school", mi.minor.score, mi.minor.band);
+  const sc = mi.shortcomings;
+  const sy = top - 172;
+  rect(p, M, sy - 40, 190, 40, { fill: sc ? C.redBg : C.greenBg, border: sc ? C.red : C.green, bw: 0.8 });
+  text(p, ctx, sc ? `${sc} minor shortcoming${sc === 1 ? "" : "s"}` : "No minor shortcomings", M + 10, sy - 18, 10, { bold: true, color: sc ? C.red : C.green });
+  text(p, ctx, "ratings of Poor or Very Poor, all locations", M + 10, sy - 31, 7.5, { color: C.soft });
+
+  // Chart: every minor item's campus score, and how its locations were rated.
+  const cx = M + 220;
+  const labelW = 180;
+  const barX = cx + labelW + 6;
+  const barW = 200;
+  const cntX = barX + barW + 36;
+  const segW = W - M - cntX;
+  text(p, ctx, "Minor items: campus score, and ratings at its locations", cx, top - 4, 10, { bold: true, color: C.navy });
+  legendLevels(p, ctx, W - M - legendWidth(ctx), top - 18);
+  const rowH = Math.min(17, (top - 30 - (FOOT + 20)) / mi.groups.length);
+  let y = top - 30;
+  for (const g of mi.groups) {
+    const yc = y - rowH / 2;
+    text(p, ctx, fit(ctx, `${g.label} *`, 8, labelW), cx, yc - 3, 8, { color: catColor(g.category) });
+    rect(p, barX, yc - 5, barW, 10, { fill: C.panel });
+    if (g.score !== null) rect(p, barX, yc - 5, (barW * g.score) / 100, 10, { fill: bandColor(g.band) });
+    text(p, ctx, g.score === null ? "N/A" : pct(g.score), barX + barW + 5, yc - 3, 8, { bold: true, color: g.score === null ? C.faint : bandColor(g.band) });
+    const levels: MinorLevel[] = [...LEVEL_ORDER, "unrecorded"];
+    const total = levels.reduce((s, lv) => s + g.counts[lv], 0);
+    let sx = cntX;
+    for (const lv of levels) {
+      const n = g.counts[lv];
+      if (!n || !total) continue;
+      const w = (segW * n) / total;
+      rect(p, sx, yc - 5, w, 10, { fill: LEVEL_STYLE[lv].fill, border: C.white, bw: 0.4 });
+      if (w > 9) textCenter(p, ctx, String(n), sx + w / 2, yc - 3, 7, { bold: true, color: LEVEL_STYLE[lv].text });
+      sx += w;
+    }
+    if (!total) text(p, ctx, "no location of its type", cntX, yc - 3, 7, { color: C.faint });
+    y -= rowH;
+  }
+
+  // Location-wise detail: every location's minor items, Poor and worse highlighted.
+  p = newPage(ctx, "Minor items by location");
+  heading(p, ctx, "Minor items by location", H - BAR - 30, "Each location's minor (*) items with their rating; Poor and Very Poor are highlighted. The % is the location's minor-items score.");
+  legendLevels(p, ctx, W - M - legendWidth(ctx), H - BAR - 30);
+  const locW = 200;
+  const scoreW = 40;
+  const chipX = M + locW + scoreW + 10;
+  const chipMax = W - M - chipX;
+  const chipH = 12;
+  y = H - BAR - 64;
+  for (const loc of mi.byLocation) {
+    const chips: { x: number; line: number; w: number; label: string; lv: MinorLevel }[] = [];
+    let lx = 0;
+    let ln = 0;
+    for (const it of loc.items) {
+      const label = `${it.label}: ${it.rating}`;
+      const w = Math.min(chipMax, width(ctx, label, 7.5, LEVEL_STYLE[it.level].strong) + 10);
+      if (lx > 0 && lx + w > chipMax) {
+        ln++;
+        lx = 0;
+      }
+      chips.push({ x: lx, line: ln, w, label, lv: it.level });
+      lx += w + 4;
+    }
+    const nameLines = wrap(ctx, loc.label, 8, locW - 6, true).slice(0, 2);
+    const rowH = Math.max((ln + 1) * (chipH + 3), nameLines.length * 10 + 2) + 8;
+    if (y - rowH < FOOT + 8) {
+      p = newPage(ctx, "Minor items by location");
+      y = H - BAR - 24;
+    }
+    line(p, M, y, W - M, y, C.rule, 0.5);
+    const bad = loc.items.some((it) => it.level === "poor" || it.level === "veryPoor");
+    nameLines.forEach((l, i) => text(p, ctx, l, M, y - 12 - i * 10, 8, { bold: true, color: bad ? C.red : C.ink }));
+    text(p, ctx, pct(loc.score), M + locW, y - 12, 8.5, { bold: true, color: bandColor(bandOf(loc.score)) });
+    for (const c of chips) {
+      const s = LEVEL_STYLE[c.lv];
+      const cy = y - 4 - (c.line + 1) * (chipH + 3);
+      // Poor and Very Poor: solid colour, bold. Ok: light green. Good: white with a green edge. N/A: grey.
+      const plain = c.lv === "good";
+      if (s.strong) rect(p, chipX + c.x, cy, c.w, chipH, { fill: s.fill });
+      else rect(p, chipX + c.x, cy, c.w, chipH, { fill: plain ? C.white : s.fill, border: plain ? s.fill : C.rule, bw: 0.6 });
+      text(p, ctx, fit(ctx, c.label, 7.5, c.w - 8, s.strong), chipX + c.x + 5, cy + 3.3, 7.5, { bold: s.strong, color: s.strong || c.lv === "ok" ? s.text : plain ? C.ink : s.text });
+    }
+    y -= rowH;
+  }
+}
+
+// ---------- W68: questionnaire and scoring (the pre-App "ACM individual form" table) ----------
+
+function questionnairePage(ctx: Ctx) {
+  const q = ctx.model.questionnaire;
+  const p = newPage(ctx, "Questionnaire and scoring");
+  heading(p, ctx, "Survey questionnaire and scoring mechanism", H - BAR - 30, "In the format of the pre-App reports. The rating ticked is the one nearest the item's combined campus score. * = minor item, maintained by the school.");
+  const cols = [
+    { k: "div", t: "Work division", w: 70 },
+    { k: "sno", t: "S. No", w: 26 },
+    { k: "item", t: "Item group", w: 232 },
+    { k: "Good", t: "Good", w: 32 },
+    { k: "Ok", t: "Ok", w: 32 },
+    { k: "Poor", t: "Poor", w: 32 },
+    { k: "Very Poor", t: "Very Poor", w: 36 },
+    { k: "score", t: "Score", w: 42 },
+    { k: "dw", t: "Divisional weightage", w: 54 },
+    { k: "gw", t: "Category weightage", w: 54 },
+    { k: "cw", t: "Cumulative weightage", w: 56 },
+    { k: "sw", t: "Scored weightage", w: 50 },
+    { k: "ds", t: "Divisional score", w: 50 },
+    { k: "ts", t: "Total score", w: 46 },
+  ];
+  const xs: number[] = [];
+  let x = M;
+  for (const c of cols) {
+    xs.push(x);
+    x += c.w;
+  }
+  const right = x;
+  const col = (k: string) => cols.findIndex((c) => c.k === k);
+  const mid = (k: string) => xs[col(k)]! + cols[col(k)]!.w / 2;
+  const headTop = H - BAR - 58;
+  const headH = 24;
+  rect(p, M, headTop - headH, right - M, headH, { fill: C.navy });
+  cols.forEach((c, i) => {
+    const lines = wrap(ctx, c.t, 7, c.w - 4, true).slice(0, 2);
+    lines.forEach((l, j) => textCenter(p, ctx, l, xs[i]! + c.w / 2, headTop - 10 - j * 8 - (lines.length === 1 ? 4 : 0), 7, { bold: true, color: C.white }));
+  });
+  const rowsTop = headTop - headH;
+  const rowH = Math.min(13, (rowsTop - (FOOT + 30)) / q.rows.length);
+  const fmt = (n: number | null, d = 1) => (n === null ? "" : `${n.toFixed(d)}%`);
+  const divStart = new Map<string, number>();
+  q.rows.forEach((r, i) => {
+    const yb = rowsTop - (i + 1) * rowH;
+    const tint = r.division === "Safety" ? hex("#FDECEC") : r.division === "Functionality" ? hex("#E6F4F1") : hex("#FBF5E6");
+    rect(p, xs[1]!, yb, xs[col("dw")]! - xs[1]!, rowH, { fill: tint });
+    rect(p, xs[col("gw")]!, yb, xs[col("ds")]! - xs[col("gw")]!, rowH, { fill: tint });
+    line(p, xs[1]!, yb, xs[col("dw")]!, yb, C.rule, 0.4);
+    line(p, xs[col("gw")]!, yb, xs[col("ds")]!, yb, C.rule, 0.4);
+    const ty = yb + rowH / 2 - 2.6;
+    if (!divStart.has(r.division)) divStart.set(r.division, i);
+    textCenter(p, ctx, String(r.sno), mid("sno"), ty, 7.5);
+    text(p, ctx, fit(ctx, `${r.label}${r.minor ? " *" : ""}`, 7.5, cols[2]!.w - 6, r.minor), xs[2]! + 3, ty, 7.5, { bold: r.minor });
+    for (const cond of ["Good", "Ok", "Poor", "Very Poor"] as const) {
+      const bx = mid(cond) - 4;
+      rect(p, bx, yb + rowH / 2 - 4, 8, 8, { fill: C.white, border: C.soft, bw: 0.6 });
+      if (r.tick === cond) check(p, bx + 4, yb + rowH / 2 - 0.5, cond === "Poor" || cond === "Very Poor" ? C.red : C.green, 0.75);
+    }
+    textCenter(p, ctx, r.score === null ? "N/A" : fmt(r.score), mid("score"), ty, 7.5, { color: r.score === null ? C.faint : C.ink });
+    textCenter(p, ctx, `${r.groupWeight}%`, mid("gw"), ty, 7.5, { bold: true });
+    textCenter(p, ctx, fmt(r.cumulative), mid("cw"), ty, 7.5);
+    textCenter(p, ctx, r.scored === null ? "-" : fmt(r.scored), mid("sw"), ty, 7.5);
+  });
+  const tableBottom = rowsTop - q.rows.length * rowH;
+  // Merged cells: division name, divisional weightage and divisional score; one total.
+  for (const d of q.divisions) {
+    const first = divStart.get(d.division);
+    if (first === undefined) continue;
+    const n = q.rows.filter((r) => r.division === d.division).length;
+    const yTop = rowsTop - first * rowH;
+    const yb = yTop - n * rowH;
+    const ym = (yTop + yb) / 2;
+    rect(p, M, yb, cols[0]!.w, n * rowH, { fill: catColor(d.division) });
+    textCenter(p, ctx, d.division, M + cols[0]!.w / 2, ym - 3, 8.5, { bold: true, color: C.white });
+    rect(p, xs[col("dw")]!, yb, cols[col("dw")]!.w, n * rowH, { fill: C.panel, border: C.rule, bw: 0.5 });
+    textCenter(p, ctx, `${d.weight}%`, mid("dw"), ym - 3, 9, { bold: true });
+    rect(p, xs[col("ds")]!, yb, cols[col("ds")]!.w, n * rowH, { fill: C.panel, border: C.rule, bw: 0.5 });
+    textCenter(p, ctx, d.contribution === null ? "-" : fmt(d.contribution, 0), mid("ds"), ym, 11, { bold: true, color: bandColor(bandOf(d.score)) });
+    textCenter(p, ctx, `(${pct(d.score)} of ${d.weight})`, mid("ds"), ym - 11, 6.5, { color: C.soft });
+    line(p, M, yb, right, yb, C.navy, 0.8);
+  }
+  const ti = col("ts");
+  const ob = bandOf(q.total);
+  rect(p, xs[ti]!, tableBottom, cols[ti]!.w, rowsTop - tableBottom, { fill: hex("#DCE6F5"), border: C.rule, bw: 0.5 });
+  textCenter(p, ctx, pct(q.total), mid("ts"), (rowsTop + tableBottom) / 2, 14, { bold: true, color: bandColor(ob) });
+  if (ob) textCenter(p, ctx, ob, mid("ts"), (rowsTop + tableBottom) / 2 - 13, 7.5, { bold: true, color: bandColor(ob) });
+  rect(p, M, tableBottom, right - M, rowsTop - tableBottom, { border: C.navy, bw: 0.8 });
+  text(
+    p,
+    ctx,
+    "Scored weightage = cumulative weightage x score. Items rated N/A or not assessed are left out and the remaining weights re-normalise, so a divisional score is its scored weightage over the weight actually scored.",
+    M,
+    tableBottom - 12,
+    7,
+    { color: C.soft },
+  );
+}
+
 // ---------- methodology & data quality ----------
 
 function methodologyPages(ctx: Ctx) {
@@ -993,10 +1222,12 @@ export async function renderReportPdf(model: ReportModel, opts: RenderOptions = 
   const ctx: Ctx = { doc, font: await doc.embedFont(StandardFonts.Helvetica), bold: await doc.embedFont(StandardFonts.HelveticaBold), model };
   summaryPage(ctx);
   lossPage(ctx);
+  minorPages(ctx);
   profilePage(ctx);
   matrixPages(ctx, "byItem");
   matrixPages(ctx, "byLocation");
   structuralPage(ctx);
+  questionnairePage(ctx);
   await photoPages(ctx, opts);
   methodologyPages(ctx);
   footers(ctx, opts.generatedAt ?? new Date());

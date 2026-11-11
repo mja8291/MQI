@@ -32,6 +32,12 @@ export function conditionToScore(condition: Condition | undefined): number | und
   return CONDITION_SCORE[condition];
 }
 
+/** W68: a rating's score for one item group — its own option score where it has one (Roof access None = 0%). */
+export function groupConditionScore(group: Pick<RubricItem, "conditionOverride">, condition: Condition | undefined): number | undefined {
+  const own = condition && condition !== "N/A" ? group.conditionOverride?.find((o) => o.condition === condition)?.score : undefined;
+  return own ?? conditionToScore(condition);
+}
+
 /**
  * Renormalizing weighted-average, generic over any numeric value getter:
  * sum(value * weight) / sum(weight) across items where a value exists.
@@ -158,13 +164,13 @@ export const CRITICAL_ITEM_GROUP: Record<(typeof CRITICAL_ITEMS)[number], string
 export function aggregateLocations(
   locations: SurveyLocation[],
   /** Defaults to the current item groups; an export of a pre-2026-10-27 survey passes the frozen legacy list instead. */
-  groups: { name: string; aggregation: "worst" | "average" }[] = RUBRIC_GROUPS
+  groups: { name: string; aggregation: "worst" | "average"; conditionOverride?: RubricItem["conditionOverride"] }[] = RUBRIC_GROUPS
 ): Record<string, number> {
   const result: Record<string, number> = {};
   for (const group of groups) {
     const values: number[] = [];
     for (const loc of locations) {
-      const v = conditionToScore(loc.scores[group.name]);
+      const v = groupConditionScore(group, loc.scores[group.name]);
       if (v !== undefined) values.push(v);
     }
     if (values.length === 0) continue;

@@ -24,7 +24,7 @@ async function scoreEverything(page: Page) {
   for (const section of ['Safety', 'Functionality', 'Aesthetics']) {
     const header = page.getByRole('button', { name: new RegExp(`^${section}`) });
     const box = page.locator('div.rounded-2xl', { has: header });
-    const pills = box.getByRole('button', { name: /^(Good|OK|Roof Access Available)$/ });
+    const pills = box.getByRole('button', { name: /^(Good|OK|Roof Access Available|Proper staircase)$/ });
     if ((await pills.count()) === 0) await header.click();
     await expect(pills.first()).toBeVisible();
     const n = await pills.count();

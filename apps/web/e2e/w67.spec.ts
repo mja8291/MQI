@@ -44,6 +44,6 @@ test('W67: network tag, stacked dashboard row, Excel campus report', async ({ pa
   expect(Date.now() - started).toBeLessThan(15_000);
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile((await download.path())!);
-  expect(wb.worksheets.map((w) => w.name).slice(0, 3)).toEqual(['Summary', 'Score by group', 'Matrix by item']);
+  expect(wb.worksheets.map((w) => w.name).slice(0, 3)).toEqual(['Summary', 'Score by group', 'Major and minor']);
   expect(wb.worksheets.at(-1)!.name).toBe('Single Survey - Calculated');
 });

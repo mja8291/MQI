@@ -1,7 +1,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { breakupView } from "@mqi/shared";
+import { breakupView, ratingBand } from "@mqi/shared";
+import { BAND_COLOR } from "@/lib/scoring";
 import type { CampusBreakupCore } from "@mqi/shared";
 import { ScreenShell } from "@/components/ui/ScreenShell";
 import { TopBar } from "@/components/ui/TopBar";
@@ -64,6 +65,13 @@ export default function DashboardPage() {
   const distribution = Object.fromEntries(BANDS.map((b) => [b, inRegion.filter((s) => s.band === b).length])) as Record<RatingBand, number>;
   const listed = inRegion.filter((s) => filter === "All" || s.band === filter);
   const outside = core?.surveyedOutsidePlan ?? 0;
+  // W68: average Major (Engineering) and Minor (school-maintained, *) scores of the surveys shown.
+  const avgOf = (xs: (number | null)[]) => {
+    const v = xs.filter((x): x is number => x !== null);
+    return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+  };
+  const avgMajor = avgOf(inRegion.map((s) => s.major));
+  const avgMinor = avgOf(inRegion.map((s) => s.minor));
   const mqiScope = `App surveys${outside ? `, incl. ${fmt(outside)} outside the survey list` : ""}${region ? ` · ${region}` : ""}`;
 
   return (
@@ -150,6 +158,25 @@ export default function DashboardPage() {
 
           <Heading sub={mqiScope}>MQI Score distribution</Heading>
           <ScoreDistribution distribution={distribution} />
+
+          <Heading sub={mqiScope}>Major and minor items</Heading>
+          <div className="grid grid-cols-2 gap-2.5" data-testid="major-minor">
+            <StatCard
+              label="Major items (Engineering)"
+              value={avgMajor === null ? "—" : `${Math.round(avgMajor)}%`}
+              sub={`Average · ${ratingBand(avgMajor) ?? "no scores"}`}
+              color={avgMajor === null ? undefined : BAND_COLOR[ratingBand(avgMajor)!]}
+            />
+            <StatCard
+              label="Minor items * (school)"
+              value={avgMinor === null ? "—" : `${Math.round(avgMinor)}%`}
+              sub={`Average · ${ratingBand(avgMinor) ?? "no scores"}`}
+              color={avgMinor === null ? undefined : BAND_COLOR[ratingBand(avgMinor)!]}
+            />
+          </div>
+          <p className="mt-1 text-[10.5px] text-ink-faint">
+            Minor (*) items are maintained by the school itself. Each campus&apos;s Major and Minor score is in the list below (tap a campus on a phone).
+          </p>
 
           <Heading sub={mqiScope}>MQI by region</Heading>
           {data.byRegion.filter((r) => !region || r.region === region).length === 0 ? (

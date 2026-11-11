@@ -1,5 +1,5 @@
 import type { Category, Condition, FloorLevel, LocationType, RubricGroup, RubricItem } from "../types";
-import { OK_UNSAFE, ROOF_ACCESS, SOUNDNESS_GUIDANCE, WALL_COLUMN_GUIDANCE, YES_NO } from "./condition-overrides";
+import { OK_UNSAFE, ROOF_ACCESS_TYPES, SOUNDNESS_GUIDANCE, WALL_COLUMN_GUIDANCE, YES_NO } from "./condition-overrides";
 
 /**
  * The survey rubric — 33 item groups (Safety 11 / Functionality 15 / Aesthetics 7),
@@ -38,7 +38,10 @@ import { OK_UNSAFE, ROOF_ACCESS, SOUNDNESS_GUIDANCE, WALL_COLUMN_GUIDANCE, YES_N
  *     Access to roof area moves onto the same scale — see
  *     condition-overrides.ts.
  * Not in the sheet, derived here:
- *   - principalMaintained (drives the Minor score) is true when every item
+ *   - principalMaintained (drives the Minor score): since 2026-11-11 (W68) exactly the
+ *     sheet's "*" item groups (school-maintained, minor): Access to roof area, Proper
+ *     Overflow Disposal System, Distribution Board, every Functionality group but Sewerage
+ *     System and Internal Flooring, and Signage. Before that it was true when every item
  *     the sheet's own item-level "Item Group" column files under the group is
  *     one of its "*" (school-maintained) items. Distribution Board is mixed
  *     (Energy & Power * + Electrical Wiring) and stays with Engineering;
@@ -89,9 +92,10 @@ const SHEET_GROUPS: RubricGroup[] = [
     name: "Access to roof area /tanks",
     category: "Safety",
     weight: 10,
+    // W68 (2026-11-11): the Review page's options, with the owner's scores (staircase 100, ladder 50, none 0); N/A allowed.
+    principalMaintained: true,
     locations: [ROOF],
-    conditionOverride: ROOF_ACCESS,
-    hideNA: true,
+    conditionOverride: ROOF_ACCESS_TYPES,
   }),
   worst({
     name: "Concrete/Plaster Soundness",
@@ -147,8 +151,9 @@ const SHEET_GROUPS: RubricGroup[] = [
     locations: [ROOF],
     conditionOverride: YES_NO,
     derived: true,
+    principalMaintained: true,
   }),
-  worst({ name: "Distribution Board", category: "Safety", weight: 7, locations: [CORRIDOR] }),
+  worst({ name: "Distribution Board", category: "Safety", weight: 7, principalMaintained: true, locations: [CORRIDOR] }),
 
   // Functionality — 45% of overall, 15 groups
   average({
@@ -190,7 +195,6 @@ const SHEET_GROUPS: RubricGroup[] = [
     name: "Sewerage System",
     category: "Functionality",
     weight: 8,
-    principalMaintained: true,
     locations: [TOILET, FACADE, LAB],
   }),
   average({
@@ -252,6 +256,7 @@ const SHEET_GROUPS: RubricGroup[] = [
     name: "Solar Panels/Inverter/Batteries",
     category: "Functionality",
     weight: 5,
+    principalMaintained: true,
     locations: [CORRIDOR, ROOF],
     // W44: panels are on the roof, inverter and batteries in the corridor/stairs.
     locationLabels: { [ROOF]: "Solar Panels", [CORRIDOR]: "Inverter/Batteries" },

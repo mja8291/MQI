@@ -14,7 +14,7 @@ describe("W66 report PDF", () => {
     const bytes = await renderReportPdf(buildReportModel(source), { generatedAt: at });
     if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT, bytes);
     const doc = await PDFDocument.load(bytes);
-    expect(doc.getPageCount()).toBe(7);
+    expect(doc.getPageCount()).toBe(10); // W68: + major/minor, minor by location, questionnaire
     expect(doc.getPage(0).getSize()).toEqual({ width: 841.89, height: 595.28 });
     expect(bytes.length).toBeLessThan(5 * 1024 * 1024);
   });
@@ -45,10 +45,29 @@ describe("W66 report PDF", () => {
       generatedAt: at,
       loadPhoto: async (id) => (id === "ok" ? { bytes: png, mimeType: "image/png" } : null),
     });
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(8);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(11);
   });
 
   it("text the PDF font can't draw is replaced, not crashed on", () => {
     expect(safe("Schmidt 45 N/mm² → ≥ ✓ اردو")).toBe("Schmidt 45 N/mm² -> >=  ????");
+  });
+});
+
+describe("W68 report PDF", () => {
+  it("minor shortcomings: a campus with Poor and Very Poor minor items still renders (and is written for review)", async () => {
+    const shabby: ReportSource = {
+      ...source,
+      locations: source.locations.map((l, i) => ({
+        ...l,
+        scores: Object.fromEntries(
+          Object.entries(l.scores).map(([k, v]) => [k, /Green board|Furniture|Door|Electrical Fixtures|Water Storage|Access to roof/.test(k) ? (i % 2 ? "Very Poor" : "Poor") : v]),
+        ) as typeof l.scores,
+      })),
+    };
+    const model = buildReportModel(shabby);
+    expect(model.minor.shortcomings).toBeGreaterThan(0);
+    const bytes = await renderReportPdf(model, { generatedAt: at });
+    if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-minor.pdf"), bytes);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(10);
   });
 });

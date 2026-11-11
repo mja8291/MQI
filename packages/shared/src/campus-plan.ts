@@ -30,10 +30,17 @@ export function rmPlanIds(rows: readonly Record<string, string>[]): Set<string> 
   return new Set(rows.flatMap((r) => splitIds(r['School ID'])));
 }
 
+/**
+ * The IDs a plan row is matched on for an app campus: its units' School IDs (W68). Only a list
+ * without them (older data) falls back to the Campus ID; mixing the two matched the wrong campus
+ * when one campus's Campus ID equals another's School ID.
+ */
+export const unitSchoolIds = (s: { schoolId: string; schoolIds?: string[] }): string[] => (s.schoolIds?.length ? s.schoolIds : splitIds(s.schoolId));
+
 /** Marks the schools whose School ID is in the plan. */
-export function markRmPlanned<S extends { schoolId: string }>(schools: readonly S[], ids: ReadonlySet<string>): (S & { rmPlanned?: boolean })[] {
+export function markRmPlanned<S extends { schoolId: string; schoolIds?: string[] }>(schools: readonly S[], ids: ReadonlySet<string>): (S & { rmPlanned?: boolean })[] {
   if (!ids.size) return [...schools];
-  return schools.map((s) => (splitIds(s.schoolId).some((id) => ids.has(id)) ? { ...s, rmPlanned: true } : s));
+  return schools.map((s) => (unitSchoolIds(s).some((id) => ids.has(id)) ? { ...s, rmPlanned: true } : s));
 }
 
 export const PLAN_CATEGORIES = ['PSSP/PSRP Deduction', 'Done without App', 'Last 5 Year Exemption', 'Survey with App'] as const;
@@ -105,9 +112,19 @@ const count = (campuses: number, eCompounds: number): CampusBreakupCount => ({ c
  * v2 (W65): the same breakup for each region (the dashboard's region filter), and the campuses
  * behind the two notes (not in the app's list; surveyed outside the Survey with App list).
  */
+/**
+ * W68: a survey carries its Campus ID; the plan lists School IDs. A surveyed campus is looked up by
+ * its units' School IDs (from the app's list), by the Campus ID only when the list doesn't know it.
+ */
+function surveyKey(appSchools: readonly School[]): (s: CapturedSchool) => { schoolId: string; name: string } {
+  const idsOfCampus = new Map(appSchools.map((a) => [a.schoolId, unitSchoolIds(a)]));
+  return (s) => ({ schoolId: (idsOfCampus.get(s.schoolId) ?? [s.schoolId]).join(' | '), name: s.name });
+}
+
 export function campusBreakup(plan: readonly PlanCampus[], captured: readonly CapturedSchool[], appSchools: readonly School[] = []): CampusBreakup {
   const find = planIndex(plan);
-  const regionOf = (s: CapturedSchool) => find({ schoolId: s.schoolId, name: s.name })?.region || s.region;
+  const key = surveyKey(appSchools);
+  const regionOf = (s: CapturedSchool) => find(key(s))?.region || s.region;
   const regions = [...new Set(plan.map((c) => c.region).filter(Boolean))].sort();
   const core = breakupCore(plan, captured, appSchools);
   const perRegion: Record<string, CampusBreakupCore> = {};
@@ -138,6 +155,7 @@ export function campusBreakup(plan: readonly PlanCampus[], captured: readonly Ca
 
 function breakupCore(plan: readonly PlanCampus[], captured: readonly CapturedSchool[], appSchools: readonly School[]): CampusBreakupCore {
   const find = planIndex(plan);
+  const key = surveyKey(appSchools);
   const ecosWith = (cats: readonly PlanCategory[]) => new Set(plan.filter((c) => c.eCompoundNo && cats.includes(c.category as PlanCategory)).map((c) => c.eCompoundNo));
   const allEcos = new Set(plan.map((c) => c.eCompoundNo).filter(Boolean)).size;
   const inDone = ecosWith(['Done without App', 'Last 5 Year Exemption', 'Survey with App']).size;
@@ -151,7 +169,7 @@ function breakupCore(plan: readonly PlanCampus[], captured: readonly CapturedSch
   const surveyed = new Map<PlanCampus, CapturedSchool>();
   const outside: OutsideScopeCampus[] = [];
   for (const s of captured) {
-    const c = find({ schoolId: s.schoolId, name: s.name });
+    const c = find(key(s));
     if (c && c.category === 'Survey with App') {
       if (!surveyed.has(c)) surveyed.set(c, s);
     } else outside.push({ name: s.name, schoolId: s.schoolId, region: c?.region || s.region, category: c?.category || 'Not in the plan' });
@@ -162,7 +180,7 @@ function breakupCore(plan: readonly PlanCampus[], captured: readonly CapturedSch
 
   // Campuses to survey that the app's campus list doesn't have (they can't be picked yet).
   const appFind = planIndex(
-    appSchools.map((s) => ({ ids: splitIds(s.schoolId), eCompoundNo: '', name: s.name, region: '', category: '' as const, assessment: '' })),
+    appSchools.map((s) => ({ ids: unitSchoolIds(s), eCompoundNo: '', name: s.name, region: '', category: '' as const, assessment: '' })),
   );
   const notInAppList = appSchools.length ? withApp.filter((c) => !c.ids.some((id) => appFind({ schoolId: id, name: '' })) && !appFind({ schoolId: '', name: c.name })) : [];
 

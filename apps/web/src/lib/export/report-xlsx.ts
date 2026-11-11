@@ -212,7 +212,7 @@ function groupsSheet(wb: ExcelJS.Workbook, m: ReportModel) {
     const row = ws.getRow(r);
     row.getCell(1).value = g.category;
     row.getCell(1).font = { bold: true, color: { argb: argb(REPORT_CATEGORY_COLOR[g.category]) } };
-    row.getCell(2).value = g.label;
+    row.getCell(2).value = g.minor ? `${g.label} *` : g.label;
     row.getCell(3).value = g.weight;
     row.getCell(4).value = round1((g.weight * CATEGORY_WEIGHT[g.category]) / 100);
     row.getCell(5).value = g.aggregation === "worst" ? "Worst location" : "Average";
@@ -465,6 +465,150 @@ function notesSheet(wb: ExcelJS.Workbook, m: ReportModel) {
   });
 }
 
+/** W68: major vs minor ("*") items, and every location's minor items with Poor and worse highlighted. */
+function minorSheet(wb: ExcelJS.Workbook, m: ReportModel) {
+  const mi = m.minor;
+  const ws = wb.addWorksheet("Major and minor", { views: [{ state: "frozen", ySplit: 0 }] });
+  ws.columns = [{ width: 42 }, { width: 12 }, { width: 12 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 10 }, { width: 12 }];
+  title(ws, "Major and minor items", "Minor (*) items are maintained by the school itself; major items by the Engineering Department. Same scoring, each set on its own.", 9);
+  headerRow(ws, 4, ["Set", "Score %", "Band", "", "", "", "", "", ""]);
+  const scoreLine = (r: number, label: string, score: number | null, band: string | null) => {
+    ws.getCell(r, 1).value = label;
+    ws.getCell(r, 1).font = { bold: true };
+    ws.getCell(r, 2).value = pct(score);
+    ws.getCell(r, 2).numFmt = "0.0";
+    ws.getCell(r, 3).value = band ?? "—";
+    bandCell(ws.getCell(r, 3), band);
+  };
+  scoreLine(5, "Major items (Engineering Department)", mi.major.score, mi.major.band);
+  scoreLine(6, "Minor items * (maintained by the school)", mi.minor.score, mi.minor.band);
+  ws.getCell(7, 1).value = `Minor shortcomings (Poor or Very Poor, all locations): ${mi.shortcomings}`;
+  ws.getCell(7, 1).font = { bold: true, color: { argb: argb(mi.shortcomings ? REPORT_CATEGORY_COLOR.Safety : REPORT_BAND_COLOR.Excellent) } };
+
+  headerRow(ws, 9, ["Minor item *", "Category", "Campus score %", "Very Poor", "Poor", "Ok", "Good", "N/A", "Not recorded"]);
+  let r = 10;
+  for (const g of mi.groups) {
+    const row = ws.getRow(r);
+    row.getCell(1).value = `${g.label} *`;
+    row.getCell(2).value = g.category;
+    row.getCell(2).font = { color: { argb: argb(REPORT_CATEGORY_COLOR[g.category]) } };
+    row.getCell(3).value = pct(g.score);
+    row.getCell(3).numFmt = "0.0";
+    bandCell(row.getCell(3), g.band);
+    const counts = [g.counts.veryPoor, g.counts.poor, g.counts.ok, g.counts.good, g.counts.na, g.counts.unrecorded];
+    counts.forEach((n, i) => {
+      const c = row.getCell(4 + i);
+      c.value = n || "";
+      c.alignment = { horizontal: "center" };
+      if (n && i < 2) {
+        c.fill = fill(i === 0 ? REPORT_CELL["Very Poor"].fill : REPORT_CELL.Poor.fill);
+        c.font = { bold: true, color: { argb: argb(i === 0 ? REPORT_CELL["Very Poor"].text : REPORT_CELL.Poor.text) } };
+      }
+    });
+    for (let k = 1; k <= 9; k++) row.getCell(k).border = thin;
+    r++;
+  }
+
+  r += 1;
+  ws.mergeCells(r, 1, r, 9);
+  ws.getCell(r, 1).value = "Minor items by location (Poor and Very Poor highlighted)";
+  ws.getCell(r, 1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+  ws.getCell(r, 1).fill = fill(REPORT_BRAND.navy);
+  r++;
+  headerRow(ws, r, ["Location", "Minor score %", "Minor item *", "Rating", "", "", "", "", ""]);
+  r++;
+  for (const loc of mi.byLocation) {
+    const first = r;
+    for (const it of loc.items) {
+      const row = ws.getRow(r);
+      row.getCell(1).value = r === first ? loc.label : "";
+      row.getCell(1).font = { bold: true };
+      if (r === first) {
+        row.getCell(2).value = pct(loc.score);
+        row.getCell(2).numFmt = "0";
+      }
+      row.getCell(3).value = it.label;
+      const c = row.getCell(4);
+      c.value = it.rating;
+      if (it.level === "veryPoor" || it.level === "poor") {
+        const st = it.level === "veryPoor" ? REPORT_CELL["Very Poor"] : REPORT_CELL.Poor;
+        c.fill = fill(st.fill);
+        c.font = { bold: true, color: { argb: argb(st.text) } };
+        row.getCell(3).font = { bold: true };
+      } else if (it.level === "ok") c.fill = fill(REPORT_CELL.Ok.fill);
+      for (const k of [1, 2, 3, 4]) row.getCell(k).border = thin;
+      r++;
+    }
+  }
+  ws.getColumn(3).width = 40;
+}
+
+/** W68: the pre-App "ACM individual form" table. */
+function questionnaireSheet(wb: ExcelJS.Workbook, m: ReportModel) {
+  const q = m.questionnaire;
+  const ws = wb.addWorksheet("Questionnaire", { views: [{ state: "frozen", ySplit: 3 }] });
+  ws.columns = [{ width: 14 }, { width: 6 }, { width: 44 }, { width: 7 }, { width: 7 }, { width: 7 }, { width: 9 }, { width: 9 }, { width: 11 }, { width: 11 }, { width: 12 }, { width: 11 }, { width: 11 }, { width: 10 }];
+  title(ws, "Survey questionnaire and scoring mechanism", "In the format of the pre-App reports. The rating ticked is the one nearest the item's combined campus score. * = minor item, maintained by the school.", 14);
+  headerRow(ws, 3, ["Work division", "S. No", "Item group", "Good", "Ok", "Poor", "Very Poor", "Score", "Divisional weightage", "Category weightage", "Cumulative weightage", "Scored weightage", "Divisional score", "Total score"]);
+  let r = 4;
+  const startOf = new Map<string, number>();
+  for (const row of q.rows) {
+    if (!startOf.has(row.division)) startOf.set(row.division, r);
+    const x = ws.getRow(r);
+    x.getCell(1).value = row.division;
+    x.getCell(2).value = row.sno;
+    x.getCell(3).value = `${row.label}${row.minor ? " *" : ""}`;
+    if (row.minor) x.getCell(3).font = { bold: true };
+    (["Good", "Ok", "Poor", "Very Poor"] as const).forEach((cond, i) => {
+      const c = x.getCell(4 + i);
+      c.value = row.tick === cond ? "✓" : "☐";
+      c.alignment = { horizontal: "center" };
+      if (row.tick === cond) c.font = { bold: true, color: { argb: argb(i >= 2 ? REPORT_CATEGORY_COLOR.Safety : REPORT_BAND_COLOR.Excellent) } };
+    });
+    x.getCell(8).value = row.score === null ? "N/A" : row.score / 100;
+    x.getCell(8).numFmt = "0.0%";
+    x.getCell(9).value = row.divisionWeight / 100;
+    x.getCell(9).numFmt = "0%";
+    x.getCell(10).value = row.groupWeight / 100;
+    x.getCell(10).numFmt = "0%";
+    x.getCell(11).value = row.cumulative / 100;
+    x.getCell(11).numFmt = "0.0%";
+    x.getCell(12).value = row.scored === null ? "-" : row.scored / 100;
+    x.getCell(12).numFmt = "0.0%";
+    for (let k = 1; k <= 14; k++) x.getCell(k).border = thin;
+    r++;
+  }
+  // Division and total cells merged, as in the old form.
+  for (const d of q.divisions) {
+    const first = startOf.get(d.division);
+    if (first === undefined) continue;
+    const last = first + q.rows.filter((x) => x.division === d.division).length - 1;
+    ws.mergeCells(first, 1, last, 1);
+    const dc = ws.getCell(first, 1);
+    dc.fill = fill(REPORT_CATEGORY_COLOR[d.division]);
+    dc.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    dc.alignment = { vertical: "middle", horizontal: "center" };
+    ws.mergeCells(first, 9, last, 9);
+    ws.getCell(first, 9).alignment = { vertical: "middle", horizontal: "center" };
+    ws.mergeCells(first, 13, last, 13);
+    const ds = ws.getCell(first, 13);
+    ds.value = d.contribution === null ? "-" : d.contribution / 100;
+    ds.numFmt = "0%";
+    ds.font = { bold: true, size: 12 };
+    ds.alignment = { vertical: "middle", horizontal: "center" };
+  }
+  ws.mergeCells(4, 14, r - 1, 14);
+  const t = ws.getCell(4, 14);
+  t.value = q.total === null ? "-" : q.total / 100;
+  t.numFmt = "0%";
+  t.font = { bold: true, size: 14 };
+  t.alignment = { vertical: "middle", horizontal: "center" };
+  t.fill = fill("#DCE6F5");
+  ws.getCell(r + 1, 1).value =
+    "Scored weightage = cumulative weightage × score. Items rated N/A or not assessed are left out and the remaining weights re-normalise, so a divisional score is its scored weightage over the weight actually scored.";
+  ws.getCell(r + 1, 1).font = { italic: true, size: 9, color: { argb: argb(REPORT_BRAND.inkSoft) } };
+}
+
 /** The report workbook: report sheets from the model, then the formula sheet. */
 export function buildReportWorkbook(model: ReportModel, calculated: SingleSurveyExportInput): ExcelJS.Workbook {
   // The formula sheet is v1's builder, unchanged (v1 parity suite); the report sheets go in front.
@@ -472,9 +616,11 @@ export function buildReportWorkbook(model: ReportModel, calculated: SingleSurvey
   const formulas = wb.getWorksheet("Single Survey - Calculated")!;
   summarySheet(wb, model);
   groupsSheet(wb, model);
+  minorSheet(wb, model);
   matrixByItemSheet(wb, model);
   matrixByLocationSheet(wb, model);
   structuralSheet(wb, model);
+  questionnaireSheet(wb, model);
   photosSheet(wb, model);
   notesSheet(wb, model);
   // Sheet order: report sheets first, formulas last.

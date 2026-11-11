@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { BAND_COLOR } from "@/lib/scoring";
+import { ratingBand } from "@mqi/shared";
 import type { CapturedSchool } from "@/lib/data/mock-dashboard";
 import { downloadSurveyExcel, downloadSurveyPdf } from "@/lib/export/submitted";
 
@@ -46,6 +47,25 @@ function Downloads({ surveyId, name }: { surveyId: string; name: string }) {
         {busy === "pdf" ? "…" : "PDF"}
       </button>
     </span>
+  );
+}
+
+/**
+ * W68: the campus's Major (Engineering) and Minor (school-maintained, *) scores. Always shown on a
+ * wide screen; on a phone, behind a tap so the row stays short.
+ */
+function MajorMinor({ major, minor, open }: { major: number | null; minor: number | null; open: boolean }) {
+  const part = (label: string, v: number | null) => (
+    <span>
+      {label}{" "}
+      <b style={{ color: v === null ? undefined : BAND_COLOR[ratingBand(v)!] }}>{v === null ? "—" : `${Math.round(v)}%`}</b>
+    </span>
+  );
+  return (
+    <div data-testid="major-minor-row" className={`${open ? "flex" : "hidden"} md:flex gap-3 mt-0.5 text-[11px] text-ink-soft`}>
+      {part("Major", major)}
+      {part("Minor *", minor)}
+    </div>
   );
 }
 
@@ -106,14 +126,21 @@ const when = (iso: string) =>
 export function SchoolRow({ school }: { school: CapturedSchool }) {
   // W53: a campus surveyed more than once lists every survey, not only the latest.
   const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState(false);
   const others = school.earlier ?? [];
   return (
     <div className="border-b border-border">
       <div className="flex items-center gap-2.5 py-2.5">
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold leading-snug line-clamp-2 break-words">
-            {school.name}
-          </div>
+          {/* W68: on a phone, tapping the campus shows its Major/Minor scores. */}
+          <button
+            type="button"
+            onClick={() => setDetails((d) => !d)}
+            aria-expanded={details}
+            className="block w-full text-left md:pointer-events-none"
+          >
+            <span className="block text-[13px] font-semibold leading-snug line-clamp-2 break-words">{school.name}</span>
+          </button>
           <div className="text-[11px] text-ink-faint">
             {school.region} · {school.area} · {when(school.date)}
             {school.submittedBy ? ` · ${school.submittedBy}` : ""}
@@ -129,6 +156,7 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
               <ChevronDown size={13} className={open ? "rotate-180" : ""} />
             </button>
           ) : null}
+          <MajorMinor major={school.major} minor={school.minor} open={details} />
           <UnsafeReasons items={school.unsafeItems} />
         </div>
         <ScoreStack overall={school.overall} band={school.band} unsafeItems={school.unsafeItems} />

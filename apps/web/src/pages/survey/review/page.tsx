@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
 import { useAuth } from "@/lib/auth/client";
-import { RUBRIC_VERSION, itemsCovered, surveyPurposeText, withDerivedScores } from "@mqi/shared";
+import { RUBRIC_VERSION, itemsCovered, roofAccessFromLocations, surveyPurposeText, withDerivedScores } from "@mqi/shared";
 import { CATEGORIES, CRITICAL_ITEMS, ratingBand, scoreSurvey } from "@/lib/scoring";
 import { isLocationComplete } from "@/lib/data/items";
 import {
@@ -91,7 +91,13 @@ export default function ReviewPage() {
   // (e.g. slabAssessment) opens with it blank rather than undefined.
   const drilling: DrillingCheck = { ...emptyDrillingCheck(), ...state.drillingCheck };
   const hasRoof = state.scoring.locations.some((l) => l.type === "Roof");
-  const [site, setSite] = useState<SiteChecks>({ ...emptySiteChecks(), ...state.siteChecks });
+  // W68: roof access is asked at the Roof location; its answer fills this page's question (still changeable here).
+  const roofAccessAtRoof = roofAccessFromLocations(state.scoring.locations);
+  const [site, setSite] = useState<SiteChecks>(() => ({
+    ...emptySiteChecks(),
+    ...state.siteChecks,
+    ...(roofAccessAtRoof ? { roofAccessType: roofAccessAtRoof } : {}),
+  }));
   const [complaints, setLocalComplaints] = useState(state.complaints);
   // v2 (W39): every answer here goes into the survey as it changes, so autosave keeps it
   // (a reload or kill on this page no longer loses Review answers). Setters via a ref: their
@@ -455,6 +461,11 @@ export default function ReviewPage() {
       </Field>
 
       <Field label={ROOF_ACCESS_TYPE_QUESTION}>
+        {roofAccessAtRoof ? (
+          <p className="-mt-1 mb-1.5 text-[11.5px] text-ink-soft" data-testid="roof-access-from-roof">
+            {site.roofAccessType === roofAccessAtRoof ? "Filled in from your answer at the Roof location." : `At the Roof location you answered "${roofAccessAtRoof}".`}
+          </p>
+        ) : null}
         <select
           value={site.roofAccessType}
           onChange={(e) => setSite({ ...site, roofAccessType: e.target.value as SiteChecks["roofAccessType"] })}

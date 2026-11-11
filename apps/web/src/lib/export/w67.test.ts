@@ -23,9 +23,11 @@ describe("W67 Excel report", () => {
     expect(wb.worksheets.map((w) => w.name)).toEqual([
       "Summary",
       "Score by group",
+      "Major and minor",
       "Matrix by item",
       "Matrix by location",
       "Structural",
+      "Questionnaire",
       "Notes",
       "Single Survey - Calculated",
     ]);
