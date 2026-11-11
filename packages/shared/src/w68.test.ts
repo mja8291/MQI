@@ -14,7 +14,7 @@ import type { Condition, SurveyLocation } from "./types";
 
 /** W68 (requested 2026-11-11): "*" items, roof access options, legacy table, School ID matching. */
 
-const roof = (c: Condition): SurveyLocation => ({ floorLevel: "Roof", type: "Roof", name: "Roof 1", scores: { [ROOF_ACCESS_ITEM]: c }, photos: {}, notes: {} }) as SurveyLocation;
+const roof = (c: Condition): SurveyLocation => ({ floorLevel: "Roof", type: "Roof", name: "Roof 1", scores: { [ROOF_ACCESS_ITEM]: c }, photos: {}, notes: {} }) as unknown as SurveyLocation;
 
 describe("W68 rubric 2026-11-11", () => {
   it("is the current version; 2026-11-07 surveys keep their frozen list", () => {
@@ -138,10 +138,31 @@ describe("W68 School IDs: the plan tabs list School IDs, the app keys campuses b
     ]);
     const captured = { schoolId: "1036", surveyId: "s1", name: "Sayada Zahra Alam Campus", region: "South", area: "A", date: "2026-11-10", overall: 90, band: "Excellent", major: 90, minor: 90, criticalItems: {} } as CapturedSchool;
     const b = campusBreakup(plan, [captured], schools);
-    expect(b.withApp.notInAppListCampuses.map((c) => c.name)).toEqual(["Missing Campus"]);
+    expect(b.withApp.notInAppListCampuses!.map((c) => c.name)).toEqual(["Missing Campus"]);
     // The survey of campus 1036 counts for the plan row with School ID 1424, not the one with 1036.
     expect(b.withApp.surveyed).toBe(1);
     expect(b.regions?.South?.withApp.surveyed).toBe(1);
     expect(b.regions?.North?.withApp.surveyed).toBe(0);
+  });
+});
+
+describe("W68 photos grouped Safety, Minor, Major, Site checks", () => {
+  it("sorts by section first, then worst rating", () => {
+    const source = reportSourceFromFound(foundSurveyFromRows(FIXTURE_SURVEY_ID, FIXTURE_ROWS)!);
+    const m = buildReportModel({
+      ...source,
+      photos: [
+        { id: "site", itemName: "Roof clean", locationName: "" },
+        { id: "major", itemName: "Paint", locationName: "KG A" },
+        { id: "minor", itemName: "Furniture Condition", locationName: "KG A" },
+        { id: "safety", itemName: "Ceiling Condition i.e. cracks & seepage", locationName: "Principal Room" },
+      ],
+    });
+    expect(m.photos.map((p) => [p.id, p.section])).toEqual([
+      ["safety", "Safety"],
+      ["minor", "Minor"],
+      ["major", "Major"],
+      ["site", "Site"],
+    ]);
   });
 });

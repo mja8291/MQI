@@ -15,6 +15,8 @@ import {
   type ReportGroup,
   type ReportModel,
   type MinorLevel,
+  type PhotoSection,
+  PHOTO_SECTIONS,
 } from "@mqi/shared";
 
 /**
@@ -846,13 +848,13 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
   // then embedded in report order.
   const load = opts.loadPhoto;
   const bytes = await mapPool(m.photos, PHOTO_FETCHES, (ph) => load(ph.id).catch(() => null));
-  const loaded: { img: PDFImage; caption: string; severity: number }[] = [];
+  const loaded: { img: PDFImage; caption: string; severity: number; section: PhotoSection }[] = [];
   for (const [i, ph] of m.photos.entries()) {
     try {
       const b = bytes[i];
       if (!b) continue;
       const img = /png/i.test(b.mimeType) ? await ctx.doc.embedPng(b.bytes) : /jpe?g/i.test(b.mimeType) ? await ctx.doc.embedJpg(b.bytes) : null;
-      if (img) loaded.push({ img, caption: ph.caption, severity: ph.severity });
+      if (img) loaded.push({ img, caption: ph.caption, severity: ph.severity, section: ph.section });
     } catch {
       // A photo that can't be read is left out; the report still prints.
     }
@@ -864,10 +866,14 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
   const cw = (W - 2 * M - gap * (cols - 1)) / cols;
   const ih = 150;
   const cellH = ih + 40;
-  for (let i = 0; i < loaded.length; i += cols * rowsPer) {
-    const p = newPage(ctx, "Photo evidence");
-    heading(p, ctx, "Photo evidence", H - BAR - 30, "Unsafe and Very Poor items first. Each caption gives the location, the item and its rating.");
-    loaded.slice(i, i + cols * rowsPer).forEach((ph, k) => {
+  // W68: one run of pages per section (Safety, Minor, Major, Site checks), worst ratings first in each.
+  for (const { section, title } of PHOTO_SECTIONS) {
+    const inSection = loaded.filter((ph) => ph.section === section);
+    for (let i = 0; i < inSection.length; i += cols * rowsPer) {
+    const p = newPage(ctx, `Photo evidence · ${title}`);
+    const n = inSection.length;
+    heading(p, ctx, `Photo evidence: ${title}${i ? " (continued)" : ""}`, H - BAR - 30, `${n} photo${n === 1 ? "" : "s"}. Unsafe and Very Poor first. Each caption gives the location, the item and its rating.`);
+    inSection.slice(i, i + cols * rowsPer).forEach((ph, k) => {
       const x = M + (k % cols) * (cw + gap);
       const yTop = H - BAR - 64 - Math.floor(k / cols) * (cellH + 10);
       const sc = Math.min(cw / ph.img.width, ih / ph.img.height);
@@ -888,6 +894,7 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
         .slice(0, 3)
         .forEach((l, j) => text(p, ctx, l, x, yTop - ih - 11 - j * 10, 8, { bold: j === 0 }));
     });
+    }
   }
 }
 

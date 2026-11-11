@@ -207,7 +207,17 @@ export interface ReportPhoto {
   itemName: string;
   /** 0 Unsafe, 1 Very Poor, 2 Poor, 3 other ratings, 4 last-page questions. */
   severity: number;
+  /** W68: photos are grouped Safety items, then minor (*) items, then major items, then site checks. */
+  section: PhotoSection;
 }
+
+export type PhotoSection = "Safety" | "Minor" | "Major" | "Site";
+export const PHOTO_SECTIONS: { section: PhotoSection; title: string }[] = [
+  { section: "Safety", title: "Safety items" },
+  { section: "Minor", title: "Minor items (*), maintained by the school" },
+  { section: "Major", title: "Major items (Engineering Department)" },
+  { section: "Site", title: "Site checks" },
+];
 
 export interface ReportModel {
   rubricVersion: string;
@@ -273,6 +283,8 @@ function binaryLabel(g: RubricGroup, c: Condition): string {
 export function optionLabel(g: Pick<RubricGroup, "conditionOverride">, c: Condition): string {
   return g.conditionOverride?.find((o) => o.condition === c)?.label ?? c;
 }
+
+const sectionIndex = (s: PhotoSection) => PHOTO_SECTIONS.findIndex((x) => x.section === s);
 
 function num(text: string | undefined): number | null {
   if (text == null || text.trim() === "") return null;
@@ -565,15 +577,17 @@ export function buildReportModel(src: ReportSource): ReportModel {
         }
       } else if (loc) severity = 3;
       const item = g ? itemLabel(g, loc?.type) : p.itemName;
+      const section: PhotoSection = !g ? "Site" : g.category === "Safety" ? "Safety" : g.principalMaintained ? "Minor" : "Major";
       return {
         id: p.id,
         itemName: p.itemName,
         locationName: p.locationName,
         severity,
+        section,
         caption: [loc ? locationPlace(loc) : p.locationName || "Site checks", item, rating].filter(Boolean).join(" · "),
       };
     })
-    .sort((a, b) => a.severity - b.severity || naturalCompare(a.caption, b.caption));
+    .sort((a, b) => sectionIndex(a.section) - sectionIndex(b.section) || a.severity - b.severity || naturalCompare(a.caption, b.caption));
 
   // ---- data quality ----
   const coverage = itemsCoveredNow(locations);
