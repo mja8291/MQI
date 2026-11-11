@@ -52,8 +52,6 @@ export function onMobile(): boolean {
   return typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-/** Below this, photos may fail to save: warn on Home. */
-export const LOW_SPACE_MB = 200;
 
 async function check(): Promise<OfflineReadiness> {
   const app = typeof navigator !== "undefined" && "serviceWorker" in navigator

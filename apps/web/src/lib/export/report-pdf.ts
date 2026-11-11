@@ -822,13 +822,33 @@ function structuralPage(ctx: Ctx) {
 
 // ---------- photos ----------
 
+const PHOTO_FETCHES = 4;
+
+/** Runs `fn` over `items` with at most `limit` at once; results keep the items' order. */
+export async function mapPool<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i]!);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
 async function photoPages(ctx: Ctx, opts: RenderOptions) {
   const m = ctx.model;
   if (!m.photos.length || !opts.loadPhoto) return;
+  // W67: photos are fetched PHOTO_FETCHES at a time (one by one made a large survey's report slow),
+  // then embedded in report order.
+  const load = opts.loadPhoto;
+  const bytes = await mapPool(m.photos, PHOTO_FETCHES, (ph) => load(ph.id).catch(() => null));
   const loaded: { img: PDFImage; caption: string; severity: number }[] = [];
-  for (const ph of m.photos) {
+  for (const [i, ph] of m.photos.entries()) {
     try {
-      const b = await opts.loadPhoto(ph.id);
+      const b = bytes[i];
       if (!b) continue;
       const img = /png/i.test(b.mimeType) ? await ctx.doc.embedPng(b.bytes) : /jpe?g/i.test(b.mimeType) ? await ctx.doc.embedJpg(b.bytes) : null;
       if (img) loaded.push({ img, caption: ph.caption, severity: ph.severity });

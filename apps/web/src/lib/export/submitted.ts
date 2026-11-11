@@ -1,4 +1,4 @@
-import { reportSourceFromFound } from '@mqi/shared';
+import { buildReportModel, reportSourceFromFound } from '@mqi/shared';
 import type { ExportRowsResult, FoundSurvey } from '@mqi/shared';
 import { api } from '@/lib/api';
 import type { SingleSurveyExportInput } from './single-survey-workbook';
@@ -38,9 +38,10 @@ export function save(data: BlobPart, type: string, filename: string): void {
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
+/** W67: the campus report as a workbook (same model as the PDF, no photos to fetch, so it is quick). */
 export async function downloadSurveyExcel(surveyId: string): Promise<void> {
-  const [found, { buildSingleSurveyWorkbook }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./single-survey-workbook')]);
-  const buf = await buildSingleSurveyWorkbook(workbookInput(found)).xlsx.writeBuffer();
+  const [found, { buildReportWorkbook }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report-xlsx')]);
+  const buf = await buildReportWorkbook(buildReportModel(reportSourceFromFound(found)), workbookInput(found)).xlsx.writeBuffer();
   save(buf, XLSX, `mqi-survey-${surveyId}.xlsx`);
 }
 

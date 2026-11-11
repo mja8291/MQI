@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 import { BrowserRouter, Outlet, Route, Routes } from 'react-router';
 import { PwaBootstrap } from '@/components/PwaBootstrap';
+import { NetworkTag } from '@/components/NetworkTag';
 import { AuthGate, AuthProvider } from '@/lib/auth/client';
 import { SurveyProvider } from '@/lib/survey-context';
 import SurveyLayout from '@/pages/survey/layout';
@@ -39,6 +40,7 @@ export function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <PwaBootstrap />
+        <NetworkTag />
         <AuthProvider>
           <SurveyProvider>
             <AuthGate>

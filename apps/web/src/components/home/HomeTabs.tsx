@@ -7,7 +7,8 @@ import { useAuth } from "@/lib/auth/client";
 import { can } from "@mqi/shared";
 import { QueueTab } from "./QueueTab";
 import { MyAssessments } from "./MyAssessments";
-import { LOW_SPACE_MB, onMobile, runningInstalled, useOfflineReadiness } from "@/lib/offline/readiness";
+import { onMobile, runningInstalled, useOfflineReadiness } from "@/lib/offline/readiness";
+import { spaceAdvice } from "@/lib/photo-limits";
 import { useQueue } from "./useQueue";
 
 type Tab = "start" | "incomplete" | "sync" | "mine";
@@ -198,9 +199,10 @@ function OfflineReadyLine() {
         </span>
       ) : null}
       {/* W49: the two storage conditions that can cost unsent photos. */}
-      {r.freeMb !== null && r.freeMb < LOW_SPACE_MB ? (
-        <span className="block mt-1 text-band-poor">
-          Phone storage is almost full ({r.freeMb} MB left for the app). Free some space so photos can be saved.
+      {/* W67: the same wording as in a survey (lib/photo-limits.ts). */}
+      {spaceAdvice(r.freeMb) ? (
+        <span role="alert" className="block mt-1 font-semibold text-band-poor">
+          {spaceAdvice(r.freeMb)!.text}
         </span>
       ) : null}
       {r.persisted === false ? (

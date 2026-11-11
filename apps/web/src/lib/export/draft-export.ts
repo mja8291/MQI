@@ -1,6 +1,5 @@
-import { RUBRIC_VERSION, columnCheckApplies, itemsCovered, surveyPurposeText, withDerivedScores, type ReportSource } from "@mqi/shared";
+import { RUBRIC_VERSION, buildReportModel, columnCheckApplies, itemsCovered, surveyPurposeText, withDerivedScores, type ReportSource } from "@mqi/shared";
 
-import { buildSingleSurveyWorkbook } from "./single-survey-workbook";
 import { buildReportPdf, phonePhoto } from "./report";
 import { aggregateLocations } from "@/lib/scoring";
 import { RUBRIC_GROUPS } from "@/lib/data/items";
@@ -63,10 +62,13 @@ export function draftExportFilenameBase(state: SurveyState): string {
   return `mqi-draft-${school}-${date}`;
 }
 
-export async function buildDraftExcelBlob({ state }: DraftExportParams): Promise<Blob> {
+export async function buildDraftExcelBlob(params: DraftExportParams): Promise<Blob> {
+  const { state } = params;
   const links = photoLinksByItem(state);
 
-  const wb = buildSingleSurveyWorkbook({
+  // W67: the report sheets (same model as the PDF), then the formula sheet.
+  const { buildReportWorkbook } = await import("./report-xlsx");
+  const wb = buildReportWorkbook(buildReportModel(draftReportSource(params)), {
     surveyId: state.surveyId ?? "draft",
     campusName: state.school?.name ?? "",
     submittedAt: NOT_SUBMITTED_LABEL,
@@ -101,9 +103,9 @@ export async function buildDraftExcelBlob({ state }: DraftExportParams): Promise
   return new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
-export async function buildDraftPdfBlob({
+/** W66: the campus report's input from the phone's own data (works offline). */
+function draftReportSource({
   state,
-  result,
   powerSupply,
   structuralConcern,
   buildingStructure,
@@ -112,10 +114,8 @@ export async function buildDraftPdfBlob({
   drillingCheck,
   siteChecks,
   complaints,
-}: DraftExportParams): Promise<Blob> {
-  // W66: the same campus report as a submitted survey, from the phone's own data (works offline).
-  void result;
-  const source: ReportSource = {
+}: DraftExportParams): ReportSource {
+  return {
     surveyId: state.surveyId ?? "draft",
     campusName: state.school?.name ?? "",
     region: state.school?.region ?? "",
@@ -153,7 +153,11 @@ export async function buildDraftPdfBlob({
       ...Object.entries(state.reviewPhotos).flatMap(([itemName, assets]) => assets.map((a) => ({ id: a.id, itemName, locationName: "" }))),
     ],
   };
-  const bytes = await buildReportPdf(source, (id) => phonePhoto(id).catch(() => null));
+}
+
+export async function buildDraftPdfBlob(params: DraftExportParams): Promise<Blob> {
+  // W66: the same campus report as a submitted survey, from the phone's own data (works offline).
+  const bytes = await buildReportPdf(draftReportSource(params), (id) => phonePhoto(id).catch(() => null));
   // pdf-lib's Uint8Array<ArrayBufferLike> doesn't structurally satisfy
   // BlobPart's stricter Uint8Array<ArrayBuffer> under this TS lib version —
   // a runtime no-op, just a type mismatch between two otherwise-identical shapes.

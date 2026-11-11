@@ -10,6 +10,7 @@ import { useSurveyStateOptional } from "@/lib/survey-context";
 import { SavePhotosButton } from "@/components/survey/SavePhotosButton";
 import { beginPhotoSave } from "@/lib/photo-saving";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { itemPhotoHint } from "@/lib/photo-limits";
 
 /** The server keeps at most this many photos per item (survey schema); the buttons stop here. */
 export const MAX_PHOTOS_PER_ITEM = 20;
@@ -243,6 +244,9 @@ export function PhotoThumbList({ photos, onRemovePhoto }: PhotoThumbListProps) {
     <div className="mt-2 space-y-1.5">
       {photos.length >= MAX_PHOTOS_PER_ITEM ? (
         <p className="text-[11px] text-ink-soft">{MAX_PHOTOS_PER_ITEM} photos is the most for one item.</p>
+      ) : itemPhotoHint(photos.length) ? (
+        // W67: a gentle limit; nothing is blocked below MAX_PHOTOS_PER_ITEM.
+        <p className="text-[11px] font-semibold text-[#92400E]" data-testid="item-photo-hint">{itemPhotoHint(photos.length)}</p>
       ) : null}
       {photos.map((p) => (
         <div key={p.id} className="flex items-center gap-2.5 text-[11px] text-ink-faint">

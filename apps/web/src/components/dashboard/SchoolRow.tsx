@@ -1,4 +1,4 @@
-import { ChevronDown, FileSpreadsheet, FileText } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { BAND_COLOR } from "@/lib/scoring";
 import type { CapturedSchool } from "@/lib/data/mock-dashboard";
@@ -11,33 +11,55 @@ const BAND_TINT: Record<string, string> = {
   Poor: "var(--band-poor-tint)",
 };
 
+/**
+ * W67: two small labelled boxes, XLS above PDF, each its own tap area (Excel green, PDF red),
+ * showing "…" while that file is being made.
+ */
 function Downloads({ surveyId, name }: { surveyId: string; name: string }) {
+  const [busy, setBusy] = useState<"xls" | "pdf" | null>(null);
+  const run = (kind: "xls" | "pdf") => {
+    if (busy) return;
+    setBusy(kind);
+    void (kind === "xls" ? downloadSurveyExcel(surveyId) : downloadSurveyPdf(surveyId))
+      .catch(() => window.alert("Couldn't download right now."))
+      .finally(() => setBusy(null));
+  };
+  const box = "h-[30px] w-11 rounded-md border text-[10.5px] font-bold tracking-wide flex items-center justify-center disabled:opacity-60";
   return (
-    <span className="flex items-center gap-1.5 shrink-0">
+    <span className="flex flex-col gap-1.5 shrink-0">
       <button
         type="button"
-        onClick={() =>
-          void downloadSurveyExcel(surveyId).catch(() =>
-            window.alert("Couldn't download right now."),
-          )
-        }
+        onClick={() => run("xls")}
+        disabled={busy !== null}
         aria-label={`Export ${name} as Excel`}
-        className="h-10 w-10 shrink-0 rounded-lg border border-border flex items-center justify-center text-ink-faint"
+        className={`${box} border-[#16A34A] text-[#15803D] bg-[#F0FDF4]`}
       >
-        <FileSpreadsheet size={15} />
+        {busy === "xls" ? "…" : "XLS"}
       </button>
       <button
         type="button"
-        onClick={() =>
-          void downloadSurveyPdf(surveyId).catch(() =>
-            window.alert("Couldn't download right now."),
-          )
-        }
+        onClick={() => run("pdf")}
+        disabled={busy !== null}
         aria-label={`Export ${name} as PDF`}
-        className="h-10 w-10 shrink-0 rounded-lg border border-border flex items-center justify-center text-ink-faint"
+        className={`${box} border-[#DC2626] text-[#B91C1C] bg-[#FEF2F2]`}
       >
-        <FileText size={15} />
+        {busy === "pdf" ? "…" : "PDF"}
       </button>
+    </span>
+  );
+}
+
+/** W67: the score and Safe/Unsafe, one above the other, so the campus name gets the width. */
+function ScoreStack({ overall, band, unsafeItems }: { overall: number; band: string; unsafeItems?: string[] }) {
+  return (
+    <span data-testid="score-stack" className="flex flex-col items-center gap-1 shrink-0">
+      <span
+        className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{ background: BAND_TINT[band], color: BAND_COLOR[band as keyof typeof BAND_COLOR] }}
+      >
+        {Math.round(overall)}% · {band}
+      </span>
+      <SafetyBadge items={unsafeItems} />
     </span>
   );
 }
@@ -89,7 +111,7 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
     <div className="border-b border-border">
       <div className="flex items-center gap-2.5 py-2.5">
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold truncate">
+          <div className="text-[13px] font-semibold leading-snug line-clamp-2 break-words">
             {school.name}
           </div>
           <div className="text-[11px] text-ink-faint">
@@ -109,17 +131,7 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
           ) : null}
           <UnsafeReasons items={school.unsafeItems} />
         </div>
-        
-        <span
-          className="text-[10.5px] font-semibold px-2.5 py-1 rounded-full shrink-0"
-          style={{
-            background: BAND_TINT[school.band],
-            color: BAND_COLOR[school.band],
-          }}
-        >
-          {Math.round(school.overall)}% · {school.band}
-        </span>
-        <SafetyBadge items={school.unsafeItems} />
+        <ScoreStack overall={school.overall} band={school.band} unsafeItems={school.unsafeItems} />
         {school.surveyId ? (
           <Downloads surveyId={school.surveyId} name={school.name} />
         ) : null}
@@ -135,17 +147,7 @@ export function SchoolRow({ school }: { school: CapturedSchool }) {
                 {e.submittedBy ? ` · ${e.submittedBy}` : ""}
                 <UnsafeReasons items={e.unsafeItems} />
               </div>
-              
-              <span
-                className="text-[10.5px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                style={{
-                  background: BAND_TINT[e.band],
-                  color: BAND_COLOR[e.band],
-                }}
-              >
-                {Math.round(e.overall)}% · {e.band}
-              </span>
-              <SafetyBadge items={e.unsafeItems} />
+              <ScoreStack overall={e.overall} band={e.band} unsafeItems={e.unsafeItems} />
               <Downloads
                 surveyId={e.surveyId}
                 name={`${school.name} (${when(e.date)})`}
