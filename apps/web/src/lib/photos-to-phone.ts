@@ -1,6 +1,6 @@
 import type { SurveyState } from './survey-context';
 import type { PhotoAsset } from './types';
-import { db, getPhoto } from './offline/db';
+import { db, getMeta, getPhoto, setMeta } from './offline/db';
 
 /**
  * v2 (W50): a copy of survey photos in the phone's Downloads folder, which gallery apps (Google
@@ -74,29 +74,70 @@ function download(blob: Blob, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/**
+ * W69 (2026-11-11): photos already copied to Downloads, by attachment id. Chrome on Android asks
+ * "Download file again?" for every file whose name is already in Downloads, so tapping "Save all"
+ * a second time on a survey with 153 photos queued 153 pop-ups over the Review page. "Save all"
+ * now skips photos it saved before; saving one photo from the viewer still always saves it.
+ */
+const SAVED_KEY = 'photosSavedToPhone';
+const MAX_REMEMBERED = 5000;
+
+async function savedIds(): Promise<Set<string>> {
+  return new Set((await getMeta<string[]>(SAVED_KEY).catch(() => undefined)) ?? []);
+}
+async function rememberSaved(ids: readonly string[]): Promise<void> {
+  if (!ids.length) return;
+  const all = [...(await savedIds()), ...ids];
+  await setMeta(SAVED_KEY, [...new Set(all)].slice(-MAX_REMEMBERED)).catch(() => undefined);
+}
+
+/** How many of these photos "Save all" would save now (not saved before). */
+export async function photosNotYetSaved(copies: readonly PhoneCopy[]): Promise<number> {
+  const done = await savedIds();
+  return copies.filter((c) => !done.has(c.id)).length;
+}
+
+/** Above this many files, the button asks first. */
+export const CONFIRM_ABOVE = 20;
+
 /** Gap between files: Chrome handles one download start at a time more reliably. */
 const GAP_MS = 400;
 
 /**
  * Saves each photo whose bytes are still on the phone. Photos already uploaded and cleared to
- * save space (evicted) are on the server instead and are skipped, like missing ones.
+ * save space (evicted) are on the server instead and are skipped, like missing ones. With
+ * `skipSaved`, photos saved to Downloads before (W69) are skipped too.
  */
-export async function savePhotosToPhone(copies: readonly PhoneCopy[]): Promise<{ saved: number; skipped: number }> {
+export async function savePhotosToPhone(
+  copies: readonly PhoneCopy[],
+  { skipSaved = false }: { skipSaved?: boolean } = {},
+): Promise<{ saved: number; skipped: number; alreadySaved: number }> {
   const seen = new Map<string, number>();
+  const done = skipSaved ? await savedIds() : new Set<string>();
+  const savedNow: string[] = [];
   let saved = 0;
   let skipped = 0;
+  let alreadySaved = 0;
   for (const c of copies) {
+    // Numbered over every photo of the item, so a photo keeps its file name whichever are skipped.
+    const key = `${c.location}\u0000${c.item}`;
+    const n = (seen.get(key) ?? 0) + 1;
+    seen.set(key, n);
+    if (done.has(c.id)) {
+      alreadySaved++;
+      continue;
+    }
     const p = await getPhoto(c.id);
     if (!p || p.evicted || !p.blob.size) {
       skipped++;
       continue;
     }
-    const key = `${c.location}\u0000${c.item}`;
-    const n = (seen.get(key) ?? 0) + 1;
-    seen.set(key, n);
     if (saved > 0) await new Promise((r) => setTimeout(r, GAP_MS));
     download(p.blob, phoneFileName(c, n, p.mimeType));
+    savedNow.push(c.id);
     saved++;
   }
-  return { saved, skipped };
+  await rememberSaved(savedNow);
+  return { saved, skipped, alreadySaved };
 }

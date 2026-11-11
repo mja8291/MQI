@@ -1,6 +1,6 @@
 import { Download } from "lucide-react";
 import { useState } from "react";
-import { savePhotosToPhone, type PhoneCopy } from "@/lib/photos-to-phone";
+import { CONFIRM_ABOVE, photosNotYetSaved, savePhotosToPhone, type PhoneCopy } from "@/lib/photos-to-phone";
 
 /**
  * v2 (W50): "Save to phone" — copies photos to the phone's Downloads folder (shown in the gallery).
@@ -10,10 +10,13 @@ export function SavePhotosButton({
   copies,
   label,
   className = "",
+  single = false,
 }: {
   copies: () => PhoneCopy[] | Promise<PhoneCopy[]>;
   label: string;
   className?: string;
+  /** W69: one photo from the viewer — always saved. Otherwise photos saved before are skipped. */
+  single?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -21,12 +24,27 @@ export function SavePhotosButton({
     setBusy(true);
     setMessage(null);
     try {
-      const { saved, skipped } = await savePhotosToPhone(await copies());
+      const list = await copies();
+      // W69: a big batch asks first; photos saved to Downloads before are not saved again.
+      const fresh = single ? list.length : await photosNotYetSaved(list);
+      if (
+        !single &&
+        fresh > CONFIRM_ABOVE &&
+        !window.confirm(`Save ${fresh} photos to the phone's Downloads? It takes about ${Math.max(1, Math.ceil((fresh * 0.5) / 60))} min. Keep the app open until it says they are saved.`)
+      )
+        return;
+      const { saved, skipped, alreadySaved } = await savePhotosToPhone(list, { skipSaved: !single });
+      const before = alreadySaved ? `${alreadySaved} photo${alreadySaved === 1 ? " was" : "s were"} saved to Downloads earlier, so not saved again.` : "";
       setMessage(
         saved === 0
-          ? "No photos on this phone to save."
-          : `${saved} photo${saved === 1 ? "" : "s"} saved to Downloads (shown in the gallery).` +
-              (skipped ? ` ${skipped} already uploaded and no longer kept on the phone.` : "")
+          ? before || "No photos on this phone to save."
+          : [
+              `${saved} photo${saved === 1 ? "" : "s"} saved to Downloads (shown in the gallery).`,
+              before,
+              skipped ? `${skipped} already uploaded and no longer kept on the phone.` : "",
+            ]
+              .filter(Boolean)
+              .join(" ")
       );
     } catch {
       setMessage("Couldn't save the photos. Try again.");

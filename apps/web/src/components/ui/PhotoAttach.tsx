@@ -200,6 +200,7 @@ function PhotoViewer({ photo, onClose, onDelete }: { photo: PhotoAsset; onClose:
       <div className="px-4 py-4 space-y-3">
         {/* W50: a copy in the phone's Downloads folder, named after the campus, location and item. */}
         <SavePhotosButton
+          single
           label="Save to phone"
           className="w-full [&>button]:w-full [&>button]:justify-center [&>button]:min-h-11 [&>span]:text-white/80"
           copies={() => {
