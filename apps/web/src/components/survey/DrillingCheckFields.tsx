@@ -179,7 +179,8 @@ export function DrillingCheckFields({ drilling, onChange }: { drilling: Drilling
               ))}
             </select>
           </Field>
-          <ReviewPhotoField itemName={SITE_PHOTO_SLAB_THICKNESS} />
+          {/* W70: the photo of the drilled hole is required. */}
+          <ReviewPhotoField itemName={SITE_PHOTO_SLAB_THICKNESS} required />
 
           <DepthField label={SCREED_THICKNESS_LABEL} valueMm={drilling.screedThicknessMm} unit={unit} onChange={(v) => onChange({ ...drilling, screedThicknessMm: v })} />
           <ScreedNote value={drilling.screedThicknessMm} />

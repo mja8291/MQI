@@ -8,6 +8,8 @@ import {
   columnCheckIssues,
   emptyDrillingCheck,
   isDrillingCheckComplete,
+  drillingPhotoMissing,
+  DRILLING_PHOTO_NEEDED,
   isUnsafe,
   itemLabel,
   maxScreedMm,
@@ -104,10 +106,10 @@ export default function CategoryPage() {
   if (!current || !current.type) return null;
   const type = current.type;
 
-  const counts = sectionCountsForLocation(type);
+  const counts = sectionCountsForLocation(type, current.name);
   const applicableCategories = RUBRIC_SECTIONS.filter((wc) => counts[wc] > 0);
   const categoryStatus = applicableCategories.map((wc) => {
-    const items = rubricGroupsForLocationAndSection(type, wc);
+    const items = rubricGroupsForLocationAndSection(type, wc, current.name);
     const answered = items.filter((i) => current!.scores[i.name]).length;
     // v2 (W13): an Unsafe item without a photo keeps its section incomplete.
     const unsafeMissing = items.filter((i) => isUnsafe(i, current!.scores[i.name]) && !(current!.photos[i.name]?.length) && !current!.photoLost?.includes(i.name)).length;
@@ -117,7 +119,9 @@ export default function CategoryPage() {
   // v2 (W27): a Roof location also carries the survey's Drilling & observation answers.
   const isRoof = type === "Roof";
   const drilling = { ...emptyDrillingCheck(), ...state.drillingCheck };
-  const drillingDone = !isRoof || isDrillingCheckComplete(drilling);
+  // W70: a drilling check also needs its hole photo.
+  const drillingPhotoNeeded = isRoof && drillingPhotoMissing(drilling, state.reviewPhotos);
+  const drillingDone = !isRoof || (isDrillingCheckComplete(drilling) && !drillingPhotoNeeded);
   // W45: a screed reading reaching 110 mm marks Roof Screeding Unsafe once; the surveyor can change it back.
   const changeDrilling = (next: DrillingCheck) => {
     setDrillingCheck(next);
@@ -264,7 +268,9 @@ export default function CategoryPage() {
             {incomplete.length === 0 && columnIssues.length > 0
               ? columnIssues[0]
               : incomplete.length === 0 && !drillingDone
-              ? "Complete Drilling & observation (thicknesses must be positive numbers)."
+              ? drillingPhotoNeeded && isDrillingCheckComplete(drilling)
+                ? DRILLING_PHOTO_NEEDED
+                : "Complete Drilling & observation (thicknesses must be positive numbers)."
               : incomplete.some((c) => c.unsafeMissing > 0) && incomplete.every((c) => c.answered === c.total)
               ? "Attach a photo to every item marked Unsafe."
               : incomplete.length === 1

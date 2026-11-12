@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { devState, installAndSignIn, lastSurveyId, reviewAndSubmit, rowsOf, scoreEverything } from './helpers';
+import { devState, installAndSignIn, lastSurveyId, reviewAndSubmit, rowsOf, scoreEverything, addDrillingHolePhoto } from './helpers';
 
 /** A drilling-card field, found by its label (the innermost wrapper: the card itself is a div.mb-4 too). */
 const field = (page: Page, label: string) =>
@@ -34,6 +34,7 @@ test('W55: levels need a building level; inches are saved as mm; soffit risk fac
   await scoreEverything(page);
   await page.locator('select').first().selectOption('YES');
   await field(page, 'Drilling point marked').selectOption('YES');
+  await addDrillingHolePhoto(page);
   await page.getByRole('radio', { name: 'inches' }).click();
   await field(page, 'Total depth of slab + roof screed/waterproofing (in)').fill('10');
   await expect(page.getByText('= 254 mm')).toBeVisible();

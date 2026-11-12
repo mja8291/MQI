@@ -12,7 +12,6 @@ import {
   type Category,
   type RatingBand,
   type ReportCell,
-  type ReportGroup,
   type ReportModel,
   type MinorLevel,
   type PhotoSection,
@@ -182,7 +181,6 @@ function summaryPage(ctx: Ctx) {
   // Header grid: 4 columns x 3 rows.
   const fields: [string, string][] = [
     ["Survey date", m.header.date],
-    ["Survey ID", m.header.surveyId],
     ["Method", m.header.method],
     ["Items covered", m.header.itemsCovered],
     ["Engineering staff", m.header.staff],
@@ -358,88 +356,6 @@ function lossPage(ctx: Ctx) {
     text(p, ctx, fit(ctx, n.label, 8.5, rw, true), rx, ry, 8.5, { bold: true });
     text(p, ctx, fit(ctx, n.note, 7.5, rw), rx, ry - 9.5, 7.5, { color: C.soft });
     ry -= 23;
-  }
-}
-
-// ---------- page 3: line profile ----------
-
-function pointColor(g: ReportGroup): RGB {
-  if (g.binary) return g.unsafe ? hex(REPORT_CELL.binaryUnsafe.fill) : hex(REPORT_CELL.binaryOk.fill);
-  return bandColor(g.band);
-}
-
-function profilePage(ctx: Ctx) {
-  const m = ctx.model;
-  const p = newPage(ctx, "Item condition profile");
-  heading(p, ctx, "Item condition profile", H - BAR - 30, "Each item group's campus score, in rubric order. Gaps are groups not assessed; dotted segments touch an Unsafe rating.");
-  const x0 = M + 34;
-  const x1 = W - M - 6;
-  const y0 = 200;
-  const y1 = H - BAR - 66;
-  const ys = (v: number) => y0 + ((y1 - y0) * v) / 100;
-  const n = m.groups.length;
-  const step = (x1 - x0) / n;
-  const xs = (i: number) => x0 + step * (i + 0.5);
-  // Band tints and grid.
-  REPORT_BAND_FLOORS.forEach((b, i) => {
-    const to = REPORT_BAND_FLOORS[i + 1]?.from ?? 100;
-    p.drawRectangle({ x: x0, y: ys(b.from), width: x1 - x0, height: ys(to) - ys(b.from), color: hex(REPORT_BAND_COLOR[b.band]), opacity: 0.08 });
-    text(p, ctx, b.band, x1 - width(ctx, b.band, 7) - 3, ys(b.from) + 3, 7, { color: hex(REPORT_BAND_COLOR[b.band]) });
-  });
-  for (const v of [0, 25, 50, 75, 100]) {
-    line(p, x0, ys(v), x1, ys(v), C.rule, 0.4);
-    textRight(p, ctx, `${v}%`, x0 - 4, ys(v) - 2.5, 7.5, { color: C.soft });
-  }
-  // Category separators and names.
-  let start = 0;
-  for (let i = 1; i <= n; i++) {
-    if (i === n || m.groups[i]!.category !== m.groups[start]!.category) {
-      const cat = m.groups[start]!.category;
-      if (i < n) line(p, x0 + step * i, y0 - 4, x0 + step * i, y1 + 14, C.soft, 0.6);
-      textCenter(p, ctx, `${cat} (${CATEGORY_WEIGHT[cat]}%)`, (x0 + step * start + x0 + step * i) / 2, y1 + 6, 8.5, { bold: true, color: catColor(cat) });
-      start = i;
-    }
-  }
-  rect(p, x0, y0, x1 - x0, y1 - y0, { border: C.rule, bw: 0.6 });
-  // Line: breaks at unassessed groups; dotted next to an Unsafe point (except the solid exceptions).
-  for (let i = 0; i < n - 1; i++) {
-    const a = m.groups[i]!;
-    const b = m.groups[i + 1]!;
-    if (a.score === null || b.score === null) continue;
-    const dotted = (a.unsafe && !a.solidWhenUnsafe) || (b.unsafe && !b.solidWhenUnsafe);
-    line(p, xs(i), ys(a.score), xs(i + 1), ys(b.score), C.navy, 1.4, dotted ? [2, 2.2] : undefined);
-  }
-  m.groups.forEach((g, i) => {
-    if (g.score === null) {
-      p.drawCircle({ x: xs(i), y: y0, size: 2.6, borderColor: C.faint, borderWidth: 0.9, color: C.white });
-      return;
-    }
-    p.drawCircle({ x: xs(i), y: ys(g.score), size: 3.4, color: pointColor(g), borderColor: C.white, borderWidth: 0.6 });
-    if (g.unsafe) warning(p, xs(i), ys(g.score) + 13, 11, hex(REPORT_CELL.binaryUnsafe.fill), C.white);
-  });
-  // X labels.
-  m.groups.forEach((g, i) => {
-    text(p, ctx, fit(ctx, g.label, 7, 120), xs(i) + 2, y0 - 8, 7, { rotate: -60, color: g.score === null ? C.faint : C.ink });
-  });
-  // Legend.
-  const ly = 30 + 12;
-  let lx = M;
-  line(p, lx, ly + 3, lx + 24, ly + 3, C.navy, 1.4);
-  text(p, ctx, "Campus score", lx + 28, ly, 8);
-  lx += 100;
-  line(p, lx, ly + 3, lx + 24, ly + 3, C.navy, 1.4, [2, 2.2]);
-  text(p, ctx, "Touches an Unsafe rating", lx + 28, ly, 8);
-  lx += 140;
-  warning(p, lx + 5, ly + 3, 11, hex(REPORT_CELL.binaryUnsafe.fill), C.white);
-  text(p, ctx, "Rated Unsafe (Wall/Column keeps a solid line)", lx + 14, ly, 8);
-  lx += 210;
-  p.drawCircle({ x: lx + 4, y: ly + 3, size: 2.6, borderColor: C.faint, borderWidth: 0.9, color: C.white });
-  text(p, ctx, "Not assessed (line breaks)", lx + 12, ly, 8);
-  lx += 130;
-  for (const b of ["Excellent", "Good", "Average", "Poor"] as RatingBand[]) {
-    p.drawCircle({ x: lx + 3, y: ly + 3, size: 3, color: bandColor(b) });
-    text(p, ctx, b, lx + 9, ly, 8);
-    lx += width(ctx, b, 8) + 18;
   }
 }
 
@@ -703,46 +619,20 @@ function structuralPage(ctx: Ctx) {
     y = kv(lx, y, "Drilling point marked", s.drilling.pointMarked);
     y = kv(lx, y, "Hole repaired (grout/epoxy)", s.drilling.holeRepaired, s.drilling.holeRepaired === "NO");
     y = kv(lx, y, "Readings typed in", s.drilling.unitTyped);
-    y -= 4;
-    const scaleMax = Math.max(REPORT_THRESHOLDS.totalDepthMm + 40, ...s.drilling.holes.map((h) => (h.totalMm ?? 0) + 20));
-    const bx = lx + 70;
-    const bw = colW - 80;
-    const sx = (mm: number) => bx + (bw * mm) / scaleMax;
+    y -= 2;
+    // W70: the readings are drawn standard vs actual on the "Drilling check" page.
     for (const h of s.drilling.holes) {
       const ok = h.totalWithinLimit !== false && h.screedWithinLimit !== false;
-      text(p, ctx, h.label, lx, y - 8, 9, { bold: true });
-      // Stacked bar: slab + screed against the total-depth limit.
-      const top = y;
-      rect(p, bx, top - 14, bw, 14, { fill: C.panel });
-      if (h.slabMm !== null) rect(p, bx, top - 14, sx(h.slabMm) - bx, 14, { fill: hex("#64748B") });
-      if (h.slabMm !== null && h.screedMm !== null) rect(p, sx(h.slabMm), top - 14, sx(h.slabMm + h.screedMm) - sx(h.slabMm), 14, { fill: C.teal });
-      rect(p, bx, top - 14, bw, 14, { border: ok ? C.green : C.red, bw: 1.4 });
-      if (h.slabMm !== null && sx(h.slabMm) - bx > 50) text(p, ctx, `slab ${h.slabMm} mm`, bx + 4, top - 10, 7.5, { color: C.white, bold: true });
-      if (h.slabMm !== null && h.screedMm !== null && sx(h.slabMm + h.screedMm) - sx(h.slabMm) > 50)
-        text(p, ctx, `screed ${h.screedMm} mm`, sx(h.slabMm) + 4, top - 10, 7.5, { color: C.white, bold: true });
-      const lim = sx(REPORT_THRESHOLDS.totalDepthMm);
-      line(p, lim, top + 4, lim, top - 18, C.red, 1, [2, 1.5]);
-      text(p, ctx, `${REPORT_THRESHOLDS.totalDepthMm} mm total limit`, lim + 3, top + 2, 7, { color: C.red });
-      // Screed alone against its own limit.
-      const sy = top - 26;
-      rect(p, bx, sy, bw, 7, { fill: C.panel });
-      if (h.screedMm !== null) rect(p, bx, sy, sx(h.screedMm) - bx, 7, { fill: C.teal });
-      const slim = sx(REPORT_THRESHOLDS.screedMm);
-      line(p, slim, sy + 10, slim, sy - 3, C.red, 1, [2, 1.5]);
-      text(p, ctx, `${REPORT_THRESHOLDS.screedMm} mm screed limit`, slim + 3, sy - 1, 7, { color: C.red });
       const mm = (v: number | null) => (v === null ? "—" : `${v} mm`);
-      const summary = `Slab ${mm(h.slabMm)} + screed ${mm(h.screedMm)} = total ${mm(h.totalMm)}${h.totalMeasured ? " (total measured)" : ""} · slab assessment ${h.assessment}`;
-      text(p, ctx, summary, bx, sy - 13, 8, { color: C.soft });
       if (ok) {
-        p.drawCircle({ x: lx + 6, y: sy - 1, size: 5.5, color: C.green });
-        check(p, lx + 6, sy - 1, C.white, 0.65);
-        text(p, ctx, "Within limits", lx + 14, sy - 3.5, 7.5, { bold: true, color: C.green });
-      } else {
-        warning(p, lx + 6, sy, 10, C.red, C.white);
-        text(p, ctx, "Over limit", lx + 14, sy - 3.5, 7.5, { bold: true, color: C.red });
-      }
-      y = sy - 26;
+        p.drawCircle({ x: lx + 5, y: y + 3, size: 5, color: C.green });
+        check(p, lx + 5, y + 3, C.white, 0.6);
+      } else warning(p, lx + 5, y + 4, 10, C.red, C.white);
+      text(p, ctx, fit(ctx, `${h.label}: total ${mm(h.totalMm)}, screeding ${mm(h.screedMm)} · ${ok ? "within standard" : "exceeds standard"}`, 8.5, colW - 16, !ok), lx + 14, y, 8.5, { bold: !ok, color: ok ? C.ink : C.red });
+      y -= 13;
     }
+    text(p, ctx, "Standard vs actual drawings: see the Drilling check page.", lx, y, 7.5, { color: C.soft });
+    y -= 14;
   }
 
   // Right column.
@@ -821,6 +711,123 @@ function structuralPage(ctx: Ctx) {
       }
     }
   }
+}
+
+// ---------- W70: drilling check, standard vs actual ----------
+
+const SLAB_FILL = hex("#94A3B8");
+const SCREED_FILL = hex("#5EEAD4");
+const SCREED_EDGE = hex("#0F766E");
+
+/** A vertical dimension line with end ticks and a label, from y1 (bottom) to y2 (top). */
+function dimension(p: PDFPage, ctx: Ctx, x: number, y1: number, y2: number, label: string, color: RGB, right = true) {
+  line(p, x, y1, x, y2, color, 0.8);
+  line(p, x - 3, y1, x + 3, y1, color, 0.8);
+  line(p, x - 3, y2, x + 3, y2, color, 0.8);
+  const t = fit(ctx, label, 7.5, 90, true);
+  const tx = right ? x + 5 : x - 5 - width(ctx, t, 7.5, true);
+  text(p, ctx, t, tx, (y1 + y2) / 2 - 2.5, 7.5, { bold: true, color });
+}
+
+/** One layer of a cross-section: a filled block, concrete hatched. */
+function layer(p: PDFPage, x: number, y: number, w: number, h: number, fill: RGB, edge: RGB, hatched: boolean) {
+  if (h <= 0) return;
+  rect(p, x, y, w, h, { fill });
+  if (hatched) hatch(p, x, y, w, h, hex("#64748B"), 5);
+  rect(p, x, y, w, h, { border: edge, bw: 0.8 });
+}
+
+function drillingPages(ctx: Ctx) {
+  const d = ctx.model.structural.drilling;
+  if (d.done !== "YES" || !d.holes.length) return;
+  const T = REPORT_THRESHOLDS;
+  const mm = (v: number | null) => (v === null ? "—" : `${v} mm`);
+  const rowH = 228;
+  let p: PDFPage | null = null;
+  let top = 0;
+  d.holes.forEach((h, i) => {
+    if (!p || top - rowH < FOOT + 6) {
+      p = newPage(ctx, "Drilling check");
+      heading(p, ctx, "Drilling check: standard vs actual", H - BAR - 30, `Drawn to scale. Total of slab + roof screeding must be ${T.totalDepthMm} mm or less; roof screeding must be under ${T.screedMm} mm. Readings typed in ${d.unitTyped || "mm"}.`);
+      top = H - BAR - 56;
+    }
+    const pg: PDFPage = p;
+    const totalOk = h.totalWithinLimit !== false;
+    const screedOk = h.screedWithinLimit !== false;
+    // Row title.
+    text(pg, ctx, `${h.label}`, M, top - 10, 11, { bold: true, color: C.navy });
+    text(pg, ctx, `Slab ${mm(h.slabMm)} + roof screeding ${mm(h.screedMm)} = total ${mm(h.totalMm)}${h.totalMeasured ? " (total measured)" : " (slab + screeding)"} · slab assessment ${h.assessment || "—"}`, M + 60, top - 10, 8.5, { color: C.soft });
+    const panelTop = top - 22;
+    const panelH = rowH - 34;
+    const panelW = (W - 2 * M - 24) / 2;
+    const drawH = panelH - 52;
+    const base = panelTop - panelH + 22;
+
+    const panel = (px: number, title: string, ok: boolean) => {
+      rect(pg, px, panelTop - panelH, panelW, panelH, { fill: ok ? C.white : C.redBg, border: ok ? C.rule : C.red, bw: ok ? 0.6 : 1.2 });
+      text(pg, ctx, title, px + 10, panelTop - 14, 9.5, { bold: true, color: C.navy });
+      const verdict = ok ? "Within standard" : "Exceeds standard";
+      const vw = width(ctx, verdict, 8, true) + 22;
+      rect(pg, px + panelW - vw - 8, panelTop - 19, vw, 14, { fill: ok ? C.green : C.red });
+      if (ok) check(pg, px + panelW - vw + 1, panelTop - 12, C.white, 0.6);
+      else warning(pg, px + panelW - vw + 1, panelTop - 11.5, 8, C.white, C.red);
+      text(pg, ctx, verdict, px + panelW - vw + 8, panelTop - 15, 8, { bold: true, color: C.white });
+      line(pg, px + 10, base, px + panelW - 10, base, C.ink, 0.8);
+    };
+
+    // Panel 1: total thickness (slab + screeding).
+    const p1 = M;
+    panel(p1, "Total thickness: slab + roof screeding", totalOk);
+    const totalActual = h.totalMm ?? (h.slabMm ?? 0) + (h.screedMm ?? 0);
+    const scale1 = drawH / Math.max(T.totalDepthMm * 1.15, totalActual * 1.08, 1);
+    const colW = 70;
+    // Standard: one block of the allowed total.
+    const sx1 = p1 + 60;
+    const stdH = T.totalDepthMm * scale1;
+    layer(pg, sx1, base, colW, stdH, C.panel, C.soft, false);
+    rect(pg, sx1, base, colW, stdH, { border: C.green, bw: 1, dash: [3, 2] });
+    textCenter(pg, ctx, "slab + screeding", sx1 + colW / 2, base + stdH / 2 + 2, 7.5, { color: C.soft });
+    textCenter(pg, ctx, "STANDARD", sx1 + colW / 2, base - 13, 8, { bold: true, color: C.green });
+    dimension(pg, ctx, sx1 - 8, base, base + stdH, `max ${T.totalDepthMm} mm`, C.green, false);
+    // Actual: slab with screeding on top.
+    const ax1 = p1 + panelW - colW - 110;
+    const slabH = (h.slabMm ?? 0) * scale1;
+    const screedH = (h.screedMm ?? 0) * scale1;
+    layer(pg, ax1, base, colW, slabH, SLAB_FILL, hex("#475569"), true);
+    layer(pg, ax1, base + slabH, colW, screedH, SCREED_FILL, SCREED_EDGE, false);
+    if (h.slabMm !== null && slabH > 12) textCenter(pg, ctx, `slab ${h.slabMm}`, ax1 + colW / 2, base + slabH / 2 - 3, 7.5, { bold: true, color: C.white });
+    if (h.screedMm !== null && screedH > 12) textCenter(pg, ctx, `screed ${h.screedMm}`, ax1 + colW / 2, base + slabH + screedH / 2 - 3, 7.5, { bold: true, color: SCREED_EDGE });
+    textCenter(pg, ctx, "ACTUAL", ax1 + colW / 2, base - 13, 8, { bold: true, color: totalOk ? C.ink : C.red });
+    dimension(pg, ctx, ax1 + colW + 8, base, base + totalActual * scale1, `total ${mm(h.totalMm)}`, totalOk ? C.ink : C.red);
+    // The limit across both columns.
+    const lim1 = base + stdH;
+    line(pg, sx1 - 2, lim1, ax1 + colW + 4, lim1, C.red, 0.9, [3, 2]);
+    text(pg, ctx, `${T.totalDepthMm} mm limit`, sx1 + colW + 6, lim1 + 3, 7, { color: C.red });
+
+    // Panel 2: roof screeding thickness.
+    const p2 = M + panelW + 24;
+    panel(p2, "Roof screeding thickness", screedOk);
+    const scale2 = drawH / Math.max(T.screedMm * 1.6, (h.screedMm ?? 0) * 1.1, 1);
+    const sx2 = p2 + 60;
+    const stdH2 = T.screedMm * scale2;
+    layer(pg, sx2, base, colW, stdH2, C.panel, C.soft, false);
+    rect(pg, sx2, base, colW, stdH2, { border: C.green, bw: 1, dash: [3, 2] });
+    textCenter(pg, ctx, "screeding", sx2 + colW / 2, base + stdH2 / 2 + 2, 7.5, { color: C.soft });
+    textCenter(pg, ctx, "STANDARD", sx2 + colW / 2, base - 13, 8, { bold: true, color: C.green });
+    dimension(pg, ctx, sx2 - 8, base, base + stdH2, `under ${T.screedMm} mm`, C.green, false);
+    const ax2 = p2 + panelW - colW - 110;
+    const actH2 = (h.screedMm ?? 0) * scale2;
+    layer(pg, ax2, base, colW, actH2, SCREED_FILL, SCREED_EDGE, false);
+    if (h.screedMm !== null && actH2 > 12) textCenter(pg, ctx, `${h.screedMm} mm`, ax2 + colW / 2, base + actH2 / 2 - 3, 7.5, { bold: true, color: SCREED_EDGE });
+    textCenter(pg, ctx, "ACTUAL", ax2 + colW / 2, base - 13, 8, { bold: true, color: screedOk ? C.ink : C.red });
+    dimension(pg, ctx, ax2 + colW + 8, base, base + actH2, `screed ${mm(h.screedMm)}`, screedOk ? C.ink : C.red);
+    const lim2 = base + stdH2;
+    line(pg, sx2 - 2, lim2, ax2 + colW + 4, lim2, C.red, 0.9, [3, 2]);
+    text(pg, ctx, `${T.screedMm} mm limit`, sx2 + colW + 6, lim2 + 3, 7, { color: C.red });
+
+    top -= rowH;
+    void i;
+  });
 }
 
 // ---------- photos ----------
@@ -1215,7 +1222,8 @@ function footers(ctx: Ctx, generatedAt: Date) {
   const gen = generatedAt.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
   pages.forEach((p, i) => {
     line(p, M, FOOT - 6, W - M, FOOT - 6, C.rule, 0.5);
-    text(p, ctx, fit(ctx, `${ctx.model.header.campusName} · Survey ${ctx.model.header.surveyId}`, 7.5, 330), M, FOOT - 17, 7.5, { color: C.soft });
+    // W70: no survey ID on the pages.
+    text(p, ctx, fit(ctx, `${ctx.model.header.campusName} · ${ctx.model.header.date}`, 7.5, 330), M, FOOT - 17, 7.5, { color: C.soft });
     textCenter(p, ctx, `Page ${i + 1} of ${pages.length}`, W / 2, FOOT - 17, 7.5, { color: C.soft });
     textRight(p, ctx, `Generated ${gen}`, W - M, FOOT - 17, 7.5, { color: C.soft });
   });
@@ -1230,13 +1238,170 @@ export async function renderReportPdf(model: ReportModel, opts: RenderOptions = 
   summaryPage(ctx);
   lossPage(ctx);
   minorPages(ctx);
-  profilePage(ctx);
   matrixPages(ctx, "byItem");
   matrixPages(ctx, "byLocation");
   structuralPage(ctx);
+  drillingPages(ctx);
   questionnairePage(ctx);
   await photoPages(ctx, opts);
   methodologyPages(ctx);
   footers(ctx, opts.generatedAt ?? new Date());
   return doc.save();
+}
+
+// ---------- W70: the principal's minor-items report ----------
+
+/**
+ * W70 (2026-11-13): a short report for the campus principal — only the minor (*) items, which the
+ * school maintains itself, that were rated Poor or Very Poor, location by location, and their
+ * photos. Same model and scoring as the campus report.
+ */
+export async function renderMinorReportPdf(model: ReportModel, opts: RenderOptions = {}): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  doc.setTitle(safe(`Minor maintenance items — ${model.header.campusName}`));
+  doc.setCreator("TCF MQI App");
+  const ctx: Ctx = { doc, font: await doc.embedFont(StandardFonts.Helvetica), bold: await doc.embedFont(StandardFonts.HelveticaBold), model };
+  const mi = model.minor;
+  const rows = mi.byLocation
+    .map((l) => ({ ...l, items: l.items.filter((it) => it.level === "poor" || it.level === "veryPoor") }))
+    .filter((l) => l.items.length);
+  const vp = rows.reduce((n, l) => n + l.items.filter((it) => it.level === "veryPoor").length, 0);
+  const poor = rows.reduce((n, l) => n + l.items.filter((it) => it.level === "poor").length, 0);
+  const title = "Minor maintenance items — for the Principal";
+  const page = () => {
+    const pg = ctx.doc.addPage([W, H]);
+    rect(pg, 0, H - BAR, W, BAR, { fill: C.navy });
+    text(pg, ctx, "TCF Maintenance Quality Index — Minor maintenance items", M, H - 17, 10, { bold: true, color: C.white });
+    textRight(pg, ctx, fit(ctx, model.header.campusName, 10, 300), W - M, H - 17, 10, { color: C.white });
+    return pg;
+  };
+
+  // Page 1: summary and the list.
+  let p = page();
+  let y = H - BAR - 30;
+  text(p, ctx, fit(ctx, model.header.campusName, 20, W - 2 * M, true), M, y, 20, { bold: true, color: C.navy });
+  y -= 16;
+  text(p, ctx, `${model.header.regionArea} · Survey date ${model.header.date}${model.header.principal && model.header.principal !== "—" ? ` · Principal: ${model.header.principal}` : ""}`, M, y, 10, { color: C.teal, bold: true });
+  y -= 22;
+  const intro = [
+    "Dear Principal,",
+    "The items below are minor items, maintained by the school itself. During the MQI survey they were rated Poor or Very Poor. Please arrange their repair or replacement; Very Poor items first.",
+  ];
+  for (const l of intro) {
+    for (const w of wrap(ctx, l, 10, W - 2 * M - 230)) {
+      text(p, ctx, w, M, y, 10);
+      y -= 13;
+    }
+    y -= 3;
+  }
+  // Cards on the right: minor score and counts.
+  const cx = W - M - 210;
+  const cTop = H - BAR - 62;
+  rect(p, cx, cTop - 66, 210, 66, { fill: C.panel, border: C.rule });
+  rect(p, cx, cTop - 66, 4, 66, { fill: bandColor(mi.minor.band) });
+  text(p, ctx, "Minor items score", cx + 12, cTop - 15, 9, { bold: true, color: C.navy });
+  text(p, ctx, pct(mi.minor.score), cx + 12, cTop - 48, 24, { bold: true, color: bandColor(mi.minor.band) });
+  text(p, ctx, mi.minor.band ?? "Not scored", cx + 16 + width(ctx, pct(mi.minor.score), 24, true), cTop - 46, 10, { bold: true, color: bandColor(mi.minor.band) });
+  const boxY = cTop - 76;
+  const half = 103;
+  rect(p, cx, boxY - 40, half, 40, { fill: vp ? hex(REPORT_CELL["Very Poor"].fill) : C.panel });
+  text(p, ctx, String(vp), cx + 10, boxY - 22, 16, { bold: true, color: vp ? C.white : C.soft });
+  text(p, ctx, "Very Poor", cx + 10, boxY - 34, 8, { bold: true, color: vp ? C.white : C.soft });
+  rect(p, cx + half + 4, boxY - 40, half, 40, { fill: poor ? hex(REPORT_CELL.Poor.fill) : C.panel });
+  text(p, ctx, String(poor), cx + half + 14, boxY - 22, 16, { bold: true, color: poor ? hex(REPORT_CELL.Poor.text) : C.soft });
+  text(p, ctx, "Poor", cx + half + 14, boxY - 34, 8, { bold: true, color: poor ? hex(REPORT_CELL.Poor.text) : C.soft });
+  y = Math.min(y, boxY - 52);
+
+  if (!rows.length) {
+    rect(p, M, y - 40, W - 2 * M, 40, { fill: C.greenBg, border: C.green, bw: 0.8 });
+    text(p, ctx, "No minor item was rated Poor or Very Poor. Thank you for keeping the campus well maintained.", M + 12, y - 24, 11, { bold: true, color: C.green });
+  } else {
+    const cols = [
+      { t: "Location", w: 260 },
+      { t: "Item", w: 330 },
+      { t: "Rating", w: W - 2 * M - 590 },
+    ];
+    const head = (yy: number) => {
+      rect(p, M, yy - 16, W - 2 * M, 16, { fill: C.navy });
+      let hx = M;
+      for (const c of cols) {
+        text(p, ctx, c.t, hx + 6, yy - 11.5, 8.5, { bold: true, color: C.white });
+        hx += c.w;
+      }
+      return yy - 16;
+    };
+    y = head(y);
+    const rowH = 15;
+    for (const loc of rows) {
+      // Very Poor first within a location.
+      const items = [...loc.items].sort((a, b) => (a.level === b.level ? 0 : a.level === "veryPoor" ? -1 : 1));
+      items.forEach((it, k) => {
+        if (y - rowH < FOOT + 10) {
+          p = page();
+          y = head(H - BAR - 24);
+        }
+        const st = it.level === "veryPoor" ? REPORT_CELL["Very Poor"] : REPORT_CELL.Poor;
+        line(p, M, y - rowH, W - M, y - rowH, C.rule, 0.4);
+        if (k === 0) text(p, ctx, fit(ctx, loc.label, 8.5, cols[0]!.w - 10, true), M + 6, y - 10.5, 8.5, { bold: true });
+        text(p, ctx, fit(ctx, it.label, 8.5, cols[1]!.w - 10), M + cols[0]!.w + 6, y - 10.5, 8.5);
+        const rx = M + cols[0]!.w + cols[1]!.w;
+        rect(p, rx + 4, y - rowH + 2, cols[2]!.w - 8, rowH - 4, { fill: hex(st.fill) });
+        text(p, ctx, fit(ctx, it.rating, 8.5, cols[2]!.w - 16, true), rx + 10, y - 10.5, 8.5, { bold: true, color: hex(st.text) });
+        y -= rowH;
+      });
+    }
+  }
+
+  // Photos of those items: minor items rated Poor or Very Poor (or their bad answer).
+  const wanted = model.photos.filter((ph) => ph.section === "Minor" && ph.severity <= 2);
+  if (wanted.length && opts.loadPhoto) {
+    const load = opts.loadPhoto;
+    const bytes = await mapPool(wanted, PHOTO_FETCHES, (ph) => load(ph.id).catch(() => null));
+    const loaded: { img: PDFImage; caption: string; severity: number }[] = [];
+    for (const [i, ph] of wanted.entries()) {
+      try {
+        const b = bytes[i];
+        if (!b) continue;
+        const img = /png/i.test(b.mimeType) ? await ctx.doc.embedPng(b.bytes) : /jpe?g/i.test(b.mimeType) ? await ctx.doc.embedJpg(b.bytes) : null;
+        if (img) loaded.push({ img, caption: ph.caption, severity: ph.severity });
+      } catch {
+        // left out
+      }
+    }
+    const cols = 3;
+    const gap = 16;
+    const cw = (W - 2 * M - gap * (cols - 1)) / cols;
+    const ih = 170;
+    for (let i = 0; i < loaded.length; i += cols * 2) {
+      const pg = page();
+      text(pg, ctx, "Photos of these items", M, H - BAR - 30, 15, { bold: true, color: C.navy });
+      text(pg, ctx, `${loaded.length} photo${loaded.length === 1 ? "" : "s"}, Very Poor first.`, M, H - BAR - 44, 8.5, { color: C.soft });
+      loaded.slice(i, i + cols * 2).forEach((ph, k) => {
+        const x = M + (k % cols) * (cw + gap);
+        const yTop = H - BAR - 58 - Math.floor(k / cols) * (ih + 52);
+        const sc = Math.min(cw / ph.img.width, ih / ph.img.height);
+        rect(pg, x, yTop - ih, cw, ih, { fill: C.panel });
+        pg.drawImage(ph.img, { x: x + (cw - ph.img.width * sc) / 2, y: yTop - ih + (ih - ph.img.height * sc) / 2, width: ph.img.width * sc, height: ph.img.height * sc });
+        const vpPhoto = ph.severity <= 1;
+        const st = vpPhoto ? REPORT_CELL["Very Poor"] : REPORT_CELL.Poor;
+        rect(pg, x, yTop - ih, cw, ih, { border: hex(st.fill), bw: 1.6 });
+        const tag = vpPhoto ? "VERY POOR" : "POOR";
+        rect(pg, x, yTop - 13, width(ctx, tag, 7.5, true) + 12, 13, { fill: hex(st.fill) });
+        text(pg, ctx, tag, x + 6, yTop - 10, 7.5, { bold: true, color: hex(st.text) });
+        wrap(ctx, ph.caption, 8.5, cw)
+          .slice(0, 3)
+          .forEach((l, j) => text(pg, ctx, l, x, yTop - ih - 12 - j * 11, 8.5, { bold: j === 0 }));
+      });
+    }
+  }
+
+  const gen = (opts.generatedAt ?? new Date()).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" });
+  const pages = ctx.doc.getPages();
+  pages.forEach((pg, i) => {
+    line(pg, M, FOOT - 6, W - M, FOOT - 6, C.rule, 0.5);
+    text(pg, ctx, fit(ctx, `${model.header.campusName} · ${model.header.date} · ${title}`, 7.5, 420), M, FOOT - 17, 7.5, { color: C.soft });
+    textCenter(pg, ctx, `Page ${i + 1} of ${pages.length}`, W / 2, FOOT - 17, 7.5, { color: C.soft });
+    textRight(pg, ctx, `Generated ${gen}`, W - M, FOOT - 17, 7.5, { color: C.soft });
+  });
+  return ctx.doc.save();
 }

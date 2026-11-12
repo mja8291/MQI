@@ -3,7 +3,7 @@ import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildReportModel, foundSurveyFromRows, reportSourceFromFound, type ReportSource } from "@mqi/shared";
 import { FIXTURE_ROWS, FIXTURE_SURVEY_ID } from "../../../../../packages/shared/src/report/fixture-01a1911f";
-import { renderReportPdf, safe } from "./report-pdf";
+import { renderMinorReportPdf, renderReportPdf, safe } from "./report-pdf";
 
 /** W66: the report renders from the model; REPORT_OUT=<file> writes the fixture's PDF for review. */
 const source = reportSourceFromFound(foundSurveyFromRows(FIXTURE_SURVEY_ID, FIXTURE_ROWS)!);
@@ -69,5 +69,56 @@ describe("W68 report PDF", () => {
     const bytes = await renderReportPdf(model, { generatedAt: at });
     if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-minor.pdf"), bytes);
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(10);
+  });
+});
+
+describe("W70 report PDF", () => {
+  it("drilling page: standard vs actual for each hole, one over both limits", async () => {
+    const drilled: ReportSource = {
+      ...source,
+      drillingCheck: {
+        ...source.drillingCheck,
+        done: "YES",
+        slabThicknessMm: "150",
+        screedThicknessMm: "60",
+        totalDepthMm: "",
+        extraHoles: [{ totalDepthMm: "", slabThicknessMm: "170", screedThicknessMm: "130", slabAssessment: "Unsafe" }],
+      },
+    };
+    const model = buildReportModel(drilled);
+    expect(model.structural.drilling.holes).toHaveLength(2);
+    const bytes = await renderReportPdf(model, { generatedAt: at });
+    if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-drill.pdf"), bytes);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(10);
+  });
+});
+
+describe("W70 principal's minor-items report", () => {
+  it("lists only Poor and Very Poor minor items, with their photos", async () => {
+    const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+    const shabby: ReportSource = {
+      ...source,
+      locations: source.locations.map((l, i) => ({
+        ...l,
+        scores: Object.fromEntries(Object.entries(l.scores).map(([k, v]) => [k, /Green board|Furniture|Door/.test(k) ? (i % 2 ? "Very Poor" : "Poor") : v])) as typeof l.scores,
+      })),
+      photos: [
+        { id: "minor", itemName: "Furniture Condition", locationName: "KG A" },
+        { id: "major", itemName: "Paint", locationName: "KG A" },
+      ],
+    };
+    const loaded: string[] = [];
+    const bytes = await renderMinorReportPdf(buildReportModel(shabby), {
+      generatedAt: at,
+      loadPhoto: async (id) => (loaded.push(id), { bytes: png, mimeType: "image/png" }),
+    });
+    if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/.pdf$/, "-principal.pdf"), bytes);
+    expect(loaded).toEqual(["minor"]); // only the minor item's photo
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2);
+  });
+
+  it("a campus with no minor shortcomings gets one page saying so", async () => {
+    const bytes = await renderMinorReportPdf(buildReportModel(source), { generatedAt: at });
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
   });
 });

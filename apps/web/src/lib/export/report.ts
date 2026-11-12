@@ -48,3 +48,9 @@ export async function buildReportPdf(source: ReportSource, loadPhoto: (id: strin
   const { renderReportPdf } = await import("./report-pdf");
   return renderReportPdf(buildReportModel(source), { loadPhoto, generatedAt: new Date() });
 }
+
+/** W70: the principal's minor-items report (only Poor/Very Poor minor items and their photos). */
+export async function buildMinorReportPdf(source: ReportSource, loadPhoto: (id: string) => Promise<ReportPhotoBytes | null>): Promise<Uint8Array> {
+  const { renderMinorReportPdf } = await import("./report-pdf");
+  return renderMinorReportPdf(buildReportModel(source), { loadPhoto, generatedAt: new Date() });
+}

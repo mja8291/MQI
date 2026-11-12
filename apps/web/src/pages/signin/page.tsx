@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { WorkingLogo } from "@/components/ui/WorkingLogo";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -74,7 +75,13 @@ export default function SignInPage() {
         ) : null}
 
         <Button type="submit" disabled={busy || !email.trim() || !password}>
-          {busy ? "Signing in…" : "Sign in"}
+          {busy ? (
+            <span className="inline-flex items-center gap-2">
+              <WorkingLogo size={22} /> Signing in…
+            </span>
+          ) : (
+            "Sign in"
+          )}
         </Button>
       </form>
 

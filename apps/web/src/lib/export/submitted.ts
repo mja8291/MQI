@@ -1,3 +1,4 @@
+import { track } from '@/lib/busy';
 import { buildReportModel, reportSourceFromFound } from '@mqi/shared';
 import type { ExportRowsResult, FoundSurvey } from '@mqi/shared';
 import { api } from '@/lib/api';
@@ -39,17 +40,23 @@ export function save(data: BlobPart, type: string, filename: string): void {
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /** W67: the campus report as a workbook (same model as the PDF, no photos to fetch, so it is quick). */
-export async function downloadSurveyExcel(surveyId: string): Promise<void> {
-  const [found, { buildReportWorkbook }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report-xlsx')]);
-  const buf = await buildReportWorkbook(buildReportModel(reportSourceFromFound(found)), workbookInput(found)).xlsx.writeBuffer();
-  save(buf, XLSX, `mqi-survey-${surveyId}.xlsx`);
+export function downloadSurveyExcel(surveyId: string): Promise<void> {
+  // W70: the working sign stays on while the file is made, not only while the server answers.
+  return track(async () => {
+    const [found, { buildReportWorkbook }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report-xlsx')]);
+    const buf = await buildReportWorkbook(buildReportModel(reportSourceFromFound(found)), workbookInput(found)).xlsx.writeBuffer();
+    save(buf, XLSX, `mqi-survey-${surveyId}.xlsx`);
+  });
 }
 
 /** W66: the campus report (packages/shared/src/report), with the survey's photos. */
-export async function downloadSurveyPdf(surveyId: string): Promise<void> {
-  const [found, { buildReportPdf, serverPhoto }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
-  const bytes = await buildReportPdf(reportSourceFromFound(found), (id) => serverPhoto(id).catch(() => null));
-  save(bytes as BlobPart, 'application/pdf', `mqi-survey-${surveyId}.pdf`);
+export function downloadSurveyPdf(surveyId: string): Promise<void> {
+  // W70: the working sign stays on while the file is made, not only while the server answers.
+  return track(async () => {
+    const [found, { buildReportPdf, serverPhoto }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
+    const bytes = await buildReportPdf(reportSourceFromFound(found), (id) => serverPhoto(id).catch(() => null));
+    save(bytes as BlobPart, 'application/pdf', `mqi-survey-${surveyId}.pdf`);
+  });
 }
 
 async function allRows(): Promise<Pick<ExportRowsResult, 'header' | 'rows'>> {
@@ -65,8 +72,22 @@ async function allRows(): Promise<Pick<ExportRowsResult, 'header' | 'rows'>> {
 }
 
 /** FR-EXP-2: all responses. */
-export async function downloadAllResponses(): Promise<void> {
-  const [rows, { buildAllResponsesWorkbook }] = await Promise.all([allRows(), import('./all-responses-workbook')]);
-  const buf = await buildAllResponsesWorkbook(rows).xlsx.writeBuffer();
-  save(buf, XLSX, `mqi-all-responses-${new Date().toISOString().slice(0, 10)}.xlsx`);
+export function downloadAllResponses(): Promise<void> {
+  // W70: the working sign stays on while the file is made, not only while the server answers.
+  return track(async () => {
+    const [rows, { buildAllResponsesWorkbook }] = await Promise.all([allRows(), import('./all-responses-workbook')]);
+    const buf = await buildAllResponsesWorkbook(rows).xlsx.writeBuffer();
+    save(buf, XLSX, `mqi-all-responses-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  });
+}
+
+/** W70: the principal's minor-items report for a submitted survey. */
+export function downloadSurveyMinorPdf(surveyId: string): Promise<void> {
+  // W70: the working sign stays on while the file is made, not only while the server answers.
+  return track(async () => {
+    const [found, { buildMinorReportPdf, serverPhoto }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
+    const bytes = await buildMinorReportPdf(reportSourceFromFound(found), (id) => serverPhoto(id).catch(() => null));
+    const name = found.campusName.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || surveyId;
+    save(bytes as BlobPart, 'application/pdf', `mqi-minor-items-${name}.pdf`);
+  });
 }

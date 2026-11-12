@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import { BottomBar } from "@/components/ui/BottomBar";
 import { useSurvey } from "@/lib/survey-context";
 import { useAuth } from "@/lib/auth/client";
-import { RUBRIC_VERSION, itemsCovered, roofAccessFromLocations, surveyPurposeText, withDerivedScores } from "@mqi/shared";
+import { RUBRIC_VERSION, drillingPhotoMissing, itemsCovered, roofAccessFromLocations, surveyPurposeText, withDerivedScores } from "@mqi/shared";
 import { CATEGORIES, CRITICAL_ITEMS, ratingBand, scoreSurvey } from "@/lib/scoring";
 import { isLocationComplete } from "@/lib/data/items";
 import {
@@ -202,7 +202,7 @@ export default function ReviewPage() {
     Boolean(structuralConcern) &&
     Boolean(buildingStructure) &&
     Boolean(centerBeam) &&
-    (!hasRoof || isDrillingCheckComplete(drilling)) &&
+    (!hasRoof || (isDrillingCheckComplete(drilling) && !drillingPhotoMissing(drilling, reviewPhotos))) &&
     isSiteChecksComplete(site, reviewPhotos) &&
     !submitting &&
     photosUploading === 0;

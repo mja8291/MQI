@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { devState, installAndSignIn, lastSurveyId, reviewAndSubmit, rowsOf, scoreEverything, startSurvey } from './helpers';
+import { devState, installAndSignIn, lastSurveyId, reviewAndSubmit, rowsOf, scoreEverything, startSurvey, addDrillingHolePhoto } from './helpers';
 
 /** A drilling-card field, found by its label (the innermost wrapper: the card itself is a div.mb-4 too). */
 const field = (page: Page, label: string) =>
@@ -17,6 +17,7 @@ test('W44/W45: Roof shows Solar Panels; total depth comes first with its guidanc
 
   await page.locator('select').first().selectOption('YES');
   await field(page, 'Drilling point marked').selectOption('YES');
+  await addDrillingHolePhoto(page);
   await expect(page.getByText('In case of roof screed (not tassu waterproofing) if the total depth is more than 260 mm (10.2 in) or damaged ceiling concrete/plaster, remove the roof screed and inspect it.')).toBeVisible();
   await field(page, 'Total depth of slab + roof screed/waterproofing (mm)').fill('300');
   await field(page, 'Slab thickness recorded (mm)').fill('150');

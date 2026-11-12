@@ -137,3 +137,10 @@ async function queuedSurveyId(page: Page): Promise<string> {
       }),
   );
 }
+
+/** W70: when drilling was done, the drilled-hole photo ("Slab thickness recorded (mm)") is required. */
+export async function addDrillingHolePhoto(page: Page): Promise<void> {
+  const input = page.locator('#photo_camera_review_Slab_thickness_recorded__mm_');
+  await input.setInputFiles(PHOTO);
+  await expect(page.locator('div.-mt-2.mb-4', { has: input }).getByText(/KB · tap to view/)).toBeVisible();
+}

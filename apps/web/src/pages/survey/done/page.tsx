@@ -8,7 +8,7 @@ import { ScreenShell } from "@/components/ui/ScreenShell";
 import { useSurvey } from "@/lib/survey-context";
 import { db } from "@/lib/offline/db";
 import { flushPendingSubmissions } from "@/lib/offline/sync";
-import { downloadSurveyExcel, downloadSurveyPdf } from "@/lib/export/submitted";
+import { downloadSurveyExcel, downloadSurveyMinorPdf, downloadSurveyPdf } from "@/lib/export/submitted";
 
 /**
  * v2: the survey is already safe on the phone when this opens (FR-HOME-5/6). The screen follows
@@ -24,7 +24,7 @@ export default function DonePage() {
   const record = useLiveQuery(() => (surveyId ? db.surveys.get(surveyId) : undefined), [surveyId]);
   // W54: once the server has everything, the phone keeps only a "sent" marker.
   const sent = useLiveQuery(() => (surveyId ? db.sent.get(surveyId) : undefined), [surveyId]);
-  const [busy, setBusy] = useState<"excel" | "pdf" | null>(null);
+  const [busy, setBusy] = useState<"excel" | "pdf" | "minor" | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
   // Clear survey state once we have landed here, not before leaving Review (that raced the navigation in v1).
@@ -52,12 +52,12 @@ export default function DonePage() {
     return () => clearTimeout(t);
   }, [failedToSend, sending, router]);
 
-  async function download(kind: "excel" | "pdf") {
+  async function download(kind: "excel" | "pdf" | "minor") {
     if (!surveyId || busy) return;
     setBusy(kind);
     setDownloadError(null);
     try {
-      await (kind === "excel" ? downloadSurveyExcel(surveyId) : downloadSurveyPdf(surveyId));
+      await (kind === "excel" ? downloadSurveyExcel(surveyId) : kind === "pdf" ? downloadSurveyPdf(surveyId) : downloadSurveyMinorPdf(surveyId));
     } catch {
       setDownloadError("Couldn't download right now. Try again from the Queue tab later.");
     } finally {
@@ -103,6 +103,15 @@ export default function DonePage() {
             className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-brand text-white flex items-center justify-center gap-2 mb-2.5"
           >
             <FileText size={16} /> {busy === "pdf" ? "Preparing…" : "Download PDF copy"}
+          </button>
+          {/* W70: the short report of minor items for the campus principal. */}
+          <button
+            type="button"
+            onClick={() => void download("minor")}
+            disabled={busy !== null}
+            className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-white border border-brand text-brand-deep flex items-center justify-center gap-2 mb-2.5"
+          >
+            <FileText size={16} /> {busy === "minor" ? "Preparing…" : "Minor items report (for the Principal)"}
           </button>
           {downloadError ? <p className="text-[11.5px] text-band-poor text-center mb-2.5">{downloadError}</p> : null}
         </>

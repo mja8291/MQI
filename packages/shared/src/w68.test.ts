@@ -18,7 +18,7 @@ const roof = (c: Condition): SurveyLocation => ({ floorLevel: "Roof", type: "Roo
 
 describe("W68 rubric 2026-11-11", () => {
   it("is the current version; 2026-11-07 surveys keep their frozen list", () => {
-    expect(RUBRIC_VERSION).toBe("2026-11-11");
+    expect(RUBRIC_VERSION >= "2026-11-11").toBe(true); // W70 moved on to 2026-11-13
     expect(rubricGroupsFor("2026-11-07")).toBe(RUBRIC_GROUPS_20261107);
     expect(RUBRIC_GROUPS_20261107).toHaveLength(33);
     expect(RUBRIC_GROUPS_20261107.find((g) => g.name === ROOF_ACCESS_ITEM)!.conditionOverride!.map((o) => o.label)).toEqual(["Roof Access Available", "Roof Access Not Available"]);
@@ -48,12 +48,13 @@ describe("W68 rubric 2026-11-11", () => {
     ]);
   });
 
-  it("roof access: Proper staircase 100%, Ladder 50%, None 0%, N/A left out; offered with N/A", () => {
+  it("roof access: Proper staircase 100%, Ladder 100% since W70 (50% under 2026-11-11), None 0%, N/A left out; offered with N/A", () => {
     const g = RUBRIC_GROUPS.find((x) => x.name === ROOF_ACCESS_ITEM)!;
     expect(g.conditionOverride!.map((o) => o.label)).toEqual(["Proper staircase", "Ladder", "None"]);
     expect(g.hideNA).toBeFalsy();
     expect(aggregateLocations([roof("Good")])[ROOF_ACCESS_ITEM]).toBe(100);
-    expect(aggregateLocations([roof("Poor")])[ROOF_ACCESS_ITEM]).toBe(50);
+    expect(aggregateLocations([roof("Poor")])[ROOF_ACCESS_ITEM]).toBe(100);
+    expect(scoreSurveyFor([roof("Poor")], "2026-11-11").categories.Safety.score).toBe(50);
     expect(aggregateLocations([roof("Very Poor")])[ROOF_ACCESS_ITEM]).toBe(0);
     expect(aggregateLocations([roof("N/A")])[ROOF_ACCESS_ITEM]).toBeUndefined();
     // A survey under 2026-11-07 still scores "Not available" at 25%.

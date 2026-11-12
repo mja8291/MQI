@@ -286,6 +286,13 @@ const SHEET_GROUPS: RubricGroup[] = [
  * v2 (W56): Guardroom is scored on every item a Toilet is; Canteen & UGWT on every item an Other
  * Room is (requested 2026-11-07; the sheet's Location column doesn't list them).
  */
+const WITH_WATER_ONLY_AT: Partial<Record<LocationType, readonly string[]>> = {
+  // W70 (2026-11-13): basins and drains are only in these rooms.
+  [LAB]: ["Wet Lab", "Bio/Chemistry Lab"],
+  [OTHER_ROOM]: ["Pantry"],
+};
+const WITH_WATER = ["Wash Basin/Taps", "Sewerage System"];
+
 export const RUBRIC_GROUPS: RubricGroup[] = SHEET_GROUPS.map((g) => {
   const otherRoom = g.locations.includes(OTHER_ROOM);
   return {
@@ -299,9 +306,20 @@ export const RUBRIC_GROUPS: RubricGroup[] = SHEET_GROUPS.map((g) => {
       ...(otherRoom && g.name !== "Green board/Softboard/Cabinet" ? [CANTEEN] : []),
       // W58: UGWT keeps Other Room's Safety items and Plaster; its only Functionality item is External Plumbing; no Paint.
       ...((otherRoom && (g.category === "Safety" || g.name === "Plaster")) || g.name === "External Plumbing" ? [UGWT] : []),
+      // W70: Pantry (an Other Room) has a basin and a drain.
+      ...(WITH_WATER.includes(g.name) ? [OTHER_ROOM] : []),
     ],
+    ...(WITH_WATER.includes(g.name) ? { onlyAtNames: WITH_WATER_ONLY_AT } : {}),
   };
 });
+
+/** W70: whether a group is scored at a location of this type and name (no name: the type decides). */
+export function groupAppliesAt(g: Pick<RubricGroup, "locations" | "onlyAtNames">, type: LocationType, name?: string): boolean {
+  if (!g.locations.includes(type)) return false;
+  const only = g.onlyAtNames?.[type];
+  if (!only || name === undefined) return true;
+  return only.some((n) => name === n || name.startsWith(`${n} `));
+}
 
 /** Display order of a location's scoring sections. */
 export const RUBRIC_SECTIONS: Category[] = ["Safety", "Functionality", "Aesthetics"];
@@ -407,8 +425,8 @@ export const CLASSROOM_GRADES_WITH_OPTIONAL_SECTION = ["Library", "Art Room/Libr
 export const CLASSROOM_SECTIONS = ["A", "B", "C", "D", "E", "Red", "Yellow", "Green", "Blue"];
 
 /** The groups the surveyor scores at a location of this type (W56: not those scored from other answers). */
-export function rubricGroupsForLocation(type: LocationType): RubricGroup[] {
-  return RUBRIC_GROUPS.filter((g) => g.locations.includes(type) && !g.derived);
+export function rubricGroupsForLocation(type: LocationType, name?: string): RubricGroup[] {
+  return RUBRIC_GROUPS.filter((g) => groupAppliesAt(g, type, name) && !g.derived);
 }
 
 /**
@@ -454,11 +472,11 @@ export function unsafeWithoutPhoto(
 }
 
 export function isLocationComplete(
-  location: { type: LocationType; scores: Record<string, Condition> },
+  location: { type: LocationType; name?: string; scores: Record<string, Condition> },
   /** W59: items the server doesn't require yet (see ADDED_LATER). */
   excused: Partial<Record<LocationType, readonly string[]>> = {}
 ): boolean {
-  return rubricGroupsForLocation(location.type).every((g) => Boolean(location.scores[g.name]) || Boolean(excused[location.type]?.includes(g.name)));
+  return rubricGroupsForLocation(location.type, location.name).every((g) => Boolean(location.scores[g.name]) || Boolean(excused[location.type]?.includes(g.name)));
 }
 
 /**
@@ -467,16 +485,18 @@ export function isLocationComplete(
  */
 export const ADDED_LATER: Partial<Record<LocationType, readonly string[]>> = {
   Guardroom: ["Distribution Board"],
+  // W70: Pantry's basin and drain.
+  "Other Room (Staff, Principal, Admin, Store etc.)": ["Wash Basin/Taps", "Sewerage System"],
 };
 
-export function rubricGroupsForLocationAndSection(type: LocationType, section: Category): RubricGroup[] {
-  return rubricGroupsForLocation(type).filter((g) => g.category === section);
+export function rubricGroupsForLocationAndSection(type: LocationType, section: Category, name?: string): RubricGroup[] {
+  return rubricGroupsForLocation(type, name).filter((g) => g.category === section);
 }
 
 /** Group counts per section for a specific location type — drives the scoring page's section counts (location-specific, not global). */
-export function sectionCountsForLocation(type: LocationType): Record<Category, number> {
+export function sectionCountsForLocation(type: LocationType, name?: string): Record<Category, number> {
   const counts: Record<Category, number> = { Safety: 0, Functionality: 0, Aesthetics: 0 };
-  for (const group of rubricGroupsForLocation(type)) counts[group.category]++;
+  for (const group of rubricGroupsForLocation(type, name)) counts[group.category]++;
   return counts;
 }
 

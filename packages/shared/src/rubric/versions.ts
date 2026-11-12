@@ -8,6 +8,7 @@ import { RUBRIC_GROUPS_20261027_2 } from './items-v20261027-2';
 import { RUBRIC_GROUPS_20261027_3 } from './items-v20261027-3';
 import { RUBRIC_GROUPS_20261028 } from './items-v20261028';
 import { RUBRIC_GROUPS_20261107 } from './items-v20261107';
+import { RUBRIC_GROUPS_20261111 } from './items-v20261111';
 import { RUBRIC_VERSION } from './rubric-version';
 
 /**
@@ -18,7 +19,7 @@ import { RUBRIC_VERSION } from './rubric-version';
  */
 export type RubricGroupList = (RubricItem & { aggregation: 'worst' | 'average' })[];
 
-export const KNOWN_RUBRIC_VERSIONS = ['', '2026-10-27', '2026-10-27.2', '2026-10-27.3', '2026-10-28', '2026-11-07', RUBRIC_VERSION] as const;
+export const KNOWN_RUBRIC_VERSIONS = ['', '2026-10-27', '2026-10-27.2', '2026-10-27.3', '2026-10-28', '2026-11-07', '2026-11-11', RUBRIC_VERSION] as const;
 
 export function rubricGroupsFor(version: string | null | undefined): RubricGroupList {
   if (!version) return LEGACY_RUBRIC_GROUPS;
@@ -27,6 +28,7 @@ export function rubricGroupsFor(version: string | null | undefined): RubricGroup
   if (version === '2026-10-27.3') return RUBRIC_GROUPS_20261027_3;
   if (version === '2026-10-28') return RUBRIC_GROUPS_20261028;
   if (version === '2026-11-07') return RUBRIC_GROUPS_20261107;
+  if (version === '2026-11-11') return RUBRIC_GROUPS_20261111;
   return RUBRIC_GROUPS;
 }
 

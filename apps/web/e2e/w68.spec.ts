@@ -36,7 +36,7 @@ test('W68: roof access Ladder at the Roof fills Review; dashboard Major/Minor', 
   const id = await lastSurveyId(page);
   await expect.poll(async () => rowsOf(await devState(), id).length, { timeout: 60_000 }).toBe(1);
   const row = rowsOf(await devState(), id)[0]!;
-  expect(row['Rubric Version']).toBe('2026-11-11');
+  expect(row['Rubric Version']).toBe('2026-11-13'); // W70
   expect(row['Access to roof area /tanks']).toBe('Poor'); // Ladder = 50%
   expect(row['Roof Access Type']).toBe('Ladder');
 

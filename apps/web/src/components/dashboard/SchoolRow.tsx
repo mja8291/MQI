@@ -3,7 +3,7 @@ import { useState } from "react";
 import { BAND_COLOR } from "@/lib/scoring";
 import { ratingBand } from "@mqi/shared";
 import type { CapturedSchool } from "@/lib/data/mock-dashboard";
-import { downloadSurveyExcel, downloadSurveyPdf } from "@/lib/export/submitted";
+import { downloadSurveyExcel, downloadSurveyMinorPdf, downloadSurveyPdf } from "@/lib/export/submitted";
 
 const BAND_TINT: Record<string, string> = {
   Excellent: "var(--brand-tint)",
@@ -17,17 +17,17 @@ const BAND_TINT: Record<string, string> = {
  * showing "…" while that file is being made.
  */
 function Downloads({ surveyId, name }: { surveyId: string; name: string }) {
-  const [busy, setBusy] = useState<"xls" | "pdf" | null>(null);
-  const run = (kind: "xls" | "pdf") => {
+  const [busy, setBusy] = useState<"xls" | "pdf" | "min" | null>(null);
+  const run = (kind: "xls" | "pdf" | "min") => {
     if (busy) return;
     setBusy(kind);
-    void (kind === "xls" ? downloadSurveyExcel(surveyId) : downloadSurveyPdf(surveyId))
+    void (kind === "xls" ? downloadSurveyExcel(surveyId) : kind === "pdf" ? downloadSurveyPdf(surveyId) : downloadSurveyMinorPdf(surveyId))
       .catch(() => window.alert("Couldn't download right now."))
       .finally(() => setBusy(null));
   };
-  const box = "h-[30px] w-11 rounded-md border text-[10.5px] font-bold tracking-wide flex items-center justify-center disabled:opacity-60";
+  const box = "h-[26px] w-11 rounded-md border text-[10.5px] font-bold tracking-wide flex items-center justify-center disabled:opacity-60";
   return (
-    <span className="flex flex-col gap-1.5 shrink-0">
+    <span className="flex flex-col gap-1 shrink-0">
       <button
         type="button"
         onClick={() => run("xls")}
@@ -45,6 +45,17 @@ function Downloads({ surveyId, name }: { surveyId: string; name: string }) {
         className={`${box} border-[#DC2626] text-[#B91C1C] bg-[#FEF2F2]`}
       >
         {busy === "pdf" ? "…" : "PDF"}
+      </button>
+      {/* W70: the principal's report of minor items rated Poor or Very Poor. */}
+      <button
+        type="button"
+        onClick={() => run("min")}
+        disabled={busy !== null}
+        aria-label={`Minor items report for ${name} (for the Principal)`}
+        title="Minor items report for the Principal"
+        className={`${box} border-[#D97706] text-[#92400E] bg-[#FFFBEB]`}
+      >
+        {busy === "min" ? "…" : "MIN"}
       </button>
     </span>
   );

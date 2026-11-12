@@ -3,12 +3,12 @@ import { ADDED_LATER, isLocationComplete, migrateLocationType, rubricGroupsForLo
 import type { Condition, LocationType } from './index';
 
 const OTHER: LocationType = 'Other Room (Staff, Principal, Admin, Store etc.)';
-const names = (t: LocationType) => rubricGroupsForLocation(t).map((g) => g.name);
+const names = (t: LocationType, name?: string) => rubricGroupsForLocation(t, name).map((g) => g.name);
 
 /** W58 (2026-11-07): Canteen and UGWT get their own items. */
 describe('W58 Canteen / UGWT', () => {
   test('Canteen is Other Room without Green board/Softboard/Cabinet', () => {
-    expect(names('Canteen')).toEqual(names(OTHER).filter((n) => n !== 'Green board/Softboard/Cabinet'));
+    expect(names('Canteen')).toEqual(names(OTHER, 'Staff room').filter((n) => n !== 'Green board/Softboard/Cabinet'));
   });
 
   test('UGWT: Other Room safety items, External Plumbing as the only Functionality item, Plaster but no Paint', () => {

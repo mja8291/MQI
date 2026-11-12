@@ -156,6 +156,16 @@ export const SITE_PHOTO_SLAB_THICKNESS = "Slab thickness recorded (mm)";
  * picture". A photo that failed to upload still counts: it's queued with the
  * submission (see PendingPhotoUpload), same as every other photo in the app.
  */
+/**
+ * W70 (2026-11-13): when drilling was done, a photo of the drilled hole (the "Slab thickness
+ * recorded" photo, showing the measured hole) is required before the Roof location is saved
+ * and before Submit.
+ */
+export function drillingPhotoMissing(c: Pick<DrillingCheck, "done">, photos: Record<string, readonly unknown[] | undefined>): boolean {
+  return c.done === "YES" && (photos[SITE_PHOTO_SLAB_THICKNESS]?.length ?? 0) === 0;
+}
+export const DRILLING_PHOTO_NEEDED = "Take a photo of the drilled hole (Slab thickness recorded) to continue.";
+
 export function isSiteChecksComplete(s: SiteChecks, photos: Record<string, readonly unknown[]>): boolean {
   if (!s.roofAccessType || !s.overflowDisposal || !s.roofClean || !s.rainSpoutsClear) return false;
   if (s.roofClean === "No" && (photos[SITE_PHOTO_ROOF_CLEAN]?.length ?? 0) === 0) return false;
@@ -203,6 +213,11 @@ export interface RubricGroup extends RubricItem {
   aggregation: "worst" | "average";
   /** Which location types this item group is scored at. */
   locations: LocationType[];
+  /**
+   * W70: at these location types, only locations with one of these names (e.g. Lab → Wet Lab,
+   * Bio/Chemistry Lab). A name may carry a number after it ("Pantry 2").
+   */
+  onlyAtNames?: Partial<Record<LocationType, readonly string[]>>;
 }
 
 /** The item name shown on screen at this location type (W44), else its label or name. */

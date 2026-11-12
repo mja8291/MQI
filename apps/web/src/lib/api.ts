@@ -1,3 +1,4 @@
+import { track } from './busy';
 import { API_VERSION } from '@mqi/shared';
 import type { ApiError, ApiResponse, ErrorCode } from '@mqi/shared';
 import { getMeta } from './offline/db';
@@ -27,6 +28,11 @@ export class ApiCallError extends Error {
 const TIMEOUT_MS = 45_000;
 
 export async function rawCall<T>(action: string, payload: unknown, session?: string | null): Promise<ApiResponse<T>> {
+  // W70: the working sign is on while the server is being asked.
+  return track(() => rawCallOnce<T>(action, payload, session));
+}
+
+async function rawCallOnce<T>(action: string, payload: unknown, session?: string | null): Promise<ApiResponse<T>> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {

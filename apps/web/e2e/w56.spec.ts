@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { devState, installAndSignIn, lastSurveyId, reviewAndSubmit, rowsOf, scoreEverything, startSurvey } from './helpers';
+import { devState, installAndSignIn, lastSurveyId, reviewAndSubmit, rowsOf, scoreEverything, startSurvey, addDrillingHolePhoto } from './helpers';
 
 const field = (page: Page, label: string) =>
   page.locator('div.mb-4', { has: page.locator('label', { hasText: label }) }).last().locator('input, select').first();
@@ -23,6 +23,7 @@ test('W56: Guardroom card, derived Roof items in the sheet, Unsafe on the dashbo
   await expect(page.getByText(SLAB, { exact: true })).toHaveCount(0); // not picked as an item
   await page.locator('select').first().selectOption('YES');
   await field(page, 'Drilling point marked').selectOption('YES');
+  await addDrillingHolePhoto(page);
   await expect(page.getByText(/In case of roof screed \(not tassu waterproofing\)/)).toBeVisible();
   await field(page, 'Total depth of slab + roof screed/waterproofing (mm)').fill('200');
   await field(page, 'Slab thickness recorded (mm)').fill('150');

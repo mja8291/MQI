@@ -84,7 +84,8 @@ describe('W56 Guardroom / Canteen & UGWT', () => {
     const names = (t: Parameters<typeof rubricGroupsForLocation>[0]) => rubricGroupsForLocation(t).map((g) => g.name);
     // W59: plus Distribution Board.
     expect(names('Guardroom')).toEqual(names('Toilet').concat('Distribution Board').sort((a, b) => names('Guardroom').indexOf(a) - names('Guardroom').indexOf(b)));
-    expect(names('Canteen & UGWT')).toEqual(names('Other Room (Staff, Principal, Admin, Store etc.)'));
+    // W70: a named Other Room (Pantry alone adds a basin and a drain).
+    expect(names('Canteen & UGWT')).toEqual(rubricGroupsForLocation('Other Room (Staff, Principal, Admin, Store etc.)', 'Staff room').map((g) => g.name));
   });
 });
 

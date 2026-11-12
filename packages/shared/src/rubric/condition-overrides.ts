@@ -29,12 +29,13 @@ export const YES_NO: NonNullable<RubricItem["conditionOverride"]> = [
 
 /**
  * W68 (2026-11-11): Access to roof area /tanks at the Roof location takes the Review page's
- * options. Owner's scores: Proper staircase 100%, Ladder 50%, None 0% (stored as Good / Poor /
- * Very Poor; `score` overrides Very Poor's usual 25%). N/A stays available.
+ * options, stored as Good / Poor / Very Poor. Owner's scores: Proper staircase 100%, None 0%
+ * (`score` overrides Very Poor's usual 25%); Ladder 50% until W70 (2026-11-13), now 100% like a
+ * staircase (still stored as Poor, so earlier ladder answers keep meaning Ladder). N/A stays available.
  */
 export const ROOF_ACCESS_TYPES: NonNullable<RubricItem["conditionOverride"]> = [
   { condition: "Good", label: "Proper staircase" },
-  { condition: "Poor", label: "Ladder" },
+  { condition: "Poor", label: "Ladder", score: 100 },
   { condition: "Very Poor", label: "None", score: 0 },
 ];
 

@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useWorking } from "@/lib/busy";
+import { WorkingLogo } from "@/components/ui/WorkingLogo";
 
 /**
  * W67: a small tag in the top-right corner of every screen saying whether the phone is Online or
@@ -16,6 +18,8 @@ export function NetworkTag() {
       window.removeEventListener("offline", update);
     };
   }, []);
+  // W70: while the app works (signing in, loading, sending, making a report) the tag shows the turning TCF logo.
+  const working = useWorking();
   return (
     <div
       role="status"
@@ -25,8 +29,9 @@ export function NetworkTag() {
         online ? "bg-[#F0FDF4] text-[#15803D] border border-[#86EFAC]" : "bg-[#FEF3C7] text-[#92400E] border border-[#F59E0B]"
       }`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-[#16A34A]" : "bg-[#D97706]"}`} aria-hidden />
+      {working ? <WorkingLogo size={14} className="-my-0.5" /> : <span className={`h-1.5 w-1.5 rounded-full ${online ? "bg-[#16A34A]" : "bg-[#D97706]"}`} aria-hidden />}
       {online ? "Online" : "Offline"}
+      {working ? <span className="sr-only" data-testid="working">, working</span> : null}
     </div>
   );
 }
