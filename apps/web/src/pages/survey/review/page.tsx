@@ -207,6 +207,19 @@ export default function ReviewPage() {
     !submitting &&
     photosUploading === 0;
 
+  // W72: when Submit is off, say why — especially what lives on another page (the Roof location's
+  // drilling card and its now-required hole photo), so nobody is stuck on a grey button.
+  const drillingIncomplete = hasRoof && !isDrillingCheckComplete(drilling);
+  const drillingPhotoNeeded = hasRoof && !drillingIncomplete && drillingPhotoMissing(drilling, reviewPhotos);
+  const submitBlockers: string[] = [
+    ...(drillingIncomplete ? ["Complete Drilling & observation at the Roof location."] : []),
+    ...(drillingPhotoNeeded ? ["Add the photo of the drilled hole at the Roof location (Drilling & observation)."] : []),
+    ...(!powerSupply || !structuralConcern || !buildingStructure || !centerBeam ? ["Answer every question on this page."] : []),
+    ...(!isSiteChecksComplete(site, reviewPhotos) ? ["Answer the roof & drainage questions, with a photo where the answer is No."] : []),
+    ...(photosUploading > 0 ? ["Wait for photos to finish saving."] : []),
+    ...(!oath ? ["Tick the declaration at the bottom."] : []),
+  ];
+
   // Once Submit is tapped and actually accepted — synced immediately, or
   // queued for later — the assessment is done, not still a draft: nothing
   // deleted the autosaved draft record before this (autosave keeps writing
@@ -645,6 +658,17 @@ export default function ReviewPage() {
         <Button disabled={!canSubmit || photoSaving} onClick={submit}>
           {photoSaving ? "Saving photo…" : submitting ? "Submitting…" : "Submit survey"}
         </Button>
+        {!canSubmit && !submitting && submitBlockers.length ? (
+          <div className="mt-2 text-[11.5px] leading-snug text-band-poor" data-testid="submit-blockers">
+            <span className="font-semibold">To submit: </span>
+            {submitBlockers.join(" ")}
+            {drillingIncomplete || drillingPhotoNeeded ? (
+              <button type="button" onClick={() => router.push("/survey/locations")} className="ml-1 font-semibold underline">
+                Go to locations
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </BottomBar>
     </ScreenShell>
   );

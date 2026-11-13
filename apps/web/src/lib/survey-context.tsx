@@ -17,7 +17,7 @@ import type {
 } from "@/lib/types";
 import type { ColumnCheck } from "@mqi/shared";
 import { UNNAMED_LOCATION_TYPES } from "@/lib/data/items";
-import { uuidv7, migrateLocationType, repairLocations, uniqueLocationName } from "@mqi/shared";
+import { uuidv7, migrateLocationType, repairLocations, rubricGroupsForLocation, uniqueLocationName } from "@mqi/shared";
 import type { SurveyPurpose } from "@mqi/shared";
 
 interface CurrentLocation {
@@ -329,10 +329,15 @@ function reducer(state: SurveyState, action: Action): SurveyState {
       current.name = named ? (action.autoName ?? action.locationType) : "";
       return { ...state, scoring: { ...state.scoring, current } };
     }
-    case "LOC_SET_LOCATION_NAME":
-      return state.scoring.current
-        ? { ...state, scoring: { ...state.scoring, current: { ...state.scoring.current, name: action.name } } }
-        : state;
+    case "LOC_SET_LOCATION_NAME": {
+      const cur = state.scoring.current;
+      if (!cur) return state;
+      // W72: items can depend on the name (W70: basins only in Wet/Bio Lab and Pantry). A rename drops
+      // ratings of items the new name doesn't have, so they can't count; photos and notes stay.
+      const keep = cur.type ? new Set(rubricGroupsForLocation(cur.type, action.name).map((g) => g.name)) : null;
+      const scores = keep ? (Object.fromEntries(Object.entries(cur.scores).filter(([n]) => keep.has(n))) as typeof cur.scores) : cur.scores;
+      return { ...state, scoring: { ...state.scoring, current: { ...cur, name: action.name, scores } } };
+    }
     case "LOC_SET_CLASSROOM": {
       const current = emptyCurrentLocation(action.floorLevel);
       current.type = "Classroom";
