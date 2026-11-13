@@ -45,7 +45,7 @@ describe("W66 report PDF", () => {
       generatedAt: at,
       loadPhoto: async (id) => (id === "ok" ? { bytes: png, mimeType: "image/png" } : null),
     });
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(11);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(12); // W71: + a notice that 1 of 2 photos could not be loaded
   });
 
   it("text the PDF font can't draw is replaced, not crashed on", () => {

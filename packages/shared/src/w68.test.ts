@@ -81,7 +81,7 @@ describe("W68 report: major/minor and the questionnaire table", () => {
     expect(model.minor.groups).toHaveLength(17);
     expect(model.groups.filter((g) => g.minor)).toHaveLength(17);
     for (const loc of model.minor.byLocation) expect(loc.items.length).toBeGreaterThan(0);
-    expect(model.minor.shortcomings).toBe(0);
+    expect(model.minor.shortcomings).toBe(1); // W71: the roof was answered "not clean" (Review page upkeep)
   });
 
   it("Poor and Very Poor minor ratings are counted as shortcomings, with the option label", () => {
@@ -90,7 +90,7 @@ describe("W68 report: major/minor and the questionnaire table", () => {
       locations: source.locations.map((l) => (l.type === "Roof" ? { ...l, scores: { ...l.scores, [ROOF_ACCESS_ITEM]: "Very Poor" as Condition } } : l)),
     };
     const m = buildReportModel(shabby);
-    expect(m.minor.shortcomings).toBe(1);
+    expect(m.minor.shortcomings).toBe(2); // roof access None + the roof not clean
     const item = m.minor.byLocation.flatMap((l) => l.items).find((i) => i.label.startsWith("Access to roof"))!;
     expect(item).toMatchObject({ rating: "None", level: "veryPoor" });
   });

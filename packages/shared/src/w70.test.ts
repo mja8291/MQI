@@ -67,3 +67,20 @@ describe("W70 report", () => {
     expect(m.categories.map((c) => c.category)).toEqual(["Safety", "Functionality", "Aesthetics"]);
   });
 });
+
+describe("W71 roof upkeep with the minor items", () => {
+  it("a roof not clean / rain spouts not clear is a minor shortcoming, with its photo grouped as minor", () => {
+    const src = reportSourceFromFound(foundSurveyFromRows(FIXTURE_SURVEY_ID, FIXTURE_ROWS)!);
+    const m = buildReportModel({
+      ...src,
+      siteChecks: { ...src.siteChecks, roofClean: "No", rainSpoutsClear: "No" },
+      photos: [{ id: "spout", itemName: "Rain spouts clear", locationName: "" }],
+    });
+    const upkeep = m.minor.byLocation.find((l) => l.label.startsWith("Roof · upkeep"))!;
+    expect(upkeep.items).toEqual([
+      { label: "Roof clean of dirt and vegetation", rating: "Not clean (dirt/vegetation)", level: "poor" },
+      { label: "Rain spouts clear", rating: "Not clear (blocked)", level: "poor" },
+    ]);
+    expect(m.photos[0]).toMatchObject({ id: "spout", section: "Minor", severity: 2 });
+  });
+});

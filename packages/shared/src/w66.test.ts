@@ -139,7 +139,8 @@ describe("W66 report model — other cases", () => {
         { id: "c", itemName: "Ceiling Condition i.e. cracks & seepage", locationName: "Principal Room" },
       ],
     });
-    expect(m.photos.map((p) => p.id)).toEqual(["c", "b", "a"]);
+    // W71: the roof-clean photo (answered No) is upkeep: grouped with the minor items, before major ones.
+    expect(m.photos.map((p) => p.id)).toEqual(["c", "a", "b"]);
     expect(m.photos[0]!.caption).toBe("Principal Room (Ground) · Ceiling Condition i.e. cracks & seepage · Unsafe");
     expect(m.structural.roof.find((r) => r.label.startsWith("Roof clean"))).toMatchObject({ bad: true, photo: true });
   });

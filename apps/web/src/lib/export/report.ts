@@ -32,9 +32,47 @@ export async function shrinkPhoto(blob: Blob): Promise<ReportPhotoBytes | null> 
 
 /** A submitted survey's photo, from the server. */
 export async function serverPhoto(id: string): Promise<ReportPhotoBytes | null> {
-  const f = await api<FileGetResult>("files.get", { attachmentId: id });
-  const bytes = Uint8Array.from(atob(f.data), (c) => c.charCodeAt(0));
-  return shrinkPhoto(new Blob([bytes], { type: f.mimeType }));
+  // W71: one retry — a Drive read on the server occasionally fails once ("Service error: Drive").
+  let last: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const f = await api<FileGetResult>("files.get", { attachmentId: id });
+      const bytes = Uint8Array.from(atob(f.data), (c) => c.charCodeAt(0));
+      const out = await shrinkPhoto(new Blob([bytes], { type: f.mimeType }));
+      if (out) return out;
+      last = new Error(`photo ${id}: not a readable image (${f.mimeType}, ${bytes.length} bytes)`);
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
+}
+
+/**
+ * W71: a photo loader for a report that remembers why photos failed, so the reason reaches the
+ * server's ErrorLog (once per report) instead of the photo silently going missing.
+ */
+export function reportPhotoLoader(load: (id: string) => Promise<ReportPhotoBytes | null>) {
+  const failures: string[] = [];
+  let total = 0;
+  return {
+    load: async (id: string) => {
+      total++;
+      try {
+        return await load(id);
+      } catch (e) {
+        const err = e as { code?: string; message?: string };
+        failures.push(`${err.code ?? "ERROR"}: ${err.message ?? String(e)}`);
+        return null;
+      }
+    },
+    async logFailures(what: string) {
+      if (!failures.length) return;
+      const { reportError } = await import("@/lib/observability");
+      const kinds = [...new Set(failures)].slice(0, 3).join(" | ");
+      await reportError(new Error(`${what}: ${failures.length} of ${total} photos not loaded — ${kinds}`), "warn");
+    },
+  };
 }
 
 /** A draft's photo, from the phone (works offline). */

@@ -296,6 +296,12 @@ export function optionLabel(g: Pick<RubricGroup, "conditionOverride">, c: Condit
 
 const sectionIndex = (s: PhotoSection) => PHOTO_SECTIONS.findIndex((x) => x.section === s);
 
+/** W71: the Review page's roof upkeep questions, reported with the minor items. */
+const SITE_UPKEEP = [
+  { key: "roofClean", photo: SITE_PHOTO_ROOF_CLEAN, label: "Roof clean of dirt and vegetation", rating: "Not clean (dirt/vegetation)" },
+  { key: "rainSpoutsClear", photo: SITE_PHOTO_RAIN_SPOUTS, label: "Rain spouts clear", rating: "Not clear (blocked)" },
+] as const;
+
 function num(text: string | undefined): number | null {
   if (text == null || text.trim() === "") return null;
   const n = Number(text);
@@ -589,7 +595,13 @@ export function buildReportModel(src: ReportSource): ReportModel {
         }
       } else if (loc) severity = 3;
       const item = g ? itemLabel(g, loc?.type) : p.itemName;
-      const section: PhotoSection = !g ? "Site" : g.category === "Safety" ? "Safety" : g.principalMaintained ? "Minor" : "Major";
+      // W71: a dirty roof or blocked rain spouts is the school's upkeep: shown with the minor items, as Poor.
+      const upkeep = SITE_UPKEEP.find((u) => u.photo === p.itemName && src.siteChecks[u.key] === "No");
+      if (upkeep) {
+        severity = 2;
+        rating = upkeep.rating;
+      }
+      const section: PhotoSection = upkeep ? "Minor" : !g ? "Site" : g.category === "Safety" ? "Safety" : g.principalMaintained ? "Minor" : "Major";
       return {
         id: p.id,
         itemName: p.itemName,
@@ -634,6 +646,12 @@ export function buildReportModel(src: ReportSource): ReportModel {
         }),
     }))
     .filter((x) => x.items.length);
+  // W71: the roof's upkeep answers (Review page) sit with the minor items: Poor when answered No.
+  const upkeepItems = SITE_UPKEEP.filter((u) => src.siteChecks[u.key]).map((u) => {
+    const no = src.siteChecks[u.key] === "No";
+    return { label: u.label, rating: no ? u.rating : "Yes", level: (no ? "poor" : "good") as MinorLevel };
+  });
+  if (upkeepItems.length) minorByLocation.push({ label: "Roof · upkeep (Review page)", score: null, items: upkeepItems });
   const minorModel: ReportMinor = {
     major: { score: result.major, band: ratingBand(result.major) },
     minor: { score: result.minor, band: ratingBand(result.minor) },

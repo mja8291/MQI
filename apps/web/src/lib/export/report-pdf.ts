@@ -848,9 +848,25 @@ export async function mapPool<T, R>(items: readonly T[], limit: number, fn: (ite
   return out;
 }
 
+/** W71: a notice in the photo evidence part of the report (photos missing or not loaded). */
+function photoNotice(ctx: Ctx, message: string) {
+  const p = newPage(ctx, "Photo evidence");
+  heading(p, ctx, "Photo evidence", H - BAR - 30);
+  rect(p, M, H - BAR - 96, W - 2 * M, 44, { fill: C.redBg, border: C.red, bw: 0.8 });
+  warning(p, M + 16, H - BAR - 73, 14, C.red, C.white);
+  wrap(ctx, message, 10, W - 2 * M - 50)
+    .slice(0, 2)
+    .forEach((l, i) => text(p, ctx, l, M + 32, H - BAR - 68 - i * 13, 10, { bold: i === 0, color: C.red }));
+}
+
 async function photoPages(ctx: Ctx, opts: RenderOptions) {
   const m = ctx.model;
-  if (!m.photos.length || !opts.loadPhoto) return;
+  if (!opts.loadPhoto) return;
+  // W71: a survey whose photos aren't on the server says so instead of silently having none.
+  if (!m.photos.length) {
+    if (!m.header.draft) photoNotice(ctx, "No photos of this survey are on the server yet. If it was submitted a moment ago, its photos may still be uploading: download the report again later.");
+    return;
+  }
   // W67: photos are fetched PHOTO_FETCHES at a time (one by one made a large survey's report slow),
   // then embedded in report order.
   const load = opts.loadPhoto;
@@ -863,9 +879,12 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
       const img = /png/i.test(b.mimeType) ? await ctx.doc.embedPng(b.bytes) : /jpe?g/i.test(b.mimeType) ? await ctx.doc.embedJpg(b.bytes) : null;
       if (img) loaded.push({ img, caption: ph.caption, severity: ph.severity, section: ph.section });
     } catch {
-      // A photo that can't be read is left out; the report still prints.
+      // A photo that can't be read is left out; the report still prints (W71: and says so).
     }
   }
+  const missing = m.photos.length - loaded.length;
+  // W71: photos that could not be loaded are counted on a page of their own, never silently dropped.
+  if (missing) photoNotice(ctx, `${missing} of ${m.photos.length} photos could not be loaded (no connection, or the server did not answer in time). Download the report again with a good connection to include them.`);
   if (!loaded.length) return;
   const cols = 4;
   const rowsPer = 2;

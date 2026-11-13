@@ -53,8 +53,10 @@ export function downloadSurveyExcel(surveyId: string): Promise<void> {
 export function downloadSurveyPdf(surveyId: string): Promise<void> {
   // W70: the working sign stays on while the file is made, not only while the server answers.
   return track(async () => {
-    const [found, { buildReportPdf, serverPhoto }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
-    const bytes = await buildReportPdf(reportSourceFromFound(found), (id) => serverPhoto(id).catch(() => null));
+    const [found, { buildReportPdf, serverPhoto, reportPhotoLoader }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
+    const photos = reportPhotoLoader(serverPhoto);
+    const bytes = await buildReportPdf(reportSourceFromFound(found), photos.load);
+    void photos.logFailures('Campus report');
     save(bytes as BlobPart, 'application/pdf', `mqi-survey-${surveyId}.pdf`);
   });
 }
@@ -85,8 +87,10 @@ export function downloadAllResponses(): Promise<void> {
 export function downloadSurveyMinorPdf(surveyId: string): Promise<void> {
   // W70: the working sign stays on while the file is made, not only while the server answers.
   return track(async () => {
-    const [found, { buildMinorReportPdf, serverPhoto }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
-    const bytes = await buildMinorReportPdf(reportSourceFromFound(found), (id) => serverPhoto(id).catch(() => null));
+    const [found, { buildMinorReportPdf, serverPhoto, reportPhotoLoader }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
+    const photos = reportPhotoLoader(serverPhoto);
+    const bytes = await buildMinorReportPdf(reportSourceFromFound(found), photos.load);
+    void photos.logFailures('Minor items report');
     const name = found.campusName.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || surveyId;
     save(bytes as BlobPart, 'application/pdf', `mqi-minor-items-${name}.pdf`);
   });

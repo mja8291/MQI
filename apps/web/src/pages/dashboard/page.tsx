@@ -38,6 +38,8 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [filter, setFilter] = useState<"All" | RatingBand>("All");
   const [region, setRegion] = useState("");
+  // W71: search the campus list by name, campus ID, area, region or surveyor.
+  const [query, setQuery] = useState("");
   const [exportingAll, setExportingAll] = useState(false);
 
   useEffect(() => {
@@ -63,7 +65,10 @@ export default function DashboardPage() {
   // The MQI sections cover the App surveys (the dashboard's campus list), in the chosen region.
   const inRegion = data ? data.schools.filter((s) => !region || s.region === region) : [];
   const distribution = Object.fromEntries(BANDS.map((b) => [b, inRegion.filter((s) => s.band === b).length])) as Record<RatingBand, number>;
-  const listed = inRegion.filter((s) => filter === "All" || s.band === filter);
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (s: (typeof inRegion)[number]) =>
+    !words.length || words.every((w) => [s.name, s.schoolId, s.area, s.region, s.submittedBy ?? ""].join(" ").toLowerCase().includes(w));
+  const listed = inRegion.filter((s) => (filter === "All" || s.band === filter) && matches(s));
   const outside = core?.surveyedOutsidePlan ?? 0;
   // W68: average Major (Engineering) and Minor (school-maintained, *) scores of the surveys shown.
   const avgOf = (xs: (number | null)[]) => {
@@ -186,8 +191,16 @@ export default function DashboardPage() {
           )}
 
           <Heading sub={`${fmt(listed.length)} shown`}>Schools captured</Heading>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search campus, campus ID, area or surveyor"
+            aria-label="Search campuses"
+            className="w-full mb-2 rounded-lg border border-border bg-white px-3 py-2.5 text-[14px] text-ink"
+          />
           {listed.length === 0 ? (
-            <p className="text-xs text-ink-faint py-3">No schools match this filter.</p>
+            <p className="text-xs text-ink-faint py-3">{query.trim() ? `No campus matches "${query.trim()}".` : "No schools match this filter."}</p>
           ) : (
             listed.map((s) => <SchoolRow key={s.schoolId} school={s} />)
           )}
