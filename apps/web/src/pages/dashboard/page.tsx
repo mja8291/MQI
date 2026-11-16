@@ -134,7 +134,7 @@ export default function DashboardPage() {
               <DataCheck v={view} />
               <NetworkBar v={view} />
               <SummaryCards v={view} b={core} />
-              <SafetyMatrix v={view} />
+              <SafetyMatrix v={view} critical={core.withApp.surveyedCritical} />
               <AppProgress b={core} />
               {data.breakup ? <RegionBreakup b={data.breakup} only={region || undefined} /> : null}
             </>

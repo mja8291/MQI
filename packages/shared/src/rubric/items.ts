@@ -111,6 +111,8 @@ const SHEET_GROUPS: RubricGroup[] = [
     weight: 16,
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM, LAB],
     conditionOverride: OK_UNSAFE,
+    // W74 (2026-11-16): Unsafe says which: cracks (Critically Unsafe) and/or seepage (Partially Unsafe).
+    unsafeParts: ["Cracks", "Seepage"],
   }),
   worst({
     name: "Wall/Column Condition i.e. cracks",

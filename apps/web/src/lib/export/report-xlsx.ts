@@ -6,6 +6,7 @@ import {
   REPORT_CATEGORY_COLOR,
   REPORT_CELL,
   REPORT_THRESHOLDS,
+  UNSAFE_LEVEL_LABEL,
   PHOTO_SECTIONS,
   type ReportCell,
   type ReportModel,
@@ -118,7 +119,7 @@ function summarySheet(wb: ExcelJS.Workbook, m: ReportModel) {
   // Safety first, whatever the score (as in the PDF).
   ws.mergeCells(r, 1, r, 5);
   const sa = ws.getCell(r, 1);
-  sa.value = m.alerts.length ? `SAFETY ALERTS (${m.alerts.length})` : "No safety alerts";
+  sa.value = m.alerts.length ? `${m.safetyLevel ? `${UNSAFE_LEVEL_LABEL[m.safetyLevel].toUpperCase()} — ` : ""}SAFETY ALERTS (${m.alerts.length})` : "No safety alerts";
   sa.font = { bold: true, color: { argb: "FFFFFFFF" } };
   sa.fill = fill(m.alerts.length ? REPORT_CATEGORY_COLOR.Safety : REPORT_BAND_COLOR.Excellent);
   r++;

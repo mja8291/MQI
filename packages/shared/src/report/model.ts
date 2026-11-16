@@ -1,4 +1,5 @@
 import type { FoundSurvey } from "../api";
+import { unsafeItemsAt, unsafeLevel, type UnsafeLevel } from "../safety-levels";
 import { RISK_FACTOR_OPTIONS, RISK_FACTOR_OTHER } from "../rubric/content";
 import { withDerivedScores } from "../rubric/derived";
 import { FLOOR_LEVELS, LOCATION_TYPES, OVERFLOW_ITEM, RUBRIC_GROUPS, RUBRIC_SECTIONS, SLAB_ASSESSMENT_ITEM, cellCondition, groupAppliesAt } from "../rubric/items";
@@ -238,6 +239,8 @@ export interface ReportModel {
     draft: boolean;
   };
   alerts: string[];
+  /** W74: Critically Unsafe (Soundness, ceiling cracks, Column), Partially Unsafe (other Unsafe answers), or null. */
+  safetyLevel: UnsafeLevel | null;
   overall: { score: number | null; band: RatingBand | null };
   categories: { category: Category; weight: number; score: number | null; band: RatingBand | null }[];
   narrative: string[];
@@ -461,11 +464,19 @@ export function buildReportModel(src: ReportSource): ReportModel {
       alerts.push("No proper overflow disposal system on the roof");
     } else if (g.name === "Access to roof area /tanks") {
       alerts.push(`Roof access not available (${joinList(bad.map(locationPlace))})`);
+    } else if (g.unsafeParts) {
+      // W74: the ceiling says which — cracks and/or seepage — per location.
+      for (const l of bad) {
+        const parts = (l.unsafeParts?.[g.name] ?? []).map((p) => p.toLowerCase());
+        alerts.push(`${ALERT_NAME[g.name] ?? itemLabel(g)} unsafe in ${locationPlace(l)}${parts.length ? `: ${parts.join(" & ")}` : ""}`);
+      }
     } else {
       alerts.push(`${ALERT_NAME[g.name] ?? itemLabel(g)} unsafe in ${joinList(bad.map(locationPlace))}`);
     }
   }
   if (src.structuralConcern === "YES") alerts.push("Structural concern observed: YES");
+  // W74: Critically or Partially Unsafe, by the owner's rule (safety-levels.ts).
+  const safetyLevel = unsafeLevel(ordered.flatMap((l) => unsafeItemsAt(l, groups)));
 
   // ---- structural panel ----
   const d = src.drillingCheck;
@@ -703,6 +714,7 @@ export function buildReportModel(src: ReportSource): ReportModel {
       draft: src.draft,
     },
     alerts,
+    safetyLevel,
     overall: { score: overall, band: ratingBand(overall) },
     categories,
     narrative,

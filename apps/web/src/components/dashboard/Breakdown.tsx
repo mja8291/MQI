@@ -169,7 +169,7 @@ export function SummaryCards({ v, b }: { v: BreakupView; b: CampusBreakupCore })
 }
 
 /** d) Safe / Unsafe × Without App / With App, of the assessed campuses only. */
-export function SafetyMatrix({ v }: { v: BreakupView }) {
+export function SafetyMatrix({ v, critical }: { v: BreakupView; /** W74: App surveys Critically Unsafe. */ critical?: number }) {
   const cell = "px-2 py-2 text-right tabular-nums";
   return (
     <section aria-label="Safety result" className="rounded-2xl border border-border bg-card p-3.5 mb-3">
@@ -194,6 +194,11 @@ export function SafetyMatrix({ v }: { v: BreakupView }) {
           ))}
         </tbody>
       </table>
+      {critical !== undefined && v.unsafe.with > 0 ? (
+        <p className="text-[11.5px] mt-1" data-testid="unsafe-levels">
+          With App: <b className="text-[#7F1D1D]">{fmt(critical)} Critically Unsafe</b> · <b className="text-[#B45309]">{fmt(v.unsafe.with - critical)} Partially Unsafe</b>
+        </p>
+      ) : null}
       <p className="text-[11px] text-ink-faint mt-1">Out of {fmt(v.assessed)} assessed campuses</p>
     </section>
   );

@@ -3,8 +3,10 @@ import { CRITICAL_ITEMS, aggregateLocations, ratingBand } from './scoring';
 import { criticalColumn } from './sheets';
 import { KNOWN_RUBRIC_VERSIONS, rubricGroupsFor } from './rubric/versions';
 import { RUBRIC_GROUPS, cellCondition, isUnsafe, unsafePartsFromCell } from './rubric/items';
+import { unsafePartLabel } from './safety-levels';
 import { isTrainingPurposeText } from './rubric/content';
 import type { Condition, DrillingCheck, SurveyLocation, RatingBand, School, SiteChecks } from './types';
+import { COLUMN_ITEM } from './types';
 
 /**
  * Pure read-side logic ported from v1 (src/lib/sheets/{schools,dashboard}.ts,
@@ -133,8 +135,9 @@ export function unsafeItemsInRow(r: SheetRow): string[] {
     const cell = (r[g.name] ?? '').trim();
     if (!cell) continue;
     if (g.unsafeParts && /\bUnsafe\b/.test(cell)) {
-      // "Column Unsafe, Wall Unsafe" (W21)
-      for (const part of cell.split(',').map((p) => p.trim().replace(/\s*Unsafe$/, ''))) if (part && part !== 'Wall') out.push(part);
+      // "Column Unsafe, Wall Unsafe" (W21); "Cracks Unsafe, Seepage Unsafe" (W74, ceiling).
+      for (const part of cell.split(',').map((p) => p.trim().replace(/\s*Unsafe$/, '')))
+        if (part && !(g.name === COLUMN_ITEM && part === 'Wall')) out.push(unsafePartLabel(g.name, part));
       continue;
     }
     if (isUnsafe(g, cellCondition(cell))) out.push(g.label ?? g.name);

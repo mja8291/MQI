@@ -1,7 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { BAND_COLOR } from "@/lib/scoring";
-import { ratingBand } from "@mqi/shared";
+import { ratingBand, unsafeLevel } from "@mqi/shared";
 import type { CapturedSchool } from "@/lib/data/mock-dashboard";
 import { downloadSurveyExcel, downloadSurveyMinorPdf, downloadSurveyPdf } from "@/lib/export/submitted";
 
@@ -98,13 +98,15 @@ function ScoreStack({ overall, band, unsafeItems }: { overall: number; band: str
 /** v2 (W56): a survey with any item marked Unsafe (Wall Unsafe alone excepted) shows in red as Unsafe. */
 /** v2 (W65): Safe or Unsafe beside the MQI score, green or red. */
 function SafetyBadge({ items }: { items?: string[] }) {
-  const unsafe = Boolean(items?.length);
+  // W74: Critically Unsafe (dark red) / Partially Unsafe (orange) / Safe.
+  const level = unsafeLevel(items);
+  const unsafe = level !== null;
   return (
     <span
       title={unsafe ? `Unsafe: ${items!.join(", ")}` : "No unsafe item"}
-      className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full shrink-0 text-white ${unsafe ? "bg-band-poor" : "bg-band-good"}`}
+      className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full shrink-0 text-white whitespace-nowrap ${level === "critical" ? "bg-[#7F1D1D]" : level === "partial" ? "bg-[#D97706]" : "bg-band-good"}`}
     >
-      {unsafe ? "Unsafe" : "Safe"}
+      {level === "critical" ? "Critically Unsafe" : level === "partial" ? "Partially Unsafe" : "Safe"}
     </span>
   );
 }

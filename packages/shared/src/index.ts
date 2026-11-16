@@ -24,3 +24,4 @@ export * from './campus-plan';
 export * from './report/config';
 export * from './report/model';
 export * from './campus-additions';
+export * from './safety-levels';

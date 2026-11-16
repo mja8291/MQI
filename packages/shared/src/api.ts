@@ -288,6 +288,8 @@ export interface CampusBreakupCore {
     surveyed: number;
     surveyedSafe: number;
     surveyedUnsafe: number;
+    /** W74: of the surveyed Unsafe campuses, those Critically Unsafe (absent from older server answers). */
+    surveyedCritical?: number;
     remaining: number;
     eCompoundsVisited: number;
     /** Campuses to survey that the app's campus list doesn't have, so they can't be picked yet. */

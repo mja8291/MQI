@@ -1,4 +1,5 @@
 import type { CampusBreakup, CampusBreakupCore, CampusBreakupCount, CampusBreakupRegion, CapturedSchool, OutsideScopeCampus } from './api';
+import { unsafeLevel } from './safety-levels';
 import type { School } from './types';
 
 /**
@@ -195,6 +196,8 @@ function breakupCore(plan: readonly PlanCampus[], captured: readonly CapturedSch
       ...count(withApp.length, inApp),
       surveyed: surveyedList.length,
       surveyedUnsafe: surveyedList.filter(appUnsafe).length,
+      // W74: of those, Critically Unsafe (Soundness, ceiling cracks, Column).
+      surveyedCritical: surveyedList.filter((c) => unsafeLevel(surveyed.get(c)?.unsafeItems) === 'critical').length,
       surveyedSafe: surveyedList.filter((c) => !appUnsafe(c)).length,
       remaining: withApp.length - surveyedList.length,
       eCompoundsVisited: new Set(surveyedList.map((c) => c.eCompoundNo).filter(Boolean)).size,

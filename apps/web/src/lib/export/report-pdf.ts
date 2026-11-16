@@ -14,6 +14,7 @@ import {
   type ReportCell,
   type ReportModel,
   type MinorLevel,
+  UNSAFE_LEVEL_LABEL,
   type PhotoSection,
   PHOTO_SECTIONS,
 } from "@mqi/shared";
@@ -210,7 +211,9 @@ function summaryPage(ctx: Ctx) {
   rect(p, M, y - bh, 6, bh, { fill: red ? C.red : C.green });
   if (red) {
     warning(p, M + 26, y - 15, 15, C.red, C.white);
-    text(p, ctx, `SAFETY ALERTS (${m.alerts.length}) — action needed regardless of the overall score`, M + 42, y - 19, 11, { bold: true, color: C.red });
+    // W74: the campus's level first: Critically or Partially Unsafe.
+    const level = m.safetyLevel ? `${UNSAFE_LEVEL_LABEL[m.safetyLevel].toUpperCase()} — ` : "";
+    text(p, ctx, `${level}SAFETY ALERTS (${m.alerts.length}) — action needed regardless of the overall score`, M + 42, y - 19, 11, { bold: true, color: C.red });
     let ly = y - 33;
     for (const { l, first } of alertLines) {
       if (first) p.drawCircle({ x: M + 48, y: ly + 3, size: 1.8, color: C.red });
