@@ -1,4 +1,4 @@
-import { PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import { CAMPUS_ADDITIONS_TAB, applyCampusAdditions, PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
 import type { Condition, DashboardData, ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
@@ -50,11 +50,20 @@ function rmPlannedIds(ctx: Ctx): Set<string> {
   return rmPlanIds(ctx.env.responses.readRows(RM_PLAN_TAB, 2, last - 1).map((cells) => toRow(header, cells)));
 }
 
+/** W73: the App's own additions to v1's school list (none while the tab is missing). */
+function campusAdditions(ctx: Ctx): Record<string, string>[] {
+  const header = ctx.env.responses.header(CAMPUS_ADDITIONS_TAB);
+  const last = ctx.env.responses.lastRow(CAMPUS_ADDITIONS_TAB);
+  if (!header || last < 2) return [];
+  return ctx.env.responses.readRows(CAMPUS_ADDITIONS_TAB, 2, last - 1).map((cells) => toRow(header, cells));
+}
+
 export function schools(ctx: Ctx): SchoolsResult {
   // 'schools.v3' (W64): the list now marks R&M Plan 2026-27 campuses; 'schools.v4' (W68): each campus
   // carries its units' School IDs. The key change drops lists cached before.
-  return cached(ctx.env, 'schools.v4', SCHOOLS_TTL, () => ({
-    schools: markRmPlanned(parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()), rmPlannedIds(ctx)),
+  // 'schools.v5' (W73): renames, other names and added campuses from the App Campus List Additions tab.
+  return cached(ctx.env, 'schools.v5', SCHOOLS_TTL, () => ({
+    schools: markRmPlanned(applyCampusAdditions(parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()), campusAdditions(ctx)), rmPlannedIds(ctx)),
   }));
 }
 

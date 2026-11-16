@@ -180,7 +180,8 @@ function breakupCore(plan: readonly PlanCampus[], captured: readonly CapturedSch
 
   // Campuses to survey that the app's campus list doesn't have (they can't be picked yet).
   const appFind = planIndex(
-    appSchools.map((s) => ({ ids: unitSchoolIds(s), eCompoundNo: '', name: s.name, region: '', category: '' as const, assessment: '' })),
+    // W73: a campus's other names count too (a renamed TBD campus, another spelling).
+    appSchools.flatMap((s) => [s.name, ...(s.otherNames ?? [])].map((name) => ({ ids: unitSchoolIds(s), eCompoundNo: '', name, region: '', category: '' as const, assessment: '' }))),
   );
   const notInAppList = appSchools.length ? withApp.filter((c) => !c.ids.some((id) => appFind({ schoolId: id, name: '' })) && !appFind({ schoolId: '', name: c.name })) : [];
 

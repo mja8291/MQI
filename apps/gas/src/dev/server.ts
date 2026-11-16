@@ -4,7 +4,7 @@
  * and by the Playwright suite. State lives in memory and resets on restart.
  */
 import { createServer } from 'node:http';
-import { API_VERSION, ATTACHMENTS_HEADER, PLAN_HEADER, PLAN_TAB, RM_PLAN_HEADER, RM_PLAN_TAB, RESPONSES_HEADER, RESPONSES_TAB } from '@mqi/shared';
+import { API_VERSION, ATTACHMENTS_HEADER, CAMPUS_ADDITIONS_HEADER, CAMPUS_ADDITIONS_TAB, PLAN_HEADER, PLAN_TAB, RM_PLAN_HEADER, RM_PLAN_TAB, RESPONSES_HEADER, RESPONSES_TAB } from '@mqi/shared';
 import { createMemoryEnv } from '../adapters/memory';
 import type { MemoryEnv } from '../adapters/memory';
 import { ensureAdmin, hashPassword } from '../core/auth';
@@ -28,6 +28,12 @@ export function seedDevEnv(env: MemoryEnv): void {
   // W64: one campus in the R&M Plan 2026-27.
   env.responses.createTab(RM_PLAN_TAB, [...RM_PLAN_HEADER]);
   env.responses.appendRaw(RM_PLAN_TAB, [["948", "OGS Trust Campus II", "S/1/10", "South West"]]);
+  // W73: one other name and one added campus, for the e2e tests.
+  env.responses.createTab(CAMPUS_ADDITIONS_TAB, [...CAMPUS_ADDITIONS_HEADER]);
+  env.responses.appendRaw(CAMPUS_ADDITIONS_TAB, [
+    ["Other name", "947", "", "Orangi Gadap Seaside Campus", "", "", "", "", "test"],
+    ["Add", "9901", "GGPS Test Added", "", "South West", "Gadap West I", "S/1/10", "99011", "test"],
+  ]);
   // W63: a small Campus Survey Plan, one campus per category (the live tab holds the R&M master sheet).
   env.responses.createTab(PLAN_TAB, [...PLAN_HEADER]);
   env.responses.appendRaw(PLAN_TAB, [

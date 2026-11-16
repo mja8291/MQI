@@ -92,11 +92,11 @@ export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
     if (existing) {
       if (unitId && !existing.schoolIds?.includes(unitId)) existing.schoolIds = [...(existing.schoolIds ?? []), unitId];
       // A campus has one row per unit: fill any detail the first unit row left blank.
-      for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned' | 'schoolIds'>, string][]) if (v && !existing[k]) existing[k] = v;
+      for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned' | 'schoolIds' | 'otherNames'>, string][]) if (v && !existing[k]) existing[k] = v;
       continue;
     }
     const school: School = { schoolId, name, region: cell(regionCol), area: cell(areaCol) };
-    for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned' | 'schoolIds'>, string][]) if (v) school[k] = v;
+    for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned' | 'schoolIds' | 'otherNames'>, string][]) if (v) school[k] = v;
     if (unitId) school.schoolIds = [unitId];
     byId.set(schoolId, school);
   }

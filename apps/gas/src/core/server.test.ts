@@ -489,7 +489,8 @@ describe('reads', () => {
   test('schools list skips inactive campuses; dashboard counts the new survey', () => {
     const r = login('reviewer@tcf.test');
     const schools = ok(call<{ schools: School[] }>('schools.list', {}, r)).schools;
-    expect(schools).toHaveLength(5);
+    expect(schools).toHaveLength(6); // W73: + the campus the dev App Campus List Additions tab adds
+    expect(schools.find((s) => s.schoolId === '947')?.otherNames).toEqual(['Orangi Gadap Seaside Campus']);
     // W10: campus details, and the e-compound name from the E-Compound Spreadsheet.
     expect(schools.find((s) => s.schoolId === '947')).toMatchObject({
       address: 'Gadap Town, Karachi',
@@ -503,7 +504,7 @@ describe('reads', () => {
     ok(push(login('surveyor@tcf.test'), makeSurvey()));
     env.cache.clear();
     const d = ok(call<{ totalSchools: number; captured: number; pending: number }>('dashboard.get', {}, r));
-    expect(d).toMatchObject({ totalSchools: 5, captured: 1, pending: 4 });
+    expect(d).toMatchObject({ totalSchools: 6, captured: 1, pending: 5 });
   });
 
   test('export.rows pages through a tab', () => {

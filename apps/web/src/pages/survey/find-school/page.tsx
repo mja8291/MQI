@@ -12,7 +12,7 @@ import { cacheSchools, getCachedSchools } from "@/lib/offline/db";
 import { api, isAuthError } from "@/lib/api";
 import { notifyAuthRequired } from "@/lib/auth/events";
 import { prefetchSiblingExternal } from "@/lib/sibling-external";
-import type { SchoolsResult } from "@mqi/shared";
+import { campusMatches, type SchoolsResult } from "@mqi/shared";
 
 export default function FindSchoolPage() {
   const router = useRouter();
@@ -70,7 +70,8 @@ export default function FindSchoolPage() {
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return schools.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 8);
+    // W73: also other names (a renamed TBD campus, other spellings), the e-compound number and the Campus ID.
+    return schools.filter((s) => campusMatches(s, q)).slice(0, 8);
   }, [schools, query]);
 
   // v2 (W10): picking a school (by search, or a sibling campus) fills Region and Area too.
@@ -137,7 +138,12 @@ export default function FindSchoolPage() {
                 {s.name}
                 <div className="text-[11px] text-ink-faint">
                   {s.region} · {s.area}
+                  {s.eCompoundNo ? ` · ${s.eCompoundNo}` : ""}
                 </div>
+                {/* W73: say which other name matched, so a renamed campus is recognised. */}
+                {!s.name.toLowerCase().includes(query.trim().toLowerCase()) && s.otherNames?.some((n) => n.toLowerCase().includes(query.trim().toLowerCase())) ? (
+                  <div className="text-[11px] text-ink-soft">Also known as {s.otherNames.find((n) => n.toLowerCase().includes(query.trim().toLowerCase()))}</div>
+                ) : null}
               </button>
             ))}
           </div>

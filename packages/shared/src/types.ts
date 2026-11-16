@@ -380,6 +380,8 @@ export interface School {
    * Survey Plan and R&M Plan tabs list School IDs, so they are matched against these.
    */
   schoolIds?: string[];
+  /** W73: other names Find school also searches (old name after a rename, other spellings). */
+  otherNames?: string[];
 }
 
 export interface RespondentDetails {
