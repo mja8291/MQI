@@ -1,7 +1,7 @@
 # MQI v2 — Handoff for a new Claude session
 
-Written 2026-11-11 after **W66**; updated 2026-11-14 after **W72** (latest code commit `ec08cee`, everything pushed to `main`).
-Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md` (one row per work item W1–W72; it is the project's change log and decision record).
+Written 2026-11-11 after **W66**; updated 2026-11-14 after **W72** and 2026-11-17 after **W75** (latest code commit `55dc378`, everything pushed to `main`).
+Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md` (one row per work item W1–W75; it is the project's change log and decision record).
 
 ---
 
@@ -18,8 +18,8 @@ Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md
 
 | | Web | API (Apps Script deployment ID, same URL every deploy) | Current version |
 |---|---|---|---|
-| Production | https://tcfmqi.web.app | `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` | API @22 (rubric 2026-11-13) |
-| Staging | https://tcfmqi-staging.web.app | `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg` | API @20 (rubric 2026-11-13) |
+| Production | https://tcfmqi.web.app | `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` | API @24 (rubric 2026-11-13) |
+| Staging | https://tcfmqi-staging.web.app | `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg` | API @22 (rubric 2026-11-13) |
 
 - Android: a Trusted Web Activity `app.web.mqi_app_tcf.pk` (v1's Play Store listing reused; see `android/README.md` and `apps/web/env/.env.production`). **Signing is done by the user, never by Claude.**
 - Repo: https://github.com/mja8291/MQI. It is **public**, so never commit personal data (names, emails, phone numbers) or secrets.
@@ -78,6 +78,9 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
   - The legacy W56 type "Canteen & UGWT" is still accepted.
   - `ADDED_LATER` lets the server accept older phones without new items.
   - Guardroom, Canteen and UGWT are shared across an e-compound and pre-fill from a sibling campus (W60).
+- **Campus list (W73).** The App's list is v1's school list (read only) **plus** the MQI Spreadsheet tab **"App Campus List Additions"** (`packages/shared/src/campus-additions.ts`, server cache key `schools.v5`, refreshed within 30 minutes). Rows: **Rename** (Campus ID + real name; the old name still finds it), **Other name** (extra search names, ";"-separated), **Add** (Campus ID, Name, Region, Area, E Compound No, School IDs, e.g. from the E-Compound sheet). Find school also searches other names, the e-compound number and the Campus ID ("Also known as …"). The staging server reads its own copy of the spreadsheet, which doesn't have this tab. Filled 2026-11-16 from the user's R&M structural survey list: 1 rename (Campus ID 1413 "Sherazi TBD Campus" → Syed Mohammad Hussain Memorial Campus), 45 other names, 5 campuses added (Altaf Agha Campus - II; GGPS Ali Garh, Hoti Khel, Khat Khali, Wattar).
+- **Critically / Partially Unsafe (W74, `packages/shared/src/safety-levels.ts`).** Ceiling Unsafe asks Cracks and/or Seepage (same picker as Wall/Column's parts). Critically Unsafe = Concrete/Plaster Soundness Unsafe, Ceiling cracks, or Column Unsafe; any other Unsafe answer is Partially Unsafe; Wall alone still leaves a campus Safe (W56); a ceiling Unsafe from before W74 (no detail) counts as critical. Labels only: scores unchanged, no rubric version change. Shown on dashboard badges, the Safety result card (counts), and the report/Excel safety banner.
+- **Accounts (W75).** Admins create accounts (`admin.users.create`: active at once, one-time password shown once, forced change at first sign-in) and delete them for good (`admin.users.delete`: removes the USERS and CREDENTIALS rows via `Table.remove`/`TablePort.removeRow`; not yourself or the only admin; submitted surveys stay). Manage users has folding sections (requests open, Access removed folded), search, and per-user actions on tap; Home's Manage users button shows the pending-request count.
 - **Dashboard (W63/W65, W67–W71).** Rows: score over Safe/Unsafe, then three boxes **XLS / PDF / MIN** (W67, W70); Major/Minor per campus (always on wide screens, on tap on phones) and their averages (W68); a search box over the campus list (W71). The plan tab and the R&M Plan list **School IDs**; the app's campus list is keyed by **Campus ID**, so since W68 each campus carries its units' `schoolIds` and matching uses those (cache key `schools.v4`). "Not in App list" is 16 (it showed 53), and the R&M reminder covers all 265 campuses (it covered 186). Driven by the `Campus Survey Plan` tab. It shows one hierarchy: Total → Exempted (PSSP/PSRP + last 5 yr) | Assessed (Safe/Unsafe, with/without App) | Pending. Checks confirm the parts add up, and a region filter applies to everything. "Checking/Training" surveys (W62 `Survey Purpose` column) are left off the dashboard. The server caches the dashboard; `forgetDashboard` clears it after each write.
 - **R&M Plan reminder (W64).** Campuses marked "Planned in this year" in the `R&M Plan 2026-27` tab show a "prepare the BOQ" reminder on Find school, Review and Done. The server's schools cache key became `schools.v3` (now `schools.v4`, W68) (`apps/gas/src/core/reads.ts`); bump it whenever the school list's shape changes.
 - **Startup (W61).** Android users got stuck on the logo. The fix:
@@ -101,7 +104,7 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 
 ## 3. Status
 
-**Done and deployed (prod API @22, staging @20, both web apps):** W1–W72. Highlights from the latest sessions:
+**Done and deployed (prod API @24, staging @22, both web apps):** W1–W75. Highlights from the latest sessions:
 
 | Item | What |
 |---|---|
@@ -120,17 +123,22 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 | W70 | Working sign; rubric 2026-11-13 (ladder 100%, basins/drains by room); drilled-hole photo required; no line graph, no survey ID, Safety first; drilling standard vs actual page; minor items report for the Principal |
 | W71 | Report photos retried, missing photos noticed and logged; roof upkeep with the minor items in both reports; dashboard search |
 | W72 | Pre-training audit: Review page says why Submit is off; renaming drops ratings the new name doesn't have |
+| W73 | Campus list completed from the "App Campus List Additions" tab (renames, other names, added campuses); Find school searches other names, e-compound and Campus ID; one survey moved to its real campus |
+| W74 | Ceiling Unsafe asks cracks/seepage; Critically vs Partially Unsafe on the dashboard and in reports |
+| W75 | Manage users: create and delete accounts, folding sections, search; request count on Home |
 
 **In progress / waiting on the user**
 - **Training sessions** with surveyors started 2026-11-14. Expect feedback and quick fixes. Trainees should open the app once with signal before going on site (Home: "✓ Ready to work offline").
 - **Report photos** (W71): the user confirmed photos show in a report downloaded from the live dashboard after W71. If they go missing again, read the ErrorLog tab ("Campus report: N of M photos not loaded — …").
 - **Umeed Ka Chiragh Campus** (survey 2026-11-13 13:44 UTC) has **no photos** on the server; its surveyor's phone may still hold them (Sync Pending).
-- None of W67–W72 has been tried on a real phone by Claude (the user and surveyors use them).
+- **20 campuses from the R&M list need the user's decision** (yellow rows in `R&M-list-vs-App-review-2026-11-16.xlsx`, in the "MQI App" folder above the repo): inactive in v1 (Anisa Abaumer Gandhi, Sarfaraz & Shagufta, Syed Kumail Zaidi TBD), possible separate campuses (Lakson Group Campus II, Nafees Yasin Malik Campus II), uncertain matches (Crescent Steel Ibrahim Hyderi, Attock Cement Sakran, Yaqout, Dr. Azimna, Javat Foundation, Al Moiz), and campuses with no ID anywhere (SSDF Dada I/II, Mudassir Sheikha Nabi Bux Soomro I/II, GGPS Shala Khael, Madiha Ilyas Sekha, NJ- Shah Abdul Latif Bhittai, Halima & Abid Jaffery, TCF School Sacha Soda, The Merali Foundation Awan Dhai Wala). Their answers become rows in the "App Campus List Additions" tab (no code change needed).
+- **Data correction done 2026-11-16:** survey `01a1e2b5-b03d-782a-80c1-d0384341305b` was filed under GPS KHURSHID ABAD (Campus ID 839) but done at Syed Mohammad Hussain Memorial Campus; moved to Campus ID 1413 / North / Sheikhupura in the response rows 2144–2168, the System Surveys register row 112, and its Drive folder (renamed and moved under North). The now-empty Drive folder "GP Central Punjab" was left in place.
+- None of W67–W75 has been tried on a real phone by Claude (the user and surveyors use them).
 
 **Exact next steps (in order)**
-1. Handle feedback from the training sessions (next work item: **W73**).
+1. Handle feedback from the training sessions and the user's decisions on the 20 campuses (next work item: **W76**).
 2. Open user-side follow-ups (remind, don't do):
-   - The **16 "Survey with App" campuses not in the App list** (W68 workbook `MQI-campus-school-list-2026-11-11.xlsx`, in the folder above the repo): fix the school list or the plan tab.
+   - The **16 "Survey with App" campuses not in the App list** (W68 workbook `MQI-campus-school-list-2026-11-11.xlsx`, in the folder above the repo): partly covered by W73 (e.g. GGPS Ali Garh); the rest can be added through the "App Campus List Additions" tab once the user gives the details.
    - Trash the 17 trial photos in Drive as the owner account. Claude had no permission; the links are in `Removed trial attachments`.
    - Test on real phones (`docs/pilot-checklist.md`).
 3. Possible improvement (not asked): `files.get` reads the whole Files register (~2,600 rows) for every photo; a TextFinder lookup would make report photos faster on big surveys.
@@ -141,6 +149,9 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 ## 4. Known bugs and gotchas
 
 **Product**
+- **Deploying while other work is uncommitted:** builds use the working tree. To ship an earlier commit without unfinished changes, deploy from a separate checkout: `git worktree add --detach <scratch>/wNN <commit>`, copy `apps/gas/.clasp.*.json` into it, `npm ci`, deploy from there, then `git worktree remove --force` (done for W73). Don't stash or reset the main folder.
+- **Campus names and IDs:** the App's `schoolId` is the **Campus ID**; plan tabs list **School IDs** (units). Two campuses can share a number across the two series, so never match a School ID against a Campus ID. Before adding a campus, check its Campus ID isn't already in the list under another name (two "missing" campuses, DFW Campus I and Noor Souriya, were existing IDs under other names).
+- **Drive folders:** creating files through the Drive connector makes them owned by the user's personal account, not the department account. Prefer renaming/moving existing department-owned folders.
 - **Rubric sheet edits (MQI Assessment Rubrics tab):** the app doesn't read this tab (it is the human source of truth); keep it in step when asked (row 10, roof access, was updated for W68 and W70). With the Sheets `updateCells` request, the `fields` mask applies to **every cell in the range**: a cell sent as `{}` gets those fields cleared. Send only the cells you change. (This blanked row 10's labels once; they were restored the same minute.)
 - **PDF fonts:** text the Helvetica font can't draw (e.g. Urdu) is replaced with `?` by `safe()` in `report-pdf.ts`.
 - **Older surveys in the PDF:** re-scoring with the current rubric gives different numbers from the sheet. For the fixture: stored 76/81/61/83, re-scored 78/79/67/83. The methodology page lists the differences, which is intended.
@@ -191,6 +202,8 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 | Excel campus report, principal's minor report | `apps/web/src/lib/export/report-xlsx.ts`, `renderMinorReportPdf` in `report-pdf.ts` |
 | Photo/storage notices, working sign, network tag | `apps/web/src/lib/photo-limits.ts`, `lib/busy.ts`, `components/NetworkTag.tsx`, `components/survey/PhotoLoadNotice.tsx` |
 | Save photos to phone | `apps/web/src/lib/photos-to-phone.ts`, `components/survey/SavePhotosButton.tsx` |
+| Campus list additions, safety levels | `packages/shared/src/campus-additions.ts`, `packages/shared/src/safety-levels.ts` |
+| Manage users | `apps/web/src/pages/admin/page.tsx`, server `apps/gas/src/core/auth.ts` (`createUser`, `deleteUser`) |
 | Decision log | `docs/parity-notes.md` |
 
 **Local-only files (not in git; copy them when moving PCs)**
@@ -277,7 +290,7 @@ npm run deploy:prod -w @mqi/web
 `deploy -i <id>` updates the existing deployment, so the URL never changes. Run web deploys from the repo root. Afterwards, check that the deployed `api-*.js` contains the right deployment ID.
 
 **Conventions**
-- Each change is a numbered work item (next: **W73**). Add a row to `docs/parity-notes.md`, add tests (`packages/shared/src/wNN.test.ts`, `server.test.ts` cases, `apps/web/e2e/wNN.spec.ts` as fits), and write the commit message as one plain sentence ending with `(WNN)`.
+- Each change is a numbered work item (next: **W76**). Add a row to `docs/parity-notes.md`, add tests (`packages/shared/src/wNN.test.ts`, `server.test.ts` cases, `apps/web/e2e/wNN.spec.ts` as fits), and write the commit message as one plain sentence ending with `(WNN)`.
 - Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Work on `main` (the user's setup; there are no PRs).
 
