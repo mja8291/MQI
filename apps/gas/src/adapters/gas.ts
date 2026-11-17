@@ -60,6 +60,12 @@ class SheetTable implements TablePort {
   removeRow(row: number): void {
     this.sheet.deleteRow(row);
   }
+  findRow(column: number, value: string): number {
+    const last = this.sheet.getLastRow();
+    if (last < 2 || !value) return 0;
+    const hit = this.sheet.getRange(2, column, last - 1, 1).createTextFinder(value).matchEntireCell(true).matchCase(true).findNext();
+    return hit ? hit.getRow() : 0;
+  }
 }
 
 class SystemDb implements SystemDbPort {

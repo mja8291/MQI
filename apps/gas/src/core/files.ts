@@ -136,7 +136,8 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
 export function get(ctx: Ctx, raw: unknown): FileGetResult {
   const p = fileGetPayload.parse(raw);
   const me = ctx.requireUser();
-  const f = Table.of(ctx.env, 'FILES', 'attachmentId').get(p.attachmentId);
+  // W76: one row, not the whole register.
+  const f = Table.of(ctx.env, 'FILES', 'attachmentId').lookup(p.attachmentId);
   if (!f || !f.driveFileId) return fail('NOT_FOUND', 'Photo not found.');
   if (f.ownerId !== me.id && !can(me.role, 'surveyDownload')) fail('FORBIDDEN', 'You cannot open this photo.');
   const file = ctx.env.drive.read(f.driveFileId);

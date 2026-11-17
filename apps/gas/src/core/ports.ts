@@ -19,6 +19,8 @@ export interface TablePort {
   append(rows: string[][]): number;
   /** W75: deletes one row (rows below move up). */
   removeRow(row: number): void;
+  /** W76: the row whose cell in this column (1-based) is exactly `value`, below the header; 0 if none. */
+  findRow(column: number, value: string): number;
 }
 
 export interface SystemDbPort {

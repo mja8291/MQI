@@ -106,6 +106,23 @@ export class Table {
     return i === undefined ? undefined : this.rows[i];
   }
 
+  /**
+   * W76: one row by its key without reading the whole tab (a sheet text search on the key column,
+   * then that one row). files.get used to read the ~2,600-row Files register for every photo, so
+   * reports of big surveys timed out on some photos. Uses the loaded rows when they are already here.
+   */
+  lookup(key: string): Row | undefined {
+    if (this.loaded) return this.get(key);
+    const header = this.port.header();
+    const col = header.indexOf(this.key) + 1;
+    if (!col) return this.get(key);
+    const row = this.port.findRow(col, key);
+    if (!row) return undefined;
+    const cells = this.port.read(row, 1, header.length)[0] ?? [];
+    const r: Row = Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']));
+    return r[this.key] === key ? r : this.get(key);
+  }
+
   find(pred: (r: Row) => boolean): Row | undefined {
     return this.all().find(pred);
   }

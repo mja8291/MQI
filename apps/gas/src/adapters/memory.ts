@@ -33,6 +33,11 @@ class MemoryTable implements TablePort {
   removeRow(row: number): void {
     this.rows.splice(row - 1, 1);
   }
+  findRow(column: number, value: string): number {
+    if (!value) return 0;
+    const i = this.rows.findIndex((r, n) => n > 0 && (r[column - 1] ?? '') === value);
+    return i < 0 ? 0 : i + 1;
+  }
 }
 
 export class MemorySystemDb implements SystemDbPort {

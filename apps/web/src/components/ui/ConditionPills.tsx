@@ -54,6 +54,12 @@ export function UnsafePartsPills({
       <button type="button" onClick={() => onChange("N/A")} className={pill(value === "N/A")}>
         N/A
       </button>
+      {/* W76: marked Unsafe before this item asked which part (W74 ceiling cracks/seepage): say so. */}
+      {value === "Very Poor" && parts.length === 0 ? (
+        <p className="basis-full text-[11.5px] font-semibold text-band-poor" data-testid="unsafe-part-needed">
+          Marked Unsafe. Choose which: {allParts.join(" and/or ")}.
+        </p>
+      ) : null}
     </div>
   );
 }
