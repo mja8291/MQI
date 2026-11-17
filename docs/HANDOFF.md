@@ -1,7 +1,7 @@
 # MQI v2 — Handoff for a new Claude session
 
-Written 2026-11-11 after **W66**; updated 2026-11-14 after **W72** and 2026-11-17 after **W75** (latest code commit `55dc378`, everything pushed to `main`).
-Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md` (one row per work item W1–W75; it is the project's change log and decision record).
+Written 2026-11-11 after **W66**; updated 2026-11-14 after **W72** and 2026-11-17 after **W76** (latest code commit `592317f`, everything pushed to `main`).
+Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md` (one row per work item W1–W76; it is the project's change log and decision record).
 
 ---
 
@@ -18,8 +18,8 @@ Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md
 
 | | Web | API (Apps Script deployment ID, same URL every deploy) | Current version |
 |---|---|---|---|
-| Production | https://tcfmqi.web.app | `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` | API @24 (rubric 2026-11-13) |
-| Staging | https://tcfmqi-staging.web.app | `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg` | API @22 (rubric 2026-11-13) |
+| Production | https://tcfmqi.web.app | `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` | API @25 (rubric 2026-11-13) |
+| Staging | https://tcfmqi-staging.web.app | `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg` | API @23 (rubric 2026-11-13) |
 
 - Android: a Trusted Web Activity `app.web.mqi_app_tcf.pk` (v1's Play Store listing reused; see `android/README.md` and `apps/web/env/.env.production`). **Signing is done by the user, never by Claude.**
 - Repo: https://github.com/mja8291/MQI. It is **public**, so never commit personal data (names, emails, phone numbers) or secrets.
@@ -104,7 +104,7 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 
 ## 3. Status
 
-**Done and deployed (prod API @24, staging @22, both web apps):** W1–W75. Highlights from the latest sessions:
+**Done and deployed (prod API @25, staging @23, both web apps):** W1–W76. Highlights from the latest sessions:
 
 | Item | What |
 |---|---|
@@ -126,6 +126,7 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 | W73 | Campus list completed from the "App Campus List Additions" tab (renames, other names, added campuses); Find school searches other names, e-compound and Campus ID; one survey moved to its real campus |
 | W74 | Ceiling Unsafe asks cracks/seepage; Critically vs Partially Unsafe on the dashboard and in reports |
 | W75 | Manage users: create and delete accounts, folding sections, search; request count on Home |
+| W76 | Photo reads look up one row (report photos stopped timing out); audit of W73–W75 |
 
 **In progress / waiting on the user**
 - **Training sessions** with surveyors started 2026-11-14. Expect feedback and quick fixes. Trainees should open the app once with signal before going on site (Home: "✓ Ready to work offline").
@@ -136,13 +137,12 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 - None of W67–W75 has been tried on a real phone by Claude (the user and surveyors use them).
 
 **Exact next steps (in order)**
-1. Handle feedback from the training sessions and the user's decisions on the 20 campuses (next work item: **W76**).
+1. Handle feedback from the training sessions and the user's decisions on the 20 campuses (next work item: **W77**).
 2. Open user-side follow-ups (remind, don't do):
    - The **16 "Survey with App" campuses not in the App list** (W68 workbook `MQI-campus-school-list-2026-11-11.xlsx`, in the folder above the repo): partly covered by W73 (e.g. GGPS Ali Garh); the rest can be added through the "App Campus List Additions" tab once the user gives the details.
    - Trash the 17 trial photos in Drive as the owner account. Claude had no permission; the links are in `Removed trial attachments`.
    - Test on real phones (`docs/pilot-checklist.md`).
-3. Possible improvement (not asked): `files.get` reads the whole Files register (~2,600 rows) for every photo; a TextFinder lookup would make report photos faster on big surveys.
-4. Optional, only if asked: embed a real font in the PDF (needs `@pdf-lib/fontkit` plus a TTF). Helvetica is used instead, and all symbols are vector shapes.
+3. Optional, only if asked: embed a real font in the PDF (needs `@pdf-lib/fontkit` plus a TTF). Helvetica is used instead, and all symbols are vector shapes.
 
 ---
 
@@ -290,7 +290,7 @@ npm run deploy:prod -w @mqi/web
 `deploy -i <id>` updates the existing deployment, so the URL never changes. Run web deploys from the repo root. Afterwards, check that the deployed `api-*.js` contains the right deployment ID.
 
 **Conventions**
-- Each change is a numbered work item (next: **W76**). Add a row to `docs/parity-notes.md`, add tests (`packages/shared/src/wNN.test.ts`, `server.test.ts` cases, `apps/web/e2e/wNN.spec.ts` as fits), and write the commit message as one plain sentence ending with `(WNN)`.
+- Each change is a numbered work item (next: **W77**). Add a row to `docs/parity-notes.md`, add tests (`packages/shared/src/wNN.test.ts`, `server.test.ts` cases, `apps/web/e2e/wNN.spec.ts` as fits), and write the commit message as one plain sentence ending with `(WNN)`.
 - Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Work on `main` (the user's setup; there are no PRs).
 
