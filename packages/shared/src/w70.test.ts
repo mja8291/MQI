@@ -17,7 +17,7 @@ const names = (t: LocationType, name?: string) => rubricGroupsForLocation(t, nam
 
 describe("W70 rubric 2026-11-13", () => {
   it("is current; 2026-11-11 surveys keep their frozen list", () => {
-    expect(RUBRIC_VERSION).toBe("2026-11-13");
+    expect(RUBRIC_VERSION >= "2026-11-13").toBe(true); // W77 moved on to 2026-11-18
     expect(rubricGroupsFor("2026-11-11")).toBe(RUBRIC_GROUPS_20261111);
   });
 

@@ -252,7 +252,9 @@ const SHEET_GROUPS: RubricGroup[] = [
     category: "Functionality",
     weight: 5,
     principalMaintained: true,
-    locations: [LAB],
+    // W77 (2026-11-18): only the DLP lab and the art room/library have a screen.
+    locations: [LAB, CLASSROOM],
+    onlyAtNames: { [LAB]: ["DLP"], [CLASSROOM]: ["Art Room", "Art Room/Library", "Library"] },
   }),
   average({
     name: "Solar Panels/Inverter/Batteries",
@@ -489,6 +491,8 @@ export const ADDED_LATER: Partial<Record<LocationType, readonly string[]>> = {
   Guardroom: ["Distribution Board"],
   // W70: Pantry's basin and drain.
   "Other Room (Staff, Principal, Admin, Store etc.)": ["Wash Basin/Taps", "Sewerage System"],
+  // W77: the art room/library's screen.
+  Classroom: ["LED/TV/UPS"],
 };
 
 export function rubricGroupsForLocationAndSection(type: LocationType, section: Category, name?: string): RubricGroup[] {

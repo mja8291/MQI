@@ -32,7 +32,7 @@ test('W70: drilling needs its hole photo; MIN downloads the principal report', a
   await reviewAndSubmit(page);
   const id = await lastSurveyId(page);
   await expect.poll(async () => rowsOf(await devState(), id).length, { timeout: 60_000 }).toBe(1);
-  expect(rowsOf(await devState(), id)[0]!['Rubric Version']).toBe('2026-11-13');
+  expect(rowsOf(await devState(), id)[0]!['Rubric Version']).toBe('2026-11-18'); // W77
 
   await page.goto('/dashboard');
   const min = page.getByRole('button', { name: /^Minor items report for OGS Trust Campus/ }).first();
