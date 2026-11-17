@@ -57,6 +57,9 @@ class SheetTable implements TablePort {
     this.write(first, rows);
     return first;
   }
+  removeRow(row: number): void {
+    this.sheet.deleteRow(row);
+  }
 }
 
 class SystemDb implements SystemDbPort {

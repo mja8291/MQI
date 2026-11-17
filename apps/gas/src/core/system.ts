@@ -134,6 +134,20 @@ export class Table {
     return next;
   }
 
+  /** W75: deletes the row with this key (rows below move up one). */
+  remove(key: string): void {
+    this.load();
+    const i = this.rowIndex.get(key);
+    if (i === undefined) throw new Error(`No ${this.key} ${key}`);
+    this.port.removeRow(i + 2);
+    this.rows.splice(i, 1);
+    this.rowIndex.clear();
+    this.rows.forEach((r, n) => {
+      const k = r[this.key];
+      if (k) this.rowIndex.set(k, n);
+    });
+  }
+
   /** Append-only log tabs (no key lookups). */
   static log(env: Env, tab: 'CHANGELOG' | 'AUDITLOG' | 'ERRORLOG', row: Row): void {
     const [name, cols] = SYSTEM_TABS[tab];

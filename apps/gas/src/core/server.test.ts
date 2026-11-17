@@ -702,3 +702,41 @@ describe('W64 R&M Plan 2026-27', () => {
     expect(list.find((s) => s.schoolId === '947')?.rmPlanned).toBeUndefined();
   });
 });
+
+describe('W75 admin creates and deletes accounts', () => {
+  test('a created account is active with a one-time password that must be changed', () => {
+    const admin = login('admin@tcf.test');
+    const made = ok(call<{ user: { id: string; status: string; role: string }; temporaryPassword: string }>('admin.users.create', { name: 'New Surveyor', email: 'New.Surveyor@tcf.test', role: 'SURVEYOR' }, admin));
+    expect(made.user).toMatchObject({ status: 'ACTIVE', role: 'SURVEYOR' });
+    const who = ok(call<{ mustChangePassword: boolean; sessionToken: string }>('auth.login', { email: 'new.surveyor@tcf.test', password: made.temporaryPassword }));
+    expect(who.mustChangePassword).toBe(true);
+    // The same email can't be created twice; a non-admin can't create or delete.
+    expect(code(call('admin.users.create', { name: 'Again', email: 'new.surveyor@tcf.test', role: 'SURVEYOR' }, admin))).toBe('CONFLICT');
+    const reviewer = login('reviewer@tcf.test');
+    expect(code(call('admin.users.create', { name: 'X Y', email: 'x@tcf.test', role: 'SURVEYOR' }, reviewer))).toBe('FORBIDDEN');
+    expect(code(call('admin.users.delete', { userId: made.user.id }, reviewer))).toBe('FORBIDDEN');
+  });
+
+  test('deleting removes the account and its sign-in; other users and its surveys stay', () => {
+    const admin = login('admin@tcf.test');
+    const surveyor = login('surveyor@tcf.test');
+    const before = ok(call<{ users: { id: string; email: string }[] }>('admin.users.list', {}, admin)).users;
+    const target = before.find((u) => u.email === 'surveyor@tcf.test')!;
+    expect(ok(call('admin.users.delete', { userId: target.id }, admin))).toEqual({ ok: true });
+    const after = ok(call<{ users: { id: string; email: string }[] }>('admin.users.list', {}, admin)).users;
+    expect(after.map((u) => u.email).sort()).toEqual(before.map((u) => u.email).filter((e) => e !== 'surveyor@tcf.test').sort());
+    // Their session and password no longer work; the others still do.
+    expect(code(call('auth.whoami', {}, surveyor))).toBe('UNAUTHENTICATED');
+    expect(code(call('auth.login', { email: 'surveyor@tcf.test', password: DEV_PASSWORD }))).not.toBe('ok');
+    expect(code(call('auth.whoami', {}, login('reviewer@tcf.test')))).toBe('ok');
+    // The email is free again.
+    expect(code(call('admin.users.create', { name: 'Dev Surveyor', email: 'surveyor@tcf.test', role: 'SURVEYOR' }, admin))).toBe('ok');
+  });
+
+  test('not yourself, and not the only administrator', () => {
+    const admin = login('admin@tcf.test');
+    const me = ok(call<{ users: { id: string; email: string }[] }>('admin.users.list', {}, admin)).users.find((u) => u.email === 'admin@tcf.test')!;
+    expect(code(call('admin.users.delete', { userId: me.id }, admin))).toBe('VALIDATION');
+    expect(code(call('admin.users.delete', { userId: 'nobody' }, admin))).toBe('NOT_FOUND');
+  });
+});

@@ -2,6 +2,7 @@ import {
   PASSWORD_MIN,
   ROLES,
   approvePayload,
+  createUserPayload,
   base64UrlDecode,
   base64UrlEncode,
   bytesToHex,
@@ -15,7 +16,7 @@ import {
   utf8Encode,
   uuidv7,
 } from '@mqi/shared';
-import type { AdminUser, IssuePasswordResult, Role, SessionUser, UserStatus, WhoAmI } from '@mqi/shared';
+import type { AdminUser, CreateUserResult, IssuePasswordResult, Role, SessionUser, UserStatus, WhoAmI } from '@mqi/shared';
 import { PROP } from './context';
 import type { Ctx } from './context';
 import { fail } from './errors';
@@ -344,6 +345,47 @@ export function revokeUser(ctx: Ctx, raw: unknown): AdminUser {
     forgetUser(ctx.env, p.userId);
     audit(ctx, 'revoke', p.userId);
     return toAdminUser(next);
+  });
+}
+
+/**
+ * W75: an administrator creates an account. It is active at once with the chosen role and a
+ * one-time password (shown once; the user must change it at first sign-in).
+ */
+export function createUser(ctx: Ctx, raw: unknown): CreateUserResult {
+  const p = createUserPayload.parse(raw);
+  return withLock(ctx, () => {
+    const users = Table.of(ctx.env, 'USERS', 'id');
+    if (users.find((u) => (u.email ?? '').toLowerCase() === p.email)) fail('CONFLICT', 'An account with this email already exists.');
+    const id = uuidv7(ctx.env.crypto.randomBytes, ctx.nowMs);
+    const temporaryPassword = generateTemporaryPassword(ctx.env.crypto);
+    Table.of(ctx.env, 'CREDENTIALS', 'userId').insert({ userId: id, ...credentialsFor(ctx.env, temporaryPassword, true, 0, ctx.nowIso) });
+    const row = { id, email: p.email, name: p.name, role: p.role, status: 'ACTIVE', createdAt: ctx.nowIso, approvedAt: ctx.nowIso, approvedBy: ctx.requireUser().id, updatedAt: ctx.nowIso };
+    users.insert(row);
+    audit(ctx, 'createUser', id, p.role);
+    return { user: toAdminUser(row), temporaryPassword };
+  });
+}
+
+/**
+ * W75: deletes an account for good (its sign-in and its row; the email can be used again).
+ * Surveys and photos the user submitted stay. Not allowed on yourself or on the last administrator.
+ */
+export function deleteUser(ctx: Ctx, raw: unknown): { ok: true } {
+  const p = userIdPayload.parse(raw);
+  if (p.userId === ctx.requireUser().id) fail('VALIDATION', 'You cannot delete your own account.');
+  return withLock(ctx, () => {
+    const users = Table.of(ctx.env, 'USERS', 'id');
+    const u = users.get(p.userId);
+    if (!u) return fail('NOT_FOUND', 'No such user.');
+    const admins = users.all().filter((x) => x.role === 'ADMIN' && x.status === 'ACTIVE');
+    if (u.role === 'ADMIN' && u.status === 'ACTIVE' && admins.length <= 1) fail('VALIDATION', 'This is the only administrator.');
+    const creds = Table.of(ctx.env, 'CREDENTIALS', 'userId');
+    if (creds.get(p.userId)) creds.remove(p.userId);
+    users.remove(p.userId);
+    forgetUser(ctx.env, p.userId);
+    audit(ctx, 'deleteUser', p.userId, `${u.role ?? ''} ${u.status ?? ''}`.trim());
+    return { ok: true as const };
   });
 }
 

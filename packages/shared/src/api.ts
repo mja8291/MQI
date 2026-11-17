@@ -358,6 +358,16 @@ export const approvePayload = z.object({ userId: z.string().max(64), role: z.enu
 export interface IssuePasswordResult {
   temporaryPassword: string;
 }
+/** W75: an administrator creates an account: active at once, with a one-time password. */
+export const createUserPayload = z.object({
+  name: z.string().trim().min(2, 'Enter the full name.').max(120),
+  email,
+  role: z.enum(ROLES),
+});
+export interface CreateUserResult {
+  user: AdminUser;
+  temporaryPassword: string;
+}
 
 // ---- observability ----
 
@@ -387,6 +397,8 @@ export const ACTIONS = [
   'admin.users.list',
   'admin.users.approve',
   'admin.users.revoke',
+  'admin.users.create',
+  'admin.users.delete',
   'admin.issuePassword',
   'client.log',
 ] as const;

@@ -17,6 +17,8 @@ export interface TablePort {
   write(startRow: number, rows: string[][]): void;
   /** Appends after the last row; returns the first new row number. */
   append(rows: string[][]): number;
+  /** W75: deletes one row (rows below move up). */
+  removeRow(row: number): void;
 }
 
 export interface SystemDbPort {

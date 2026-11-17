@@ -10,6 +10,8 @@ import { MyAssessments } from "./MyAssessments";
 import { onMobile, runningInstalled, useOfflineReadiness } from "@/lib/offline/readiness";
 import { spaceAdvice } from "@/lib/photo-limits";
 import { useQueue } from "./useQueue";
+import { api } from "@/lib/api";
+import type { AdminUser } from "@mqi/shared";
 
 type Tab = "start" | "incomplete" | "sync" | "mine";
 
@@ -124,9 +126,10 @@ export function HomeTabs() {
           {user?.role === "ADMIN" ? (
             <Link
               href="/admin"
-              className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-transparent text-brand-deep border border-border mt-2.5"
+              className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-transparent text-brand-deep border border-border mt-2.5 inline-flex items-center justify-center gap-2"
             >
               Manage users
+              <PendingRequests />
             </Link>
           ) : null}
           <OfflineReadyLine />
@@ -211,5 +214,28 @@ function OfflineReadyLine() {
         </span>
       ) : null}
     </p>
+  );
+}
+
+/**
+ * W75: new account requests waiting for an administrator, as a red number on Manage users.
+ * Read when Home opens with signal; nothing shows offline or when there are none.
+ */
+function PendingRequests() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    api<{ users: AdminUser[] }>("admin.users.list")
+      .then((r) => alive && setN(r.users.filter((u) => u.status === "PENDING").length))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!n) return null;
+  return (
+    <span aria-label={`${n} new account request${n === 1 ? "" : "s"}`} data-testid="pending-requests" className="min-w-5 h-5 px-1.5 rounded-full bg-band-poor text-white text-[11px] font-bold inline-flex items-center justify-center">
+      {n}
+    </span>
   );
 }

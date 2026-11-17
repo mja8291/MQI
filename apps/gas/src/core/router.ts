@@ -38,6 +38,8 @@ const ROUTES: Record<ActionName, Route> = {
   'admin.users.list': { handler: (c) => auth.listUsers(c), permission: 'users' },
   'admin.users.approve': { handler: auth.approveUser, permission: 'users' },
   'admin.users.revoke': { handler: auth.revokeUser, permission: 'users' },
+  'admin.users.create': { handler: auth.createUser, permission: 'users' },
+  'admin.users.delete': { handler: auth.deleteUser, permission: 'users' },
   'admin.issuePassword': { handler: auth.issuePassword, permission: 'users' },
   'client.log': { handler: clientLog },
 };

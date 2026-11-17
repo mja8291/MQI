@@ -30,6 +30,9 @@ class MemoryTable implements TablePort {
     this.rows.push(...rows.map((r) => [...r]));
     return first;
   }
+  removeRow(row: number): void {
+    this.rows.splice(row - 1, 1);
+  }
 }
 
 export class MemorySystemDb implements SystemDbPort {

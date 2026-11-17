@@ -34,12 +34,14 @@ test('sign-up, approval, temporary password and forced change', async ({ browser
   await admin.getByRole('link', { name: 'Manage users' }).click();
   const row = admin.locator('div.px-3\\.5', { hasText: email });
   await row.getByRole('button', { name: 'Approve' }).click();
-  await expect(admin.locator('section', { hasText: 'Active' }).getByText(email)).toBeVisible();
+  await expect(admin.getByRole('region', { name: 'Active users' }).getByText(email)).toBeVisible();
 
   await signIn(user, email, 'first-password-1');
   await expect(user.getByRole('link', { name: 'Start new survey' })).toBeVisible();
 
   // Admin issues a temporary password: the user's session ends and the next sign-in must change it.
+  // W75: an active user's actions show once the user is tapped.
+  await row.getByRole('button', { name: new RegExp(email) }).click();
   await row.getByRole('button', { name: 'Temporary password' }).click();
   await admin.getByRole('button', { name: 'Issue password' }).click();
   const temp = (await admin.locator('code').innerText()).trim();
