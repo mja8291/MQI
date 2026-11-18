@@ -9,6 +9,8 @@ playwright-report/
 .env.*
 !apps/web/env/.env
 !apps/web/env/.env.*
+!apps/budget/env/.env
+!apps/budget/env/.env.*
 !.env.example
 
 # Read-only clone of the v1 app (mja8291/tcf @ master). Never committed.

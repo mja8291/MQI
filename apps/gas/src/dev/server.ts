@@ -19,7 +19,20 @@ export const DEV_USERS = [
   { email: 'admin@tcf.test', name: 'Dev Admin', role: 'ADMIN' },
   { email: 'surveyor@tcf.test', name: 'Dev Surveyor', role: 'SURVEYOR' },
   { email: 'reviewer@tcf.test', name: 'Dev Reviewer', role: 'REVIEWER' },
+  // R&M Budget site (Build 1).
+  { email: 'costs@tcf.test', name: 'Dev Cost Manager', role: 'COST_MANAGER' },
 ] as const;
+
+/** R&M Budget: a small SMS 2026 tab (one row per school unit), matching the sample school list. */
+export const SAMPLE_SMS: string[][] = [
+  ['School ID', 'Campus Name', 'Campus Name with ID', 'Assessment Year', 'Campus ID', 'Unit ID', 'eCompoundNo', 'Build Donor new', 'School Type', 'Programme', 'Region', 'Area', 'Cluster', 'Location', 'Built Year', 'Build Donor'],
+  ['1001', 'OGS Trust Campus', '', '2026', '947', '5001', 'S/1/10', '', 'PR', 'Flagship', 'South West', 'Gadap West I', 'Gadap', '', '2001', 'Donor A'],
+  ['1002', 'OGS Trust Campus', '', '2026', '947', '5002', 'S/1/10', '', 'SC', 'Flagship', 'South West', 'Gadap West I', 'Gadap', '', '2001', 'Donor A'],
+  ['1003', 'OGS Trust Campus II', '', '2026', '948', '5003', 'S/1/10', '', 'PR', 'Flagship', 'South West', 'Gadap West I', 'Gadap', '', '2005', 'Donor B'],
+  ['1004', 'Zia & Faiza Bhutta Family Foundation Campus', '', '2026', '1306', '5004', '', '', 'PR', 'Flagship', 'North', 'Sheikhupura', '', '', '2010', 'Donor C'],
+  ['1005', 'Alfalah Campus', '', '2026', '499', '5005', 'LS/1/05', '', 'PR', 'Flagship', 'Lower Sindh', 'Hyderabad 1', '', '', '1999', 'Donor D'],
+  ['1006', 'Fazalillahi Campus-I', '', '2026', '107', '5006', 'SW/6/99', '', 'PR', 'Flagship', 'South West', 'Baldia Town 2', '', '', '1998', 'Donor E'],
+];
 
 export function seedDevEnv(env: MemoryEnv): void {
   // v1's tabs exist before v2 ever runs; Source App is added by v2 itself.
@@ -45,6 +58,9 @@ export function seedDevEnv(env: MemoryEnv): void {
     ["5001", "GPC/1/24", "GGPS Sample", "GP Central Punjab", "PSSP/PSRP Deduction", ""],
     ["5002", "N/77/20", "Campus Not In The App List", "North", "Survey with App", ""],
   ]);
+  // R&M Budget: the campus master tab.
+  env.responses.createTab('SMS 2026', SAMPLE_SMS[0]!);
+  env.responses.appendRaw('SMS 2026', SAMPLE_SMS.slice(1));
   env.props.set('PBKDF2_ITERATIONS', '1000');
   setupCore(env);
   const ctx = new Ctx(env, 'seed', 'seed');

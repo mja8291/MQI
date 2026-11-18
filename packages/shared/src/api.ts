@@ -401,6 +401,14 @@ export const ACTIONS = [
   'admin.users.delete',
   'admin.issuePassword',
   'client.log',
+  // R&M Budget (Build 1): Cost Manager and Admin only.
+  'budget.state',
+  'budget.campuses',
+  'budget.import',
+  'budget.cycle.save',
+  'budget.scenario.save',
+  'budget.scenario.delete',
+  'budget.zones.save',
 ] as const;
 export type ActionName = (typeof ACTIONS)[number];
 

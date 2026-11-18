@@ -234,6 +234,7 @@ export class StaticSchools implements SchoolsPort {
 
 export interface MemoryEnv extends Env {
   system: MemorySystemDb;
+  budget: MemorySystemDb;
   responses: MemoryResponses;
   schools: StaticSchools;
   cache: MemoryCache;
@@ -265,6 +266,7 @@ export function createMemoryEnv(opts: { now?: number; schools?: string[][] } = {
   const logs: string[] = [];
   return {
     system: new MemorySystemDb(),
+    budget: new MemorySystemDb(),
     responses: new MemoryResponses(),
     schools: new StaticSchools(opts.schools ?? SAMPLE_SCHOOLS, opts.schools ? [] : SAMPLE_ECOMPOUNDS),
     cache: new MemoryCache(now),

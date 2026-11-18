@@ -83,6 +83,37 @@ class SystemDb implements SystemDbPort {
   }
 }
 
+/**
+ * R&M Budget spreadsheet: opened on first use only (survey actions never touch it). When the
+ * BUDGET_SPREADSHEET_ID property is unset, "R&M Budget" is created in the v2 root folder, owned by the
+ * deploying (department) account, and remembered.
+ */
+class BudgetDb implements SystemDbPort {
+  private ssCache: GoogleAppsScript.Spreadsheet.Spreadsheet | null = null;
+  private get ss(): GoogleAppsScript.Spreadsheet.Spreadsheet {
+    if (this.ssCache) return this.ssCache;
+    const id = props.get(PROP.BUDGET_SPREADSHEET_ID);
+    if (id) return (this.ssCache = SpreadsheetApp.openById(id));
+    const env = props.get(PROP.ENV_NAME) === "production" ? "" : ` (${props.get(PROP.ENV_NAME) || "staging"})`;
+    const ss = SpreadsheetApp.create(`R&M Budget${env}`);
+    const root = props.get(PROP.V2_ROOT_FOLDER_ID);
+    if (root) DriveApp.getFileById(ss.getId()).moveTo(DriveApp.getFolderById(root));
+    props.set(PROP.BUDGET_SPREADSHEET_ID, ss.getId());
+    return (this.ssCache = ss);
+  }
+  table(name: string): TablePort | null {
+    const s = this.ss.getSheetByName(name);
+    return s ? new SheetTable(s) : null;
+  }
+  createTable(name: string, header: string[]): TablePort {
+    const t = new SheetTable(this.ss.insertSheet(name));
+    t.setHeader(header);
+    const blank = this.ss.getSheetByName("Sheet1");
+    if (blank && this.ss.getSheets().length > 1) this.ss.deleteSheet(blank);
+    return t;
+  }
+}
+
 // ---- v1 response tabs: header-driven, RAW, atomic appends ----
 
 class Responses implements ResponsesPort {
@@ -263,6 +294,7 @@ const drive: DrivePort = {
 export function createGasEnv(): Env {
   return {
     system: new SystemDb(),
+    budget: new BudgetDb(),
     responses: new Responses(),
     schools,
     cache,

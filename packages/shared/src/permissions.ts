@@ -5,30 +5,33 @@
  *
  * Downloads and the dashboard stay open to every approved user, as in v1 (decided 28 Oct 2026).
  */
-export const ROLES = ['SURVEYOR', 'REVIEWER', 'ADMIN'] as const;
+export const ROLES = ['SURVEYOR', 'REVIEWER', 'ADMIN', 'COST_MANAGER'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABEL: Record<Role, string> = {
   SURVEYOR: 'Surveyor',
   REVIEWER: 'Reviewer',
   ADMIN: 'Administrator',
+  COST_MANAGER: 'Cost Manager',
 };
 
 export type Level = 'none' | 'view' | 'own' | 'all';
 
-export const PERMISSIONS = ['survey', 'surveyDownload', 'dashboard', 'exportAll', 'users'] as const;
+export const PERMISSIONS = ['survey', 'surveyDownload', 'dashboard', 'exportAll', 'users', 'budget'] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 type Row = Record<Role, Level>;
-const row = (SURVEYOR: Level, REVIEWER: Level, ADMIN: Level): Row => ({ SURVEYOR, REVIEWER, ADMIN });
+const row = (SURVEYOR: Level, REVIEWER: Level, ADMIN: Level, COST_MANAGER: Level): Row => ({ SURVEYOR, REVIEWER, ADMIN, COST_MANAGER });
 
-//                                      Surveyor Reviewer Admin
+//                                      Surveyor Reviewer Admin  Cost Manager
 export const MATRIX: Record<Permission, Row> = {
-  survey:         row('own',  'none', 'own'),
-  surveyDownload: row('all',  'all',  'all'),
-  dashboard:      row('view', 'view', 'view'),
-  exportAll:      row('view', 'view', 'view'),
-  users:          row('none', 'none', 'all'),
+  survey:         row('own',  'none', 'own', 'none'),
+  surveyDownload: row('all',  'all',  'all', 'all'),
+  dashboard:      row('view', 'view', 'view', 'view'),
+  exportAll:      row('view', 'view', 'view', 'view'),
+  users:          row('none', 'none', 'all', 'none'),
+  // R&M Budget site (2026-11-18): never surveyors or reviewers.
+  budget:         row('none', 'none', 'all', 'all'),
 };
 
 export function level(role: Role, permission: Permission): Level {

@@ -95,6 +95,8 @@ export interface DrivePort {
 
 export interface Env {
   system: SystemDbPort;
+  /** R&M Budget spreadsheet (Build 1); opened (or created) only by budget actions. */
+  budget: SystemDbPort;
   responses: ResponsesPort;
   schools: SchoolsPort;
   cache: CachePort;

@@ -1,10 +1,22 @@
 {
-  "projects": { "default": "tcfmqi" },
+  "projects": {
+    "default": "tcfmqi"
+  },
   "targets": {
     "tcfmqi": {
       "hosting": {
-        "prod": ["tcfmqi"],
-        "staging": ["tcfmqi-staging"]
+        "prod": [
+          "tcfmqi"
+        ],
+        "staging": [
+          "tcfmqi-staging"
+        ],
+        "budget": [
+          "tcfmqi-budget"
+        ],
+        "budget-staging": [
+          "tcfmqi-budget-staging"
+        ]
       }
     }
   }

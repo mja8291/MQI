@@ -18,6 +18,8 @@ export const PROP = {
   ADMIN_EMAIL: 'ADMIN_EMAIL',
   ADMIN_NAME: 'ADMIN_NAME',
   SCHEMA_VERSION: 'SCHEMA_VERSION',
+  /** R&M Budget spreadsheet; created in the v2 root folder on first use when unset. */
+  BUDGET_SPREADSHEET_ID: 'BUDGET_SPREADSHEET_ID',
 } as const;
 
 /** Per-request state. */

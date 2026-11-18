@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { API_VERSION, MIN_CLIENT_API_VERSION, PUBLIC_ACTIONS, RUBRIC_VERSION, can, clientLogPayload, requestEnvelope } from '@mqi/shared';
 import type { ActionName, ApiResponse, Permission } from '@mqi/shared';
 import * as auth from './auth';
+import * as budget from './budget';
 import { Ctx } from './context';
 import { AppError, fail } from './errors';
 import * as files from './files';
@@ -42,6 +43,14 @@ const ROUTES: Record<ActionName, Route> = {
   'admin.users.delete': { handler: auth.deleteUser, permission: 'users' },
   'admin.issuePassword': { handler: auth.issuePassword, permission: 'users' },
   'client.log': { handler: clientLog },
+  // R&M Budget site (Build 1).
+  'budget.state': { handler: (c) => budget.state(c), permission: 'budget' },
+  'budget.campuses': { handler: budget.campuses, permission: 'budget' },
+  'budget.import': { handler: (c) => budget.importCampuses(c), permission: 'budget' },
+  'budget.cycle.save': { handler: budget.saveCycle, permission: 'budget' },
+  'budget.scenario.save': { handler: budget.saveScenario, permission: 'budget' },
+  'budget.scenario.delete': { handler: budget.deleteScenario, permission: 'budget' },
+  'budget.zones.save': { handler: budget.saveZones, permission: 'budget' },
 };
 
 /** Sanitised client error (no tokens, no personal data), throttled so it cannot flood the sheet. */

@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/* Same colours as the survey app. */
+:root {
+  --ink: #1b241d;
+  --ink-soft: #4b5c50;
+  --ink-faint: #8b968c;
+  --surface: #f1f4ee;
+  --card: #ffffff;
+  --border: #dde5d9;
+  --brand: #0e5c4d;
+  --brand-deep: #123d24;
+  --brand-tint: #e1f5ee;
+  --warn: #b23a3a;
+  --warn-tint: #fbeae9;
+  --amber: #c97a2e;
+  --amber-tint: #fbeee1;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-tint: var(--brand-tint);
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-amber: var(--amber);
+  --color-amber-tint: var(--amber-tint);
+}
+
+html,
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+table.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+table.tbl th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: #f7f9f5;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  position: sticky;
+  top: 0;
+}
+table.tbl td {
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  vertical-align: top;
+}
+table.tbl th.num {
+  text-align: right;
+}
+
+input.cell,
+select.cell {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 13px;
+  background: white;
+  min-width: 0;
+}
+input.cell:focus,
+select.cell:focus {
+  outline: 2px solid var(--brand);
+  outline-offset: -1px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--brand-deep);
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: white;
+}
+.btn-danger {
+  color: var(--warn);
+}
+.card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}

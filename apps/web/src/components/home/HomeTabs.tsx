@@ -132,6 +132,17 @@ export function HomeTabs() {
               <PendingRequests />
             </Link>
           ) : null}
+          {/* R&M Budget (Build 1): a separate site, linked for Cost Managers and Admins only. */}
+          {user && can(user.role, "budget") && import.meta.env.VITE_BUDGET_URL ? (
+            <a
+              href={import.meta.env.VITE_BUDGET_URL}
+              target="_blank"
+              rel="noopener"
+              className="w-full min-h-11 rounded-xl px-5 py-3 text-sm font-semibold text-center bg-transparent text-brand-deep border border-border mt-2.5"
+            >
+              Open R&amp;M Budget
+            </a>
+          ) : null}
           <OfflineReadyLine />
           {queue.pending.length > 0 ? (
             // v2 (W29): a standing reminder until every submitted survey has reached the server.

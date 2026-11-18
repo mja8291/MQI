@@ -11,6 +11,7 @@ export default defineConfig({
       { extends: true, test: { name: 'gas', root: './apps/gas', include: ['src/**/*.test.ts'], environment: 'node' } },
       './tools/fixtures/vitest.config.ts',
       './apps/web/vitest.config.ts',
+      { extends: true, test: { name: 'budget', root: './apps/budget', include: ['src/**/*.test.ts'], environment: 'node' } },
     ],
   },
 });
