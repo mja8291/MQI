@@ -228,8 +228,15 @@ const lock: LockPort = {
     return true;
   },
   release: () => {
-    heldLock?.releaseLock();
-    heldLock = null;
+    // W82: commit this request's sheet writes before the next request may read them. Without it a
+    // request arriving right after could miss a register row just written and write the survey again
+    // (survey 01a1d635…, 13 Nov: written twice two seconds apart).
+    try {
+      SpreadsheetApp.flush();
+    } finally {
+      heldLock?.releaseLock();
+      heldLock = null;
+    }
   },
 };
 

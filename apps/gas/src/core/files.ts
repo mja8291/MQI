@@ -100,13 +100,19 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
     location: f.floorLevel ? { floorLevel: f.floorLevel, type: f.locationType ?? '', name: f.locationLabel ?? '' } : undefined,
   });
 
+  // W82: the survey's folders are found or created under the lock: a phone uploads several photos at
+  // once, and each upload used to create its own copy of a new folder (photos split across copies).
+  const folder = () => withLock(ctx, () => ctx.env.drive.ensureFolder(where.folders));
+
   let session = f.session ?? '';
   let fileId = '';
   try {
+    const needsFolder = p.chunkCount === 1 || p.chunkIndex === 0 || !session;
+    const folderId = needsFolder ? folder() : '';
     if (p.chunkCount === 1) {
-      fileId = ctx.env.drive.createFile(ctx.env.drive.ensureFolder(where.folders), where.fileName, f.mimeType ?? 'image/jpeg', bytes);
+      fileId = ctx.env.drive.createFile(folderId, where.fileName, f.mimeType ?? 'image/jpeg', bytes);
     } else {
-      if (p.chunkIndex === 0 || !session) session = ctx.env.drive.startResumable(ctx.env.drive.ensureFolder(where.folders), where.fileName, f.mimeType ?? 'image/jpeg', p.totalSize);
+      if (p.chunkIndex === 0 || !session) session = ctx.env.drive.startResumable(folderId, where.fileName, f.mimeType ?? 'image/jpeg', p.totalSize);
       const r = ctx.env.drive.putChunk(session, bytes, p.chunkIndex * UPLOAD_CHUNK_BYTES, p.totalSize);
       if (r.done) fileId = r.fileId ?? '';
     }

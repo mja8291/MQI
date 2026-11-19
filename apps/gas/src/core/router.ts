@@ -10,6 +10,7 @@ import type { Env } from './ports';
 import * as reads from './reads';
 import * as sync from './sync';
 import { Table } from './system';
+import { withLock } from './lock';
 
 type Handler = (ctx: Ctx, payload: unknown) => unknown;
 
@@ -44,14 +45,15 @@ const ROUTES: Record<ActionName, Route> = {
   'admin.issuePassword': { handler: auth.issuePassword, permission: 'users' },
   'client.log': { handler: clientLog },
   'campus.details': { handler: reads.campusDetails, permission: 'surveyDownload' },
-  // R&M Budget site (Build 1).
-  'budget.state': { handler: (c) => budget.state(c), permission: 'budget' },
+  // R&M Budget site (Build 1). W82: each under the lock: saves check-then-write (names, newer saves), and
+  // the first use creates the budget spreadsheet and its tabs, which two requests must not both do.
+  'budget.state': { handler: (c) => withLock(c, () => budget.state(c)), permission: 'budget' },
   'budget.campuses': { handler: budget.campuses, permission: 'budget' },
-  'budget.import': { handler: (c) => budget.importCampuses(c), permission: 'budget' },
-  'budget.cycle.save': { handler: budget.saveCycle, permission: 'budget' },
-  'budget.scenario.save': { handler: budget.saveScenario, permission: 'budget' },
-  'budget.scenario.delete': { handler: budget.deleteScenario, permission: 'budget' },
-  'budget.zones.save': { handler: budget.saveZones, permission: 'budget' },
+  'budget.import': { handler: (c) => withLock(c, () => budget.importCampuses(c)), permission: 'budget' },
+  'budget.cycle.save': { handler: (c, p) => withLock(c, () => budget.saveCycle(c, p)), permission: 'budget' },
+  'budget.scenario.save': { handler: (c, p) => withLock(c, () => budget.saveScenario(c, p)), permission: 'budget' },
+  'budget.scenario.delete': { handler: (c, p) => withLock(c, () => budget.deleteScenario(c, p)), permission: 'budget' },
+  'budget.zones.save': { handler: (c, p) => withLock(c, () => budget.saveZones(c, p)), permission: 'budget' },
 };
 
 /** Sanitised client error (no tokens, no personal data), throttled so it cannot flood the sheet. */

@@ -20,13 +20,15 @@ export function ScenarioPage() {
   const scenario = state?.scenarios.find((s) => s.id === scenarioId);
   const cycle = state?.cycles.find((c) => c.id === scenario?.cycleId);
   const campuses = useCycleCampuses(scenario?.cycleId);
-  const [draft, setDraft] = useState<ScenarioConfig | null>(null);
+  // W82: an edit belongs to one scenario at one saved version. Moving to another scenario, or a newer
+  // save arriving, never carries an edit across (it falls back to that scenario's saved settings); a
+  // background refresh of the same version keeps the edit.
+  const version = scenario ? `${scenario.id}@${scenario.updatedAt ?? ''}` : '';
+  const [edit, setEdit] = useState<{ version: string; config: ScenarioConfig } | null>(null);
+  const draft: ScenarioConfig | null = edit && edit.version === version ? edit.config : (scenario?.config ?? null);
+  const setDraft = (config: ScenarioConfig) => setEdit({ version, config });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
-
-  useEffect(() => {
-    if (scenario) setDraft(structuredClone(scenario.config));
-  }, [scenario]);
 
   const dirty = useMemo(() => !!scenario && !!draft && JSON.stringify(draft) !== JSON.stringify(scenario.config), [scenario, draft]);
   useEffect(() => {
@@ -47,6 +49,7 @@ export function ScenarioPage() {
     try {
       const s = await api<Scenario>('budget.scenario.save', { id: scenario.id, cycleId: scenario.cycleId, name: scenario.name, config: draft, ...(scenario.updatedAt ? { baseUpdatedAt: scenario.updatedAt } : {}) });
       putScenario(s);
+      setEdit(null);
       setMsg('Saved.');
     } catch (e) {
       setMsg(errorText(e));
@@ -80,7 +83,7 @@ export function ScenarioPage() {
         <div className="flex-1" />
         {dirty ? <span className="text-[12.5px] font-semibold text-amber">Unsaved changes</span> : null}
         {msg ? <span className={`text-[12.5px] ${msg === 'Saved.' ? 'text-brand' : 'text-warn'}`} role="status">{msg}</span> : null}
-        <button type="button" className="btn" disabled={!dirty} onClick={() => setDraft(structuredClone(scenario.config))}>
+        <button type="button" className="btn" disabled={!dirty} onClick={() => setEdit(null)}>
           Undo changes
         </button>
         <button type="button" className="btn btn-primary" disabled={!dirty || saving} onClick={save}>

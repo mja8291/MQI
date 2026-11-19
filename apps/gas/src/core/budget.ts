@@ -13,6 +13,7 @@ import {
 import type { BudgetCampusesResult, BudgetCycle, BudgetImportResult, BudgetState, CampusMaster, CampusSource, RegionZone, Scenario } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
+import { withLock } from './lock';
 import type { Env, TablePort } from './ports';
 import { dashboard } from './reads';
 import { toRow } from './responses';
@@ -171,11 +172,12 @@ export function state(ctx: Ctx): BudgetState {
 /** The imported master joined with each campus's latest MQI survey in the cycle's window (the dashboard's figures). */
 export function campuses(ctx: Ctx, raw: unknown): BudgetCampusesResult {
   const { cycleId } = budgetCampusesPayload.parse(raw);
-  const row = table(ctx.env, 'CYCLES', 'id').get(cycleId);
+  // W82: the budget sheet is read under the lock (its first use creates it); the dashboard outside it.
+  const [row, master] = withLock(ctx, () => [table(ctx.env, 'CYCLES', 'id').get(cycleId), readMaster(ctx.env)] as const);
   if (!row) return fail('NOT_FOUND', 'Budget cycle not found.');
   const cycle = toCycle(row);
   const d = dashboard(ctx);
-  const { campuses: list, summary } = joinCampusSurveys(readMaster(ctx.env), d.schools, { from: cycle.surveyFrom, to: cycle.surveyTo });
+  const { campuses: list, summary } = joinCampusSurveys(master, d.schools, { from: cycle.surveyFrom, to: cycle.surveyTo });
   return { campuses: list, summary, generatedAt: d.generatedAt ?? ctx.nowIso };
 }
 
