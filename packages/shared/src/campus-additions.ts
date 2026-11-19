@@ -66,10 +66,35 @@ export function applyCampusAdditions(schools: readonly School[], rows: readonly 
   return out;
 }
 
-/** W73: whether a campus matches a Find school search (name, other names, e-compound no., Campus ID). */
+/**
+ * W73: whether a campus matches a Find school search (name, other names, e-compound no., Campus ID).
+ * W79: the words may come in any order and some may be left out of the name ("Sardar Yasin Malik VI"
+ * finds "Sardar Yasin Malik Campus VI"); see campusMatchScore for the order shown.
+ */
 export function campusMatches(s: Pick<School, 'name' | 'otherNames' | 'eCompoundNo' | 'schoolId'>, query: string): boolean {
+  return campusMatchScore(s, query) > 0;
+}
+
+const words = (t: string) => t.toLowerCase().split(/[^a-z0-9/]+/).filter(Boolean);
+
+/**
+ * W79: how well a campus matches a search: 0 none, 1 every word appears somewhere in one name,
+ * 2 every word is a whole word of that name, 3 the name contains the search as typed, 4 the Campus ID.
+ * Find school lists the best matches first, so "... VI" puts Campus VI above VII and VIII.
+ */
+export function campusMatchScore(s: Pick<School, 'name' | 'otherNames' | 'eCompoundNo' | 'schoolId'>, query: string): number {
   const q = query.trim().toLowerCase();
-  if (!q) return false;
-  if (s.schoolId === q) return true;
-  return [s.name, ...(s.otherNames ?? []), s.eCompoundNo ?? ''].some((n) => n.toLowerCase().includes(q));
+  if (!q) return 0;
+  if (s.schoolId === q) return 4;
+  const qWords = words(q);
+  let best = 0;
+  for (const name of [s.name, ...(s.otherNames ?? []), s.eCompoundNo ?? '']) {
+    const n = name.toLowerCase();
+    if (!n) continue;
+    if (n.includes(q)) return 3;
+    if (!qWords.length || !qWords.every((w) => n.includes(w))) continue;
+    const nWords = new Set(words(n));
+    best = Math.max(best, qWords.every((w) => nWords.has(w)) ? 2 : 1);
+  }
+  return best;
 }

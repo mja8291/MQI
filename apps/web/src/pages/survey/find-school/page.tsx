@@ -12,7 +12,7 @@ import { cacheSchools, getCachedSchools } from "@/lib/offline/db";
 import { api, isAuthError } from "@/lib/api";
 import { notifyAuthRequired } from "@/lib/auth/events";
 import { prefetchSiblingExternal } from "@/lib/sibling-external";
-import { campusMatches, type SchoolsResult } from "@mqi/shared";
+import { campusMatchScore, type SchoolsResult } from "@mqi/shared";
 
 export default function FindSchoolPage() {
   const router = useRouter();
@@ -71,7 +71,13 @@ export default function FindSchoolPage() {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     // W73: also other names (a renamed TBD campus, other spellings), the e-compound number and the Campus ID.
-    return schools.filter((s) => campusMatches(s, q)).slice(0, 8);
+    // W79: best matches first (as typed, then whole words, then parts of words).
+    return schools
+      .map((s) => ({ s, score: campusMatchScore(s, q) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score || a.s.name.localeCompare(b.s.name))
+      .slice(0, 8)
+      .map((x) => x.s);
   }, [schools, query]);
 
   // v2 (W10): picking a school (by search, or a sibling campus) fills Region and Area too.
