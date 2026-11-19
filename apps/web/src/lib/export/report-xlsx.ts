@@ -104,6 +104,18 @@ function summarySheet(wb: ExcelJS.Workbook, m: ReportModel) {
   };
   const h = m.header;
   kv("Region · Area", h.regionArea);
+  // W81: the campus's details from the campus list.
+  const cp = h.campus;
+  kv("Location", cp?.location ?? "");
+  kv("Cluster", cp?.cluster ?? "");
+  kv("E-compound no.", cp?.eCompoundNo ?? "");
+  kv("Sibling campuses", cp ? cp.siblings || "None" : "");
+  kv("Build donor", cp?.buildDonor ?? "");
+  kv("Build year (established)", cp?.established ?? "");
+  kv("Programme · sub programme", cp?.subProgram ?? "");
+  kv("School type", cp?.schoolType ?? "");
+  kv("Last maintenance", cp?.lastMaintenance ?? "");
+  if (cp?.lastRegular || /emergency/i.test(cp?.lastMaintenance ?? "")) kv("Last regular / special work", cp?.lastRegular || "None on record");
   kv("Survey ID", h.surveyId);
   kv("Date", h.date);
   kv("Method", h.method);

@@ -1,4 +1,5 @@
 import type { FoundSurvey } from "../api";
+import { maintenanceText, type LastMaintenance } from "../campus-maintenance";
 import { unsafeItemsAt, unsafeLevel, type UnsafeLevel } from "../safety-levels";
 import { RISK_FACTOR_OPTIONS, RISK_FACTOR_OTHER } from "../rubric/content";
 import { withDerivedScores } from "../rubric/derived";
@@ -18,6 +19,7 @@ import {
   type LocationType,
   type RatingBand,
   type RubricGroup,
+  type School,
   type SiteChecks,
 } from "../types";
 import { REPORT_THRESHOLDS, REPORT_TOP_LOSSES, REPORT_TOP_STRENGTHS, UNSAFE_SOLID_EXCEPTIONS } from "./config";
@@ -81,6 +83,45 @@ export interface ReportSource {
   draft: boolean;
   locations: ReportLocationInput[];
   photos: ReportPhotoInput[];
+  /** W81: the campus's details from the school list (see reportCampus); absent when the list isn't at hand. */
+  campus?: ReportCampus | null;
+}
+
+/** W81: campus details shown at the top of the report. Every field is display text ("" when unknown). */
+export interface ReportCampus {
+  location: string;
+  cluster: string;
+  eCompoundNo: string;
+  buildDonor: string;
+  established: string;
+  subProgram: string;
+  schoolType: string;
+  /** Other campuses with the same e-compound number, by name. */
+  siblings: string;
+  /** W81: "2025-26 Emergency · Contractor · Engineer: X" ("" when not on record). */
+  lastMaintenance: string;
+  /** When the last job was an Emergency: the latest Regular or Special job, same format. */
+  lastRegular: string;
+}
+
+/** W81: a campus's report details from the App's school list (siblings share its e-compound number). */
+export function reportCampus(schoolId: string | undefined, schools: readonly School[], maintenance: Readonly<Record<string, LastMaintenance>> = {}): ReportCampus | null {
+  const s = schoolId ? schools.find((x) => x.schoolId === schoolId) : undefined;
+  if (!s) return null;
+  const ec = (s.eCompoundNo ?? '').trim();
+  const siblings = ec ? schools.filter((x) => x.schoolId !== s.schoolId && (x.eCompoundNo ?? '').trim() === ec).map((x) => x.name).sort((a, b) => a.localeCompare(b)) : [];
+  return {
+    location: s.address || [s.town, s.city].filter(Boolean).join(', '),
+    cluster: s.cluster ?? '',
+    eCompoundNo: ec,
+    buildDonor: s.buildDonor ?? '',
+    established: s.establishedYear ?? '',
+    subProgram: [s.program, s.subProgram].filter(Boolean).join(' · '),
+    schoolType: (s.schoolTypes ?? []).join(', '),
+    siblings: siblings.join(', '),
+    lastMaintenance: maintenanceText(maintenance[s.schoolId]),
+    lastRegular: maintenanceText(maintenance[s.schoolId]?.regular),
+  };
 }
 
 // ---------- output ----------
@@ -204,6 +245,8 @@ export interface ReportStructural {
 export interface ReportPhoto {
   id: string;
   caption: string;
+  /** W81: the caption in parts, so the PDF can lay it out: where, what, and the rating. */
+  captionParts: { place: string; item: string; rating: string };
   locationName: string;
   itemName: string;
   /** 0 Unsafe, 1 Very Poor, 2 Poor, 3 other ratings, 4 last-page questions. */
@@ -237,6 +280,8 @@ export interface ReportModel {
     timeTaken: string;
     itemsCovered: string;
     draft: boolean;
+    /** W81: campus details (location, cluster, e-compound, donor, year, programme, type, siblings). */
+    campus: ReportCampus | null;
   };
   alerts: string[];
   /** W74: Critically Unsafe (Soundness, ceiling cracks, Column), Partially Unsafe (other Unsafe answers), or null. */
@@ -620,6 +665,7 @@ export function buildReportModel(src: ReportSource): ReportModel {
         severity,
         section,
         caption: [loc ? locationPlace(loc) : p.locationName || "Site checks", item, rating].filter(Boolean).join(" · "),
+        captionParts: { place: loc ? locationPlace(loc) : p.locationName || "Site checks", item: item ?? "", rating: rating ?? "" },
       };
     })
     .sort((a, b) => sectionIndex(a.section) - sectionIndex(b.section) || a.severity - b.severity || naturalCompare(a.caption, b.caption));
@@ -712,6 +758,7 @@ export function buildReportModel(src: ReportSource): ReportModel {
       timeTaken: duration(src.timeTakenSeconds),
       itemsCovered: pct(coverage.percent),
       draft: src.draft,
+      campus: src.campus ?? null,
     },
     alerts,
     safetyLevel,

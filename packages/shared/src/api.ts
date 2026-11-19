@@ -149,6 +149,8 @@ export const surveyGetPayload = z.object({ surveyId: z.string().min(1).max(80) }
 /** v1 FoundSurvey (src/lib/export/find-survey.ts): what the Excel/PDF builders read. */
 export interface FoundSurvey {
   surveyId: string;
+  /** W81: the Campus ID ("School ID" column). */
+  schoolId?: string;
   /** v2 (W62): the sheet's "Survey Purpose" ("" before it existed). */
   purpose?: string;
   rubricVersion: string;
@@ -321,7 +323,10 @@ export type SchoolsResult = { schools: School[] };
  * v2 (W30): External Development is shared by the campuses of one e-compound. The latest one
  * recorded for a sibling campus pre-fills the next sibling's survey (editable).
  */
-export const siblingExternalPayload = z.object({ schoolId: z.string().min(1).max(64) });
+/** W81: campus.details. */
+export const campusDetailsPayload = z.object({ schoolId: z.string().min(1).max(64) });
+
+export const siblingExternalPayload =z.object({ schoolId: z.string().min(1).max(64) });
 export type SiblingExternalResult = {
   found: { campusName: string; schoolId: string; surveyId: string; date: string; scores: Record<string, string> } | null;
   /**
@@ -401,6 +406,8 @@ export const ACTIONS = [
   'admin.users.delete',
   'admin.issuePassword',
   'client.log',
+  // W81: one campus's report details (location, cluster, donor, siblings, last maintenance).
+  'campus.details',
   // R&M Budget (Build 1): Cost Manager and Admin only.
   'budget.state',
   'budget.campuses',

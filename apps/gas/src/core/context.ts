@@ -10,6 +10,8 @@ export const PROP = {
   SCHOOLS_SHEET_TAB: 'SCHOOLS_SHEET_TAB',
   /** Optional; defaults to the department's E-Compound Spreadsheet (names for Find school). */
   ECOMPOUND_SPREADSHEET_ID: 'ECOMPOUND_SPREADSHEET_ID',
+  /** W81: optional; defaults to the engineering team's "Last Maintenance" job sheet. */
+  MAINTENANCE_SPREADSHEET_ID: 'MAINTENANCE_SPREADSHEET_ID',
   V2_ROOT_FOLDER_ID: 'V2_ROOT_FOLDER_ID',
   PHOTOS_FOLDER_ID: 'PHOTOS_FOLDER_ID',
   SESSION_SECRET: 'SESSION_SECRET',

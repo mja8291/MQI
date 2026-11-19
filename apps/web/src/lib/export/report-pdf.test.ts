@@ -31,6 +31,32 @@ describe("W66 report PDF", () => {
     if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-wide.pdf"), bytes);
   });
 
+  it("W81: campus details on page 1 and long photo captions render (both reports)", async () => {
+    const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+    const withCampus: ReportSource = {
+      ...source,
+      campus: {
+        location: "Village Malik Abdul Sattar, Taluka and Tehsil Mirpur Khas, District Mirpur Khas, Sindh, a very long address",
+        cluster: "Malik Abdul Sattar",
+        eCompoundNo: "S/129/17",
+        buildDonor: "Hilton Pharma (Pvt) Ltd",
+        established: "2017",
+        subProgram: "Flagship · Rural",
+        schoolType: "Primary, Secondary",
+        siblings: "Sardar Yasin Malik Campus VIII, Sardar Yasin Malik Campus IX, Sardar Yasin Malik Campus XIV",
+        lastMaintenance: "2025-26 Emergency (in execution) · M.F Enterprises · Engineer: Jamshed Humayoun",
+        lastRegular: "2022-23 Regular · RR Constructors · Engineer: Haseeb",
+      },
+      photos: ["Girls Toilet", "Male Staff Toilet", "Principal Room", "Staff room"].map((l, i) => ({ id: `p${i}`, itemName: "Ceiling Condition i.e. cracks & seepage", locationName: l })),
+    };
+    const opts = { generatedAt: at, loadPhoto: async () => ({ bytes: png, mimeType: "image/png" }) };
+    const bytes = await renderReportPdf(buildReportModel(withCampus), opts);
+    if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-campus.pdf"), bytes);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(10);
+    const minor = await renderMinorReportPdf(buildReportModel(withCampus), opts);
+    expect((await PDFDocument.load(minor)).getPageCount()).toBeGreaterThan(0);
+  });
+
   it("photos: embedded, Unsafe first; a photo that can't load is skipped", async () => {
     // 1x1 red PNG.
     const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));

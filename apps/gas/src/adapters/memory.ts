@@ -230,6 +230,11 @@ export class StaticSchools implements SchoolsPort {
   eCompoundGrid(): string[][] {
     return this.eCompoundRows;
   }
+  /** W81: jobs of the "Last Maintenance" sheet (tests and the dev server set them). */
+  maintenance: Record<string, string>[] = [];
+  maintenanceRows(columns: readonly string[]): Record<string, string>[] {
+    return this.maintenance.map((r) => Object.fromEntries(columns.map((c) => [c, r[c] ?? ''])));
+  }
 }
 
 export interface MemoryEnv extends Env {

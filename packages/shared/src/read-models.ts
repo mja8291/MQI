@@ -72,6 +72,13 @@ export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
   const codeCol = col('ecompound no', 'ecompoundno', 'e-compound no');
   // W68: the units' own School IDs (a different column from the Campus ID used as schoolId).
   const unitIdCol = col('school id', 'schoolid') === idCol ? -1 : col('school id', 'schoolid');
+  // W81: campus details for the report.
+  const clusterCol = col('cluster');
+  const donorCol = col('build donor');
+  const programCol = col('program', 'programme');
+  const subProgramCol = col('sub program', 'sub programme');
+  const yearCol = col('school establishment year', 'built year');
+  const unitTypeCol = col('unit type', 'school type');
   const names = eCompoundNames(eCompoundGrid);
 
   const byId = new Map<string, School>();
@@ -88,18 +95,27 @@ export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
       latitude: cell(latCol),
       longitude: cell(lngCol),
       eCompoundNo: cell(codeCol),
+      cluster: cell(clusterCol),
+      buildDonor: cell(donorCol),
+      program: cell(programCol),
+      subProgram: cell(subProgramCol),
+      establishedYear: cell(yearCol),
     };
+    type TextKey = Exclude<keyof School, 'rmPlanned' | 'schoolIds' | 'otherNames' | 'schoolTypes'>;
     const existing = byId.get(schoolId);
     const unitId = cell(unitIdCol);
+    const unitType = cell(unitTypeCol);
     if (existing) {
       if (unitId && !existing.schoolIds?.includes(unitId)) existing.schoolIds = [...(existing.schoolIds ?? []), unitId];
+      if (unitType && !existing.schoolTypes?.includes(unitType)) existing.schoolTypes = [...(existing.schoolTypes ?? []), unitType];
       // A campus has one row per unit: fill any detail the first unit row left blank.
-      for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned' | 'schoolIds' | 'otherNames'>, string][]) if (v && !existing[k]) existing[k] = v;
+      for (const [k, v] of Object.entries(details) as [TextKey, string][]) if (v && !existing[k]) existing[k] = v;
       continue;
     }
     const school: School = { schoolId, name, region: cell(regionCol), area: cell(areaCol) };
-    for (const [k, v] of Object.entries(details) as [Exclude<keyof School, 'rmPlanned' | 'schoolIds' | 'otherNames'>, string][]) if (v) school[k] = v;
+    for (const [k, v] of Object.entries(details) as [TextKey, string][]) if (v) school[k] = v;
     if (unitId) school.schoolIds = [unitId];
+    if (unitType) school.schoolTypes = [unitType];
     byId.set(schoolId, school);
   }
   for (const school of byId.values()) {
@@ -360,6 +376,8 @@ export function foundSurveyFromRows(surveyId: string, rows: readonly SheetRow[])
   return {
     ...common(surveyId, first),
     rubricVersion: version,
+    // W81: the Campus ID, so the report can show the campus's details from the school list.
+    schoolId: String(first['School ID'] ?? ''),
     conditions: {},
     aggregatedScores: aggregateLocations(locations, groups),
     items: groups,

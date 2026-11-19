@@ -1,6 +1,7 @@
 import { RUBRIC_VERSION, buildReportModel, columnCheckApplies, itemsCovered, surveyPurposeText, withDerivedScores, type ReportSource } from "@mqi/shared";
 
 import { buildReportPdf, phonePhoto } from "./report";
+import { campusFor } from "./campus";
 import { aggregateLocations } from "@/lib/scoring";
 import { RUBRIC_GROUPS } from "@/lib/data/items";
 import type { SurveyState } from "@/lib/survey-context";
@@ -68,7 +69,7 @@ export async function buildDraftExcelBlob(params: DraftExportParams): Promise<Bl
 
   // W67: the report sheets (same model as the PDF), then the formula sheet.
   const { buildReportWorkbook } = await import("./report-xlsx");
-  const wb = buildReportWorkbook(buildReportModel(draftReportSource(params)), {
+  const wb = buildReportWorkbook(buildReportModel({ ...draftReportSource(params), campus: await campusFor(state.school?.schoolId) }), {
     surveyId: state.surveyId ?? "draft",
     campusName: state.school?.name ?? "",
     submittedAt: NOT_SUBMITTED_LABEL,
@@ -157,7 +158,7 @@ function draftReportSource({
 
 export async function buildDraftPdfBlob(params: DraftExportParams): Promise<Blob> {
   // W66: the same campus report as a submitted survey, from the phone's own data (works offline).
-  const bytes = await buildReportPdf(draftReportSource(params), (id) => phonePhoto(id).catch(() => null));
+  const bytes = await buildReportPdf({ ...draftReportSource(params), campus: await campusFor(params.state.school?.schoolId) }, (id) => phonePhoto(id).catch(() => null));
   // pdf-lib's Uint8Array<ArrayBufferLike> doesn't structurally satisfy
   // BlobPart's stricter Uint8Array<ArrayBuffer> under this TS lib version —
   // a runtime no-op, just a type mismatch between two otherwise-identical shapes.

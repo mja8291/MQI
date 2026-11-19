@@ -382,6 +382,18 @@ export interface School {
   schoolIds?: string[];
   /** W73: other names Find school also searches (old name after a rename, other spellings). */
   otherNames?: string[];
+  /**
+   * W81: campus details for the report (v1 school list columns). Kept on the server: schools.list
+   * leaves them out so the phones' saved campus list doesn't grow (campus.details sends one campus's).
+   */
+  cluster?: string;
+  buildDonor?: string;
+  program?: string;
+  subProgram?: string;
+  /** "School Establishment Year". */
+  establishedYear?: string;
+  /** The units' "Unit Type", e.g. ["Primary", "Secondary"]. */
+  schoolTypes?: string[];
 }
 
 export interface RespondentDetails {

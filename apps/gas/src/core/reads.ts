@@ -1,5 +1,5 @@
-import { CAMPUS_ADDITIONS_TAB, applyCampusAdditions, PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
-import type { Condition, DashboardData, ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
+import { MAINTENANCE_COLUMNS, campusDetailsPayload, reportCampus, summarizeMaintenance, CAMPUS_ADDITIONS_TAB, applyCampusAdditions, PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import type { LastMaintenance, ReportCampus, Condition, DashboardData,ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import { Table } from './system';
@@ -58,13 +58,49 @@ function campusAdditions(ctx: Ctx): Record<string, string>[] {
   return ctx.env.responses.readRows(CAMPUS_ADDITIONS_TAB, 2, last - 1).map((cells) => toRow(header, cells));
 }
 
-export function schools(ctx: Ctx): SchoolsResult {
+/**
+ * The campus list with every detail (W81: cluster, build donor, programme, establishment year, unit
+ * types), kept on the server for campus.details and the budget.
+ */
+export function fullSchools(ctx: Ctx): SchoolsResult {
   // 'schools.v3' (W64): the list now marks R&M Plan 2026-27 campuses; 'schools.v4' (W68): each campus
   // carries its units' School IDs. The key change drops lists cached before.
   // 'schools.v5' (W73): renames, other names and added campuses from the App Campus List Additions tab.
-  return cached(ctx.env, 'schools.v5', SCHOOLS_TTL, () => ({
+  // 'schools.full.v1' (W81): with the report-only details.
+  return cached(ctx.env, 'schools.full.v1', SCHOOLS_TTL, () => ({
     schools: markRmPlanned(applyCampusAdditions(parseSchools(ctx.env.schools.grid(), ctx.env.schools.eCompoundGrid()), campusAdditions(ctx)), rmPlannedIds(ctx)),
   }));
+}
+
+/** W81: what phones save for Find school: the report-only details are left out, so the list stays as small as before. */
+export function schools(ctx: Ctx): SchoolsResult {
+  return {
+    schools: fullSchools(ctx).schools.map((s) => {
+      const { cluster: _c, buildDonor: _b, program: _p, subProgram: _s, establishedYear: _e, schoolTypes: _t, ...lean } = s;
+      return lean;
+    }),
+  };
+}
+
+/**
+ * W81: each campus's last maintenance, from the engineering team's job sheet (only its needed columns),
+ * kept for 30 minutes. {} when the sheet can't be read: reports then show no maintenance line.
+ */
+function maintenance(ctx: Ctx): Record<string, LastMaintenance> {
+  return cached(ctx.env, 'maintenance.v1', SCHOOLS_TTL, () => {
+    try {
+      return summarizeMaintenance(ctx.env.schools.maintenanceRows(MAINTENANCE_COLUMNS));
+    } catch (e) {
+      ctx.env.log(`maintenance sheet: ${e instanceof Error ? e.message : String(e)}`);
+      return {};
+    }
+  });
+}
+
+/** W81: one campus's report details (with siblings and last maintenance), when a report is made. */
+export function campusDetails(ctx: Ctx, raw: unknown): { campus: ReportCampus | null } {
+  const { schoolId } = campusDetailsPayload.parse(raw);
+  return { campus: reportCampus(schoolId, fullSchools(ctx).schools, maintenance(ctx)) };
 }
 
 /** v2 (W63): the campus breakup, from the Campus Survey Plan tab (none while the tab is missing or empty). */

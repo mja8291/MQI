@@ -59,6 +59,15 @@ export function applyCampusAdditions(schools: readonly School[], rows: readonly 
       const ids = splitIds(r['School IDs']);
       if (ids.length) school.schoolIds = ids;
       addNames(school, names(r['Other Names']));
+      // W81: a part of an existing campus, given that campus's ID plus a suffix (e.g. "10-S", AES Lal
+      // Pir's secondary building), shares its details (location, cluster, donor, year, programme).
+      const base = id.includes('-') ? byId.get(id.slice(0, id.indexOf('-'))) : undefined;
+      if (base) {
+        for (const k of ['town', 'city', 'address', 'latitude', 'longitude', 'cluster', 'buildDonor', 'program', 'subProgram', 'establishedYear'] as const) {
+          if (base[k] && !school[k]) school[k] = base[k];
+        }
+        if (!school.eCompoundName && base.eCompoundName && base.eCompoundNo === school.eCompoundNo) school.eCompoundName = base.eCompoundName;
+      }
       out.push(school);
       byId.set(id, school);
     }

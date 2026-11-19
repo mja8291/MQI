@@ -53,6 +53,8 @@ export interface SchoolsPort {
   grid(): string[][];
   /** E-Compound names (header row + rows); [] when unavailable — the school list never depends on it. */
   eCompoundGrid(): string[][];
+  /** W81: the "Last Maintenance" job sheet, only these columns (by header), one object per job. */
+  maintenanceRows(columns: readonly string[]): Record<string, string>[];
 }
 
 export interface CachePort {

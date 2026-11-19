@@ -43,6 +43,7 @@ const ROUTES: Record<ActionName, Route> = {
   'admin.users.delete': { handler: auth.deleteUser, permission: 'users' },
   'admin.issuePassword': { handler: auth.issuePassword, permission: 'users' },
   'client.log': { handler: clientLog },
+  'campus.details': { handler: reads.campusDetails, permission: 'surveyDownload' },
   // R&M Budget site (Build 1).
   'budget.state': { handler: (c) => budget.state(c), permission: 'budget' },
   'budget.campuses': { handler: budget.campuses, permission: 'budget' },

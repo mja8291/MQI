@@ -16,6 +16,7 @@ import {
   type MinorLevel,
   UNSAFE_LEVEL_LABEL,
   type PhotoSection,
+  type ReportPhoto,
   PHOTO_SECTIONS,
 } from "@mqi/shared";
 
@@ -57,6 +58,7 @@ const C = {
   white: rgb(1, 1, 1),
   red: hex("#B91C1C"),
   redBg: hex("#FEF2F2"),
+  amber: hex("#B45309"),
   green: hex("#15803D"),
   greenBg: hex("#F0FDF4"),
 };
@@ -104,6 +106,22 @@ function fit(ctx: Ctx, s: string, size: number, max: number, bold = false): stri
   while (t.length > 1 && width(ctx, `${t}…`, size, bold) > max) t = t.slice(0, -1);
   return `${t}…`;
 }
+/**
+ * W81: a photo caption under its photo, centred in the photo's width: the place (bold), the item
+ * (up to two lines), then the rating in colour. Each line is measured in the font it is drawn in, so
+ * nothing runs into the next photo.
+ */
+function photoCaption(p: PDFPage, ctx: Ctx, parts: ReportPhoto["captionParts"], x: number, yTop: number, w: number, size: number, severity: number) {
+  const lh = size + 2.5;
+  const max = w - 4;
+  const lines: { s: string; bold: boolean; color: RGB }[] = [{ s: fit(ctx, parts.place, size, max, true), bold: true, color: C.ink }];
+  const item = wrap(ctx, parts.item, size, max);
+  const itemLines = item.length > 2 ? [item[0]!, fit(ctx, item.slice(1).join(" "), size, max)] : item;
+  for (const l of itemLines) if (l) lines.push({ s: l, bold: false, color: C.soft });
+  if (parts.rating) lines.push({ s: fit(ctx, parts.rating, size, max, true), bold: true, color: severity <= 1 ? C.red : severity === 2 ? C.amber : C.ink });
+  lines.forEach((l, j) => textCenter(p, ctx, l.s, x + w / 2, yTop - (j + 1) * lh, size, { bold: l.bold, color: l.color }));
+}
+
 function wrap(ctx: Ctx, s: string, size: number, max: number, bold = false): string[] {
   const lines: string[] = [];
   let cur = "";
@@ -179,8 +197,21 @@ function summaryPage(ctx: Ctx) {
   y -= 16;
   text(p, ctx, m.header.regionArea, M, y, 11, { color: C.teal, bold: true });
 
-  // Header grid: 4 columns x 3 rows.
-  const fields: [string, string][] = [
+  // Header grid: 4 columns x 6 rows. W81: the campus's details first; Location, Sibling campuses and
+  // the two maintenance fields take two columns each.
+  const cp = m.header.campus;
+  const dash = (s: string | undefined) => (s && s.trim() ? s : "—");
+  const fields: [string, string, number?][] = [
+    ["Location", dash(cp?.location), 2],
+    ["Cluster", dash(cp?.cluster)],
+    ["E-compound no.", dash(cp?.eCompoundNo)],
+    ["Sibling campuses", cp ? (cp.siblings || "None") : "—", 2],
+    ["Build donor", dash(cp?.buildDonor)],
+    ["Build year (established)", dash(cp?.established)],
+    ["Programme · sub programme", dash(cp?.subProgram)],
+    ["School type", dash(cp?.schoolType)],
+    ["Last maintenance", dash(cp?.lastMaintenance), 2],
+    ["Last regular / special work (before the emergency)", cp?.lastRegular ? cp.lastRegular : cp?.lastMaintenance && /emergency/i.test(cp.lastMaintenance) ? "None on record" : "—", 2],
     ["Survey date", m.header.date],
     ["Method", m.header.method],
     ["Items covered", m.header.itemsCovered],
@@ -193,15 +224,20 @@ function summaryPage(ctx: Ctx) {
     ["Rubric", `${m.rubricVersion}${m.submittedRubricVersion !== m.rubricVersion ? ` (submitted under ${m.submittedRubricVersion || "pre-2026-10-27"})` : ""}`],
   ];
   const colW = (W - 2 * M) / 4;
+  const rowH = 21;
+  const rows = 6;
   y -= 10;
-  rect(p, M, y - 3 * 25 - 4, W - 2 * M, 3 * 25 + 4, { fill: C.panel });
-  fields.forEach(([label, value], i) => {
-    const cx = M + 8 + (i % 4) * colW;
-    const cy = y - 11 - Math.floor(i / 4) * 25;
-    text(p, ctx, label.toUpperCase(), cx, cy, 7, { color: C.soft, bold: true });
-    text(p, ctx, fit(ctx, value, 9, colW - 14), cx, cy - 11, 9);
-  });
-  y -= 3 * 25 + 14;
+  rect(p, M, y - rows * rowH - 4, W - 2 * M, rows * rowH + 4, { fill: C.panel });
+  let slot = 0;
+  for (const [label, value, span = 1] of fields) {
+    if ((slot % 4) + span > 4) slot += 4 - (slot % 4);
+    const cx = M + 8 + (slot % 4) * colW;
+    const cy = y - 10 - Math.floor(slot / 4) * rowH;
+    text(p, ctx, label.toUpperCase(), cx, cy, 6.5, { color: C.soft, bold: true });
+    text(p, ctx, fit(ctx, value, 8.5, colW * span - 14), cx, cy - 10, 8.5);
+    slot += span;
+  }
+  y -= rows * rowH + 12;
 
   // Safety banner: first, above the score.
   const alertLines = m.alerts.flatMap((a) => wrap(ctx, a, 9.5, W - 2 * M - 70).map((l, i) => ({ l, first: i === 0 })));
@@ -874,13 +910,13 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
   // then embedded in report order.
   const load = opts.loadPhoto;
   const bytes = await mapPool(m.photos, PHOTO_FETCHES, (ph) => load(ph.id).catch(() => null));
-  const loaded: { img: PDFImage; caption: string; severity: number; section: PhotoSection }[] = [];
+  const loaded: { img: PDFImage; caption: ReportPhoto["captionParts"]; severity: number; section: PhotoSection }[] = [];
   for (const [i, ph] of m.photos.entries()) {
     try {
       const b = bytes[i];
       if (!b) continue;
       const img = /png/i.test(b.mimeType) ? await ctx.doc.embedPng(b.bytes) : /jpe?g/i.test(b.mimeType) ? await ctx.doc.embedJpg(b.bytes) : null;
-      if (img) loaded.push({ img, caption: ph.caption, severity: ph.severity, section: ph.section });
+      if (img) loaded.push({ img, caption: ph.captionParts, severity: ph.severity, section: ph.section });
     } catch {
       // A photo that can't be read is left out; the report still prints (W71: and says so).
     }
@@ -894,7 +930,8 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
   const gap = 14;
   const cw = (W - 2 * M - gap * (cols - 1)) / cols;
   const ih = 150;
-  const cellH = ih + 40;
+  // W81: room for four caption lines (place, item on up to two lines, rating).
+  const cellH = ih + 52;
   // W68: one run of pages per section (Safety, Minor, Major, Site checks), worst ratings first in each.
   for (const { section, title } of PHOTO_SECTIONS) {
     const inSection = loaded.filter((ph) => ph.section === section);
@@ -919,9 +956,7 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
         warning(p, x + 6, yTop - 6.5, 8, C.white, C.red);
         text(p, ctx, tag, x + 12, yTop - 10, 7.5, { bold: true, color: C.white });
       }
-      wrap(ctx, ph.caption, 8, cw)
-        .slice(0, 3)
-        .forEach((l, j) => text(p, ctx, l, x, yTop - ih - 11 - j * 10, 8, { bold: j === 0 }));
+      photoCaption(p, ctx, ph.caption, x, yTop - ih - 1, cw, 8, ph.severity);
     });
     }
   }
@@ -1304,6 +1339,30 @@ export async function renderMinorReportPdf(model: ReportModel, opts: RenderOptio
   text(p, ctx, fit(ctx, model.header.campusName, 20, W - 2 * M, true), M, y, 20, { bold: true, color: C.navy });
   y -= 16;
   text(p, ctx, `${model.header.regionArea} · Survey date ${model.header.date}${model.header.principal && model.header.principal !== "—" ? ` · Principal: ${model.header.principal}` : ""}`, M, y, 10, { color: C.teal, bold: true });
+  // W81: the campus's details, on up to three lines.
+  const cp = model.header.campus;
+  if (cp) {
+    const bits = [
+      cp.location && `Location: ${cp.location}`,
+      cp.cluster && `Cluster: ${cp.cluster}`,
+      cp.eCompoundNo && `E-compound: ${cp.eCompoundNo}`,
+      cp.schoolType && `School type: ${cp.schoolType}`,
+      cp.subProgram && `Programme: ${cp.subProgram}`,
+      cp.buildDonor && `Build donor: ${cp.buildDonor}`,
+      cp.established && `Established: ${cp.established}`,
+      cp.lastMaintenance && `Last maintenance: ${cp.lastMaintenance}`,
+      cp.lastRegular && `Last regular/special work: ${cp.lastRegular}`,
+      cp.siblings && `Sibling campuses: ${cp.siblings}`,
+    ].filter(Boolean) as string[];
+    // Left of the score cards (they start 230 pt from the right edge).
+    const cw = W - 2 * M - 230;
+    const lines = wrap(ctx, bits.join("  ·  "), 8.5, cw);
+    const shown = lines.length > 3 ? [...lines.slice(0, 2), fit(ctx, lines.slice(2).join(" "), 8.5, cw)] : lines;
+    for (const l of shown) {
+      y -= 12;
+      text(p, ctx, l, M, y, 8.5, { color: C.soft });
+    }
+  }
   y -= 22;
   const intro = [
     "Dear Principal,",
@@ -1379,13 +1438,13 @@ export async function renderMinorReportPdf(model: ReportModel, opts: RenderOptio
   if (wanted.length && opts.loadPhoto) {
     const load = opts.loadPhoto;
     const bytes = await mapPool(wanted, PHOTO_FETCHES, (ph) => load(ph.id).catch(() => null));
-    const loaded: { img: PDFImage; caption: string; severity: number }[] = [];
+    const loaded: { img: PDFImage; caption: ReportPhoto["captionParts"]; severity: number }[] = [];
     for (const [i, ph] of wanted.entries()) {
       try {
         const b = bytes[i];
         if (!b) continue;
         const img = /png/i.test(b.mimeType) ? await ctx.doc.embedPng(b.bytes) : /jpe?g/i.test(b.mimeType) ? await ctx.doc.embedJpg(b.bytes) : null;
-        if (img) loaded.push({ img, caption: ph.caption, severity: ph.severity });
+        if (img) loaded.push({ img, caption: ph.captionParts, severity: ph.severity });
       } catch {
         // left out
       }
@@ -1400,7 +1459,7 @@ export async function renderMinorReportPdf(model: ReportModel, opts: RenderOptio
       text(pg, ctx, `${loaded.length} photo${loaded.length === 1 ? "" : "s"}, Very Poor first.`, M, H - BAR - 44, 8.5, { color: C.soft });
       loaded.slice(i, i + cols * 2).forEach((ph, k) => {
         const x = M + (k % cols) * (cw + gap);
-        const yTop = H - BAR - 58 - Math.floor(k / cols) * (ih + 52);
+        const yTop = H - BAR - 58 - Math.floor(k / cols) * (ih + 58);
         const sc = Math.min(cw / ph.img.width, ih / ph.img.height);
         rect(pg, x, yTop - ih, cw, ih, { fill: C.panel });
         pg.drawImage(ph.img, { x: x + (cw - ph.img.width * sc) / 2, y: yTop - ih + (ih - ph.img.height * sc) / 2, width: ph.img.width * sc, height: ph.img.height * sc });
@@ -1410,9 +1469,7 @@ export async function renderMinorReportPdf(model: ReportModel, opts: RenderOptio
         const tag = vpPhoto ? "VERY POOR" : "POOR";
         rect(pg, x, yTop - 13, width(ctx, tag, 7.5, true) + 12, 13, { fill: hex(st.fill) });
         text(pg, ctx, tag, x + 6, yTop - 10, 7.5, { bold: true, color: hex(st.text) });
-        wrap(ctx, ph.caption, 8.5, cw)
-          .slice(0, 3)
-          .forEach((l, j) => text(pg, ctx, l, x, yTop - ih - 12 - j * 11, 8.5, { bold: j === 0 }));
+        photoCaption(pg, ctx, ph.caption, x, yTop - ih - 1, cw, 8.5, ph.severity);
       });
     }
   }

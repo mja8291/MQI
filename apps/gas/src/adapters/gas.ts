@@ -173,6 +173,7 @@ class Responses implements ResponsesPort {
 
 /** The department's E-Compound Spreadsheet (read only); override with ECOMPOUND_SPREADSHEET_ID. */
 const DEFAULT_ECOMPOUND_SPREADSHEET_ID = '1F3e0-nGWeDeSUnlZq6Thqa-wSE9LlXnNFrqlUwMrcfM';
+const DEFAULT_MAINTENANCE_SPREADSHEET_ID = '1EVrG7jv-J2U62yFceb-mc0IV_diZQxD5Y1Cg-t9WIqY';
 
 const schools: SchoolsPort = {
   grid() {
@@ -195,6 +196,18 @@ const schools: SchoolsPort = {
       console.warn('E-Compound Spreadsheet unavailable: ' + String(e));
       return [];
     }
+  },
+  // W81: the engineering team's "Last Maintenance" job sheet; only the asked-for columns are read.
+  maintenanceRows(columns) {
+    const s = SpreadsheetApp.openById(props.get(PROP.MAINTENANCE_SPREADSHEET_ID) || DEFAULT_MAINTENANCE_SPREADSHEET_ID).getSheets()[0];
+    if (!s || s.getLastRow() < 2) return [];
+    const header = s.getRange(1, 1, 1, s.getLastColumn()).getDisplayValues()[0]!.map((h) => h.trim().toLowerCase());
+    const n = s.getLastRow() - 1;
+    const cols = columns.map((c) => {
+      const i = header.indexOf(c.toLowerCase());
+      return i === -1 ? null : s.getRange(2, i + 1, n, 1).getDisplayValues();
+    });
+    return Array.from({ length: n }, (_, r) => Object.fromEntries(columns.map((c, k) => [c, cols[k]?.[r]?.[0] ?? ''])));
   },
 };
 

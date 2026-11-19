@@ -1,7 +1,13 @@
 import { track } from '@/lib/busy';
 import { buildReportModel, reportSourceFromFound } from '@mqi/shared';
-import type { ExportRowsResult, FoundSurvey } from '@mqi/shared';
+import type { ExportRowsResult, FoundSurvey, ReportSource } from '@mqi/shared';
 import { api } from '@/lib/api';
+import { campusFor } from './campus';
+
+/** W81: the report's input with the campus's details from the campus list. */
+async function sourceWithCampus(found: FoundSurvey): Promise<ReportSource> {
+  return { ...reportSourceFromFound(found), campus: await campusFor(found.schoolId) };
+}
 import type { SingleSurveyExportInput } from './single-survey-workbook';
 
 /**
@@ -44,7 +50,7 @@ export function downloadSurveyExcel(surveyId: string): Promise<void> {
   // W70: the working sign stays on while the file is made, not only while the server answers.
   return track(async () => {
     const [found, { buildReportWorkbook }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report-xlsx')]);
-    const buf = await buildReportWorkbook(buildReportModel(reportSourceFromFound(found)), workbookInput(found)).xlsx.writeBuffer();
+    const buf = await buildReportWorkbook(buildReportModel(await sourceWithCampus(found)), workbookInput(found)).xlsx.writeBuffer();
     save(buf, XLSX, `mqi-survey-${surveyId}.xlsx`);
   });
 }
@@ -55,7 +61,7 @@ export function downloadSurveyPdf(surveyId: string): Promise<void> {
   return track(async () => {
     const [found, { buildReportPdf, serverPhoto, reportPhotoLoader }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
     const photos = reportPhotoLoader(serverPhoto);
-    const bytes = await buildReportPdf(reportSourceFromFound(found), photos.load);
+    const bytes = await buildReportPdf(await sourceWithCampus(found), photos.load);
     void photos.logFailures('Campus report');
     save(bytes as BlobPart, 'application/pdf', `mqi-survey-${surveyId}.pdf`);
   });
@@ -89,7 +95,7 @@ export function downloadSurveyMinorPdf(surveyId: string): Promise<void> {
   return track(async () => {
     const [found, { buildMinorReportPdf, serverPhoto, reportPhotoLoader }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report')]);
     const photos = reportPhotoLoader(serverPhoto);
-    const bytes = await buildMinorReportPdf(reportSourceFromFound(found), photos.load);
+    const bytes = await buildMinorReportPdf(await sourceWithCampus(found), photos.load);
     void photos.logFailures('Minor items report');
     const name = found.campusName.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || surveyId;
     save(bytes as BlobPart, 'application/pdf', `mqi-minor-items-${name}.pdf`);
