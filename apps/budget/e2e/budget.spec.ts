@@ -39,25 +39,35 @@ test('R&M Budget: import, cycle, two scenarios, compare and the budget book in t
   await expect(page.getByTestId('total')).toHaveText('5.00');
   const scenarioUrl = page.url();
 
-  // Scenario B: a clone with a different emergency count.
+  // Scenario B: a clone of A (found by its address, not its position: a retry may find earlier
+  // scenarios on the same dev server) with a different emergency count.
+  const sourcePath = new URL(scenarioUrl).pathname;
   await page.getByRole('link', { name: /^FY \d{4}-\d{2}$/ }).click();
   const rows = page.locator('tbody tr').filter({ has: page.getByRole('button', { name: 'Clone' }) });
-  const before = await rows.count();
-  await rows.last().getByRole('button', { name: 'Clone' }).click();
-  await expect(rows).toHaveCount(before + 1);
-  await rows.last().getByRole('link').click();
+  const sourceRow = rows.filter({ has: page.locator(`a[href="${sourcePath}"]`) });
+  await expect(sourceRow).toHaveCount(1);
+  const hrefs = async () => rows.locator('a').evaluateAll((as) => as.map((a) => a.getAttribute('href') ?? ''));
+  const known = new Set(await hrefs());
+  await sourceRow.getByRole('button', { name: 'Clone' }).click();
+  await expect.poll(async () => (await hrefs()).filter((h) => !known.has(h)).length).toBe(1);
+  const clonePath = (await hrefs()).find((h) => !known.has(h))!;
+  expect(clonePath).not.toBe(sourcePath);
+  await page.locator(`a[href="${clonePath}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`${clonePath}$`));
   await page.getByRole('tab', { name: 'Settings' }).click();
   await page.getByLabel('Count of Emergencies').fill('20');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByText('Saved.')).toBeVisible();
-  // The source scenario is unchanged.
+  await page.getByRole('tab', { name: 'Dashboard' }).click();
+  await expect(page.getByTestId('total')).toHaveText('10.00');
+  // The source scenario is unchanged (read back from the server).
   await page.goto(scenarioUrl);
   await expect(page.getByTestId('total')).toHaveText('5.00');
 
   // Compare the two.
   await page.getByRole('link', { name: /^FY \d{4}-\d{2}$/ }).click();
-  await rows.nth(before - 1).getByRole('checkbox').check();
-  await rows.nth(before).getByRole('checkbox').check();
+  await sourceRow.getByRole('checkbox').check();
+  await rows.filter({ has: page.locator(`a[href="${clonePath}"]`) }).getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Compare' }).click();
   const compare = page.getByTestId('compare');
   await expect(compare.locator('tr[data-differs="yes"]').filter({ hasText: 'Emergencies' }).first()).toBeVisible();
