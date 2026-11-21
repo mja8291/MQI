@@ -1,5 +1,5 @@
-import { MAINTENANCE_COLUMNS, campusDetailsPayload, reportCampus, summarizeMaintenance, CAMPUS_ADDITIONS_TAB, applyCampusAdditions, PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
-import type { LastMaintenance, ReportCampus, Condition, DashboardData,ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
+import { campusDetail, campusTracker, MAINTENANCE_COLUMNS, campusDetailsPayload, reportCampus, summarizeMaintenance, CAMPUS_ADDITIONS_TAB, applyCampusAdditions, PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import type { ExportSummaryResult, PlanCampus, LastMaintenance, ReportCampus, Condition, DashboardData,ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import { Table } from './system';
@@ -76,7 +76,7 @@ export function fullSchools(ctx: Ctx): SchoolsResult {
 export function schools(ctx: Ctx): SchoolsResult {
   return {
     schools: fullSchools(ctx).schools.map((s) => {
-      const { cluster: _c, buildDonor: _b, program: _p, subProgram: _s, establishedYear: _e, schoolTypes: _t, ...lean } = s;
+      const { cluster: _c, buildDonor: _b, program: _p, subProgram: _s, establishedYear: _e, schoolTypes: _t, unitIds: _u, ...lean } = s;
       return lean;
     }),
   };
@@ -104,12 +104,31 @@ export function campusDetails(ctx: Ctx, raw: unknown): { campus: ReportCampus | 
 }
 
 /** v2 (W63): the campus breakup, from the Campus Survey Plan tab (none while the tab is missing or empty). */
-function withBreakup(ctx: Ctx, d: DashboardData): DashboardData {
+function planCampuses(ctx: Ctx): PlanCampus[] {
   const header = ctx.env.responses.header(PLAN_TAB);
   const last = ctx.env.responses.lastRow(PLAN_TAB);
-  if (!header || last < 2) return d;
-  const rows = ctx.env.responses.readRows(PLAN_TAB, 2, last - 1).map((cells) => toRow(header, cells));
-  const plan = parsePlan(rows);
+  if (!header || last < 2) return [];
+  return parsePlan(ctx.env.responses.readRows(PLAN_TAB, 2, last - 1).map((cells) => toRow(header, cells)));
+}
+
+/**
+ * W84: the exported workbook's Tracker and Detail sheets, worked out here (the whole responses tab, the
+ * Campus Survey Plan and the full campus list) and kept 5 minutes, so the phone only receives the
+ * finished summary and writes it into the file.
+ */
+export function exportSummary(ctx: Ctx): ExportSummaryResult {
+  return cached(ctx.env, 'export.summary.v1', DASHBOARD_TTL, () => {
+    const header = ctx.env.responses.header(RESPONSES_TAB) ?? [];
+    const last = ctx.env.responses.lastRow(RESPONSES_TAB);
+    const rows = last > 1 ? ctx.env.responses.readRows(RESPONSES_TAB, 2, last - 1).map((cells) => toRow(header, cells)) : [];
+    const plan = planCampuses(ctx);
+    const detail = campusDetail(rows, plan, fullSchools(ctx).schools);
+    return { detail, tracker: campusTracker(detail, plan), generatedAt: ctx.nowIso };
+  });
+}
+
+function withBreakup(ctx: Ctx, d: DashboardData): DashboardData {
+  const plan = planCampuses(ctx);
   return plan.length ? { ...d, breakup: campusBreakup(plan, d.schools, schools(ctx).schools) } : d;
 }
 

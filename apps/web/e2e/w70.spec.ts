@@ -38,5 +38,6 @@ test('W70: drilling needs its hole photo; MIN downloads the principal report', a
   const min = page.getByRole('button', { name: /^Minor items report for OGS Trust Campus/ }).first();
   await expect(min).toHaveText('MIN', { timeout: 20_000 });
   const [download] = await Promise.all([page.waitForEvent('download'), min.click()]);
-  expect(download.suggestedFilename()).toMatch(/^mqi-minor-items-OGS-Trust-Campus.*\.pdf$/);
+  // W84: "Campus - Area - date - Minor items".
+  expect(download.suggestedFilename()).toMatch(/^OGS Trust Campus - Gadap West I - \d{4}-\d{2}-\d{2} - Minor items\.pdf$/);
 });

@@ -76,3 +76,22 @@ describe('W83 one-row writes for photos', () => {
     expect(new Table(port, 'attachmentId').all().map((r) => `${r.attachmentId}:${r.state}`)).toEqual(['a:pending', 'b:done', 'c:pending', 'd:pending']);
   });
 });
+
+describe('W84 export.summary', () => {
+  test('the server works out Tracker and Detail and keeps them', async () => {
+    const { API_VERSION } = await import('@mqi/shared');
+    const { createMemoryEnv } = await import('../adapters/memory');
+    const { DEV_PASSWORD, seedDevEnv } = await import('../dev/server');
+    const { handleRequest } = await import('./router');
+    const env = createMemoryEnv();
+    seedDevEnv(env);
+    const call = (action: string, session?: string) =>
+      handleRequest(env, JSON.stringify({ action, apiVersion: API_VERSION, auth: session ? { session } : undefined, payload: {} })) as unknown as { ok: boolean; data: { detail: { source: string; campus: string; safetyStatus: string }[]; tracker: { totals: { planned: number } } } };
+    const s = (handleRequest(env, JSON.stringify({ action: 'auth.login', apiVersion: API_VERSION, payload: { email: 'reviewer@tcf.test', password: DEV_PASSWORD } })) as unknown as { data: { sessionToken: string } }).data.sessionToken;
+    const r = call('export.summary', s);
+    expect(r.ok).toBe(true);
+    // The dev plan has one campus done without the App (Fazalillahi Campus-I, Unsafe).
+    expect(r.data.detail.find((d) => d.source === 'Done without App' && d.campus === 'Fazalillahi Campus-I')?.safetyStatus).toBe('Unsafe');
+    expect(r.data.tracker.totals.planned).toBe(7);
+  });
+});

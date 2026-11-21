@@ -1,8 +1,15 @@
 import { track } from '@/lib/busy';
 import { buildReportModel, reportSourceFromFound } from '@mqi/shared';
-import type { ExportRowsResult, FoundSurvey, ReportSource } from '@mqi/shared';
+import type { ExportSummaryResult, ExportRowsResult, FoundSurvey, ReportSource } from '@mqi/shared';
 import { api } from '@/lib/api';
 import { campusFor } from './campus';
+
+/** W84: report files are named "Campus - Area - yyyy-mm-dd" (the survey date), not by survey ID. */
+export function reportFileName(found: Pick<FoundSurvey, 'campusName' | 'area' | 'submittedAt' | 'surveyId'>): string {
+  const clean = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+  const date = /^\d{4}-\d{2}-\d{2}/.test(found.submittedAt) ? found.submittedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  return [clean(found.campusName), clean(found.area), date].filter(Boolean).join(' - ') || found.surveyId;
+}
 
 /** W81: the report's input with the campus's details from the campus list. */
 async function sourceWithCampus(found: FoundSurvey): Promise<ReportSource> {
@@ -51,7 +58,7 @@ export function downloadSurveyExcel(surveyId: string): Promise<void> {
   return track(async () => {
     const [found, { buildReportWorkbook }] = await Promise.all([api<FoundSurvey>('surveys.get', { surveyId }), import('./report-xlsx')]);
     const buf = await buildReportWorkbook(buildReportModel(await sourceWithCampus(found)), workbookInput(found)).xlsx.writeBuffer();
-    save(buf, XLSX, `mqi-survey-${surveyId}.xlsx`);
+    save(buf, XLSX, `${reportFileName(found)}.xlsx`);
   });
 }
 
@@ -63,7 +70,7 @@ export function downloadSurveyPdf(surveyId: string): Promise<void> {
     const photos = reportPhotoLoader(serverPhoto);
     const bytes = await buildReportPdf(await sourceWithCampus(found), photos.load);
     void photos.logFailures('Campus report');
-    save(bytes as BlobPart, 'application/pdf', `mqi-survey-${surveyId}.pdf`);
+    save(bytes as BlobPart, 'application/pdf', `${reportFileName(found)}.pdf`);
   });
 }
 
@@ -83,9 +90,15 @@ async function allRows(): Promise<Pick<ExportRowsResult, 'header' | 'rows'>> {
 export function downloadAllResponses(): Promise<void> {
   // W70: the working sign stays on while the file is made, not only while the server answers.
   return track(async () => {
-    const [rows, { buildAllResponsesWorkbook }] = await Promise.all([allRows(), import('./all-responses-workbook')]);
-    const buf = await buildAllResponsesWorkbook(rows).xlsx.writeBuffer();
-    save(buf, XLSX, `mqi-all-responses-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    // W84: Tracker and Detail are worked out on the server; without them (an older server, or busy)
+    // the file still has every response under Descriptive.
+    const [rows, summary, { buildAllResponsesWorkbook }] = await Promise.all([
+      allRows(),
+      api<ExportSummaryResult>('export.summary').catch(() => null),
+      import('./all-responses-workbook'),
+    ]);
+    const buf = await buildAllResponsesWorkbook(rows, summary).xlsx.writeBuffer();
+    save(buf, XLSX, `MQI surveys - Tracker, Detail, Descriptive - ${new Date().toISOString().slice(0, 10)}.xlsx`);
   });
 }
 
@@ -97,7 +110,6 @@ export function downloadSurveyMinorPdf(surveyId: string): Promise<void> {
     const photos = reportPhotoLoader(serverPhoto);
     const bytes = await buildMinorReportPdf(await sourceWithCampus(found), photos.load);
     void photos.logFailures('Minor items report');
-    const name = found.campusName.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '') || surveyId;
-    save(bytes as BlobPart, 'application/pdf', `mqi-minor-items-${name}.pdf`);
+    save(bytes as BlobPart, 'application/pdf', `${reportFileName(found)} - Minor items.pdf`);
   });
 }

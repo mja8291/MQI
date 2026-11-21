@@ -4,6 +4,7 @@ import { ROLES } from './permissions';
 import { attachmentSchema, submittedSurveySchema } from './survey';
 import type { LocationType, RatingBand, RubricItem, School } from './types';
 import type { DrillingCheck, SiteChecks } from './types';
+import type { CampusDetailRow, Tracker } from './export/campus-summary';
 
 /**
  * One Apps Script web-app URL. Every call is POST text/plain (no CORS preflight) with
@@ -323,6 +324,13 @@ export type SchoolsResult = { schools: School[] };
  * v2 (W30): External Development is shared by the campuses of one e-compound. The latest one
  * recorded for a sibling campus pre-fills the next sibling's survey (editable).
  */
+/** W84: export.summary. */
+export interface ExportSummaryResult {
+  detail: CampusDetailRow[];
+  tracker: Tracker;
+  generatedAt: string;
+}
+
 /** W81: campus.details. */
 export const campusDetailsPayload = z.object({ schoolId: z.string().min(1).max(64) });
 
@@ -408,6 +416,8 @@ export const ACTIONS = [
   'client.log',
   // W81: one campus's report details (location, cluster, donor, siblings, last maintenance).
   'campus.details',
+  // W84: the exported workbook's Tracker and Detail sheets, worked out on the server.
+  'export.summary',
   // R&M Budget (Build 1): Cost Manager and Admin only.
   'budget.state',
   'budget.campuses',

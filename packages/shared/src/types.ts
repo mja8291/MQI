@@ -394,6 +394,8 @@ export interface School {
   establishedYear?: string;
   /** The units' "Unit Type", e.g. ["Primary", "Secondary"]. */
   schoolTypes?: string[];
+  /** W84: the units' Unit IDs ("Unit Key" in v1's list), for the export. */
+  unitIds?: string[];
 }
 
 export interface RespondentDetails {

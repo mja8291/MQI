@@ -34,11 +34,16 @@ function syncStatus(p: QueuedSubmission, syncingNow: boolean): { label: string; 
   if (p.status === "failed") return { label: `Couldn't be sent: ${p.lastError?.message ?? "rejected by the server"}`, tone: "warn", needsSignIn: false, failed: true };
   if (syncingNow) return { label: "Syncing…", tone: "info", needsSignIn: false };
   if (p.lastError?.kind === "auth") return { label: "Sign in to sync", tone: "warn", needsSignIn: true };
+  // W84: answers already on the server show on the dashboard; only photos are left. Say so, so a
+  // survey seen on the dashboard and still listed here doesn't look lost.
+  if (p.status === "uploading" && p.lastError?.kind === "server") {
+    return { label: `Answers received (on the dashboard) · photos still uploading: ${p.lastError.message.replace(/^Server error — /, "")}`, tone: "warn", needsSignIn: false };
+  }
   if (p.lastError?.kind === "server") return { label: p.lastError.message, tone: "warn", needsSignIn: false };
   if (p.lastError?.kind === "offline" || (typeof navigator !== "undefined" && !navigator.onLine)) {
     return { label: "Waiting for a connection", tone: "muted", needsSignIn: false };
   }
-  if (p.status === "uploading") return { label: "On the server · uploading photos", tone: "muted", needsSignIn: false };
+  if (p.status === "uploading") return { label: "Answers received (on the dashboard) · uploading photos", tone: "muted", needsSignIn: false };
   return { label: "Waiting to sync", tone: "muted", needsSignIn: false };
 }
 

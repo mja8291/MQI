@@ -45,6 +45,7 @@ const ROUTES: Record<ActionName, Route> = {
   'admin.issuePassword': { handler: auth.issuePassword, permission: 'users' },
   'client.log': { handler: clientLog },
   'campus.details': { handler: reads.campusDetails, permission: 'surveyDownload' },
+  'export.summary': { handler: (c) => reads.exportSummary(c), permission: 'exportAll' },
   // R&M Budget site (Build 1). W82: each under the lock: saves check-then-write (names, newer saves), and
   // the first use creates the budget spreadsheet and its tabs, which two requests must not both do.
   'budget.state': { handler: (c) => withLock(c, () => budget.state(c)), permission: 'budget' },

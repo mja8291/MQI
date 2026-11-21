@@ -57,10 +57,12 @@ function sanitizeFilenamePart(s: string): string {
   return s.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "draft";
 }
 
+/** W84: "Campus - Area - yyyy-mm-dd - Draft", like the submitted reports. */
 export function draftExportFilenameBase(state: SurveyState): string {
-  const school = sanitizeFilenamePart(state.school?.name ?? "survey");
+  const clean = (s: string) => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
   const date = new Date().toISOString().slice(0, 10);
-  return `mqi-draft-${school}-${date}`;
+  const parts = [clean(state.school?.name ?? ""), clean(state.school?.area ?? ""), date].filter(Boolean);
+  return parts.length > 1 ? `${parts.join(" - ")} - Draft` : `${sanitizeFilenamePart(state.school?.name ?? "survey")}-${date}-Draft`;
 }
 
 export async function buildDraftExcelBlob(params: DraftExportParams): Promise<Blob> {

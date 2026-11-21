@@ -41,6 +41,7 @@ export default function DashboardPage() {
   // W71: search the campus list by name, campus ID, area, region or surveyor.
   const [query, setQuery] = useState("");
   const [exportingAll, setExportingAll] = useState(false);
+  const [stale, setStale] = useState(false);
 
   useEffect(() => {
     // Last copy first (works offline, as v1's cached /api/dashboard did), then the server's.
@@ -48,10 +49,12 @@ export default function DashboardPage() {
     api<DashboardData>("dashboard.get")
       .then((fresh) => {
         setData(fresh);
+        setStale(false);
         void setMeta("dashboard", fresh);
       })
       .catch((e: unknown) => {
         if (isAuthError(e)) notifyAuthRequired(); // signed out or no longer approved — the app sends them to sign in
+        else setStale(true);
       });
   }, []);
 
@@ -105,6 +108,12 @@ export default function DashboardPage() {
         <p className="text-sm text-ink-faint">Loading…</p>
       ) : (
         <>
+          {/* W84: the saved copy is shown while the server is asked; say so when it couldn't be refreshed. */}
+          {stale ? (
+            <p role="alert" data-testid="dashboard-stale" className="mb-3 rounded-lg border border-band-average bg-band-average-tint px-3 py-2 text-[12px] font-semibold text-band-average">
+              Showing the copy saved on this phone{data.generatedAt ? ` (${new Date(data.generatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })})` : ""}. The latest figures could not be loaded: check the connection and open the dashboard again.
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <span className="text-[11.5px] text-ink-faint">
               {data.generatedAt

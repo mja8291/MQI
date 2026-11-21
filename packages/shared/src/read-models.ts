@@ -79,6 +79,7 @@ export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
   const subProgramCol = col('sub program', 'sub programme');
   const yearCol = col('school establishment year', 'built year');
   const unitTypeCol = col('unit type', 'school type');
+  const unitKeyCol = col('unit key', 'unit id');
   const names = eCompoundNames(eCompoundGrid);
 
   const byId = new Map<string, School>();
@@ -101,13 +102,15 @@ export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
       subProgram: cell(subProgramCol),
       establishedYear: cell(yearCol),
     };
-    type TextKey = Exclude<keyof School, 'rmPlanned' | 'schoolIds' | 'otherNames' | 'schoolTypes'>;
+    type TextKey = Exclude<keyof School, 'rmPlanned' | 'schoolIds' | 'otherNames' | 'schoolTypes' | 'unitIds'>;
+    const unitKey = cell(unitKeyCol);
     const existing = byId.get(schoolId);
     const unitId = cell(unitIdCol);
     const unitType = cell(unitTypeCol);
     if (existing) {
       if (unitId && !existing.schoolIds?.includes(unitId)) existing.schoolIds = [...(existing.schoolIds ?? []), unitId];
       if (unitType && !existing.schoolTypes?.includes(unitType)) existing.schoolTypes = [...(existing.schoolTypes ?? []), unitType];
+      if (unitKey && !existing.unitIds?.includes(unitKey)) existing.unitIds = [...(existing.unitIds ?? []), unitKey];
       // A campus has one row per unit: fill any detail the first unit row left blank.
       for (const [k, v] of Object.entries(details) as [TextKey, string][]) if (v && !existing[k]) existing[k] = v;
       continue;
@@ -116,6 +119,7 @@ export function parseSchools(grid: Grid, eCompoundGrid: Grid = []): School[] {
     for (const [k, v] of Object.entries(details) as [TextKey, string][]) if (v) school[k] = v;
     if (unitId) school.schoolIds = [unitId];
     if (unitType) school.schoolTypes = [unitType];
+    if (unitKey) school.unitIds = [unitKey];
     byId.set(schoolId, school);
   }
   for (const school of byId.values()) {

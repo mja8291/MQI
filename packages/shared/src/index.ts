@@ -27,3 +27,4 @@ export * from './campus-additions';
 export * from './safety-levels';
 export * from './budget';
 export * from './campus-maintenance';
+export * from './export/campus-summary';
