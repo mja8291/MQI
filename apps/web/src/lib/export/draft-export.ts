@@ -155,6 +155,12 @@ function draftReportSource({
       ),
       ...Object.entries(state.reviewPhotos).flatMap(([itemName, assets]) => assets.map((a) => ({ id: a.id, itemName, locationName: "" }))),
     ],
+    // W86: notes per item and location, printed with the photos.
+    notes: state.scoring.locations.flatMap((l) =>
+      Object.entries(l.notes ?? {})
+        .filter(([, note]) => String(note).trim())
+        .map(([itemName, note]) => ({ itemName, locationName: l.name, note: String(note) })),
+    ),
   };
 }
 

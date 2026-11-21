@@ -85,6 +85,8 @@ export interface ReportSource {
   photos: ReportPhotoInput[];
   /** W81: the campus's details from the school list (see reportCampus); absent when the list isn't at hand. */
   campus?: ReportCampus | null;
+  /** W86: the surveyor's notes per item and location, printed with that item's photos. */
+  notes?: { itemName: string; locationName: string; note: string }[];
 }
 
 /** W81: campus details shown at the top of the report. Every field is display text ("" when unknown). */
@@ -246,7 +248,7 @@ export interface ReportPhoto {
   id: string;
   caption: string;
   /** W81: the caption in parts, so the PDF can lay it out: where, what, and the rating. */
-  captionParts: { place: string; item: string; rating: string };
+  captionParts: { place: string; item: string; rating: string; note?: string };
   locationName: string;
   itemName: string;
   /** 0 Unsafe, 1 Very Poor, 2 Poor, 3 other ratings, 4 last-page questions. */
@@ -633,6 +635,9 @@ export function buildReportModel(src: ReportSource): ReportModel {
 
   // ---- photos ----
   const locByName = new Map(ordered.map((l) => [l.name, l]));
+  // W86: notes by item and location ("" for the last page's questions).
+  const noteMap = new Map((src.notes ?? []).map((n) => [`${n.itemName}\u0000${n.locationName}`, n.note.trim()]));
+  const noteFor = (itemName: string, locationName: string) => noteMap.get(`${itemName}\u0000${locationName}`) ?? "";
   const photos: ReportPhoto[] = src.photos
     .map((p) => {
       const loc = p.locationName ? locByName.get(p.locationName) : undefined;
@@ -665,7 +670,13 @@ export function buildReportModel(src: ReportSource): ReportModel {
         severity,
         section,
         caption: [loc ? locationPlace(loc) : p.locationName || "Site checks", item, rating].filter(Boolean).join(" · "),
-        captionParts: { place: loc ? locationPlace(loc) : p.locationName || "Site checks", item: item ?? "", rating: rating ?? "" },
+        captionParts: {
+          place: loc ? locationPlace(loc) : p.locationName || "Site checks",
+          item: item ?? "",
+          rating: rating ?? "",
+          // W86: the surveyor's note on this item at this location, when there is one.
+          ...(noteFor(p.itemName, p.locationName) ? { note: noteFor(p.itemName, p.locationName) } : {}),
+        },
       };
     })
     .sort((a, b) => sectionIndex(a.section) - sectionIndex(b.section) || a.severity - b.severity || naturalCompare(a.caption, b.caption));
@@ -855,5 +866,6 @@ export function reportSourceFromFound(found: FoundSurvey): ReportSource {
       };
     }),
     photos: (found.photos ?? []).map((p) => ({ id: p.attachmentId, itemName: p.itemName, locationName: p.locationName })),
+    notes: found.notes ?? [],
   };
 }

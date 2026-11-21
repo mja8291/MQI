@@ -1,4 +1,4 @@
-import { campusDetail, campusTracker, MAINTENANCE_COLUMNS, campusDetailsPayload, reportCampus, summarizeMaintenance, CAMPUS_ADDITIONS_TAB, applyCampusAdditions, PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
+import { ATTACHMENTS_TAB, campusDetail, campusTracker, MAINTENANCE_COLUMNS, campusDetailsPayload, reportCampus, summarizeMaintenance, CAMPUS_ADDITIONS_TAB, applyCampusAdditions, PLAN_TAB, RM_PLAN_TAB, campusBreakup, markRmPlanned, parsePlan, rmPlanIds, RESPONSES_TAB, SHARED_LOCATION_TYPES, cellCondition, isUnsafe, migrateLocationType, rubricGroupsForLocation, siblingExternalPayload, buildDashboard, DASHBOARD_COLUMNS, exportRowsPayload, foundSurveyFromRows, parseSchools, surveyGetPayload } from '@mqi/shared';
 import type { ExportSummaryResult, PlanCampus, LastMaintenance, ReportCampus, Condition, DashboardData,ExportRowsResult, FoundSurvey, LocationType, SchoolsResult, SharedLocation, SiblingExternalResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
@@ -149,7 +149,11 @@ export function surveyGet(ctx: Ctx, raw: unknown): FoundSurvey {
     .all()
     .filter((f) => f.surveyId === surveyId && f.driveFileId)
     .map((f) => ({ attachmentId: f.attachmentId ?? '', itemName: f.itemName ?? '', locationName: f.locationName ?? '' }));
-  return { ...found, photos };
+  // W86: the surveyor's notes (attachments rows with a Note), shown with the photos in the report.
+  const notes = rowsAt(ctx.env, ATTACHMENTS_TAB, findRows(ctx.env, ATTACHMENTS_TAB, 'Survey ID', ids))
+    .filter((r) => (r['Note'] ?? '').trim())
+    .map((r) => ({ itemName: r['Item Name'] ?? '', locationName: r['Location Name'] ?? '', note: (r['Note'] ?? '').trim() }));
+  return { ...found, photos, notes };
 }
 
 export function exportRows(ctx: Ctx, raw: unknown): ExportRowsResult {

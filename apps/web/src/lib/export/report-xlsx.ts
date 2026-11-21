@@ -440,9 +440,9 @@ function structuralSheet(wb: ExcelJS.Workbook, m: ReportModel) {
 function photosSheet(wb: ExcelJS.Workbook, m: ReportModel) {
   if (!m.photos.length) return;
   const ws = wb.addWorksheet("Photos", { views: [{ state: "frozen", ySplit: 3 }] });
-  ws.columns = [{ width: 6 }, { width: 26 }, { width: 44 }, { width: 60 }, { width: 40 }];
-  title(ws, `Photo evidence (${m.photos.length})`, "Photos are in the PDF report and in the survey's Drive folder. Grouped Safety, Minor (*), Major, Site checks; Unsafe and Very Poor first in each.", 5);
-  headerRow(ws, 3, ["#", "Location", "Item", "Caption", "Section"]);
+  ws.columns = [{ width: 6 }, { width: 26 }, { width: 44 }, { width: 60 }, { width: 40 }, { width: 50 }];
+  title(ws, `Photo evidence (${m.photos.length})`, "Photos are in the PDF report and in the survey's Drive folder. Grouped Safety, Minor (*), Major, Site checks; Unsafe and Very Poor first in each.", 6);
+  headerRow(ws, 3, ["#", "Location", "Item", "Caption", "Section", "Note"]);
   m.photos.forEach((p, i) => {
     const row = ws.getRow(4 + i);
     row.getCell(1).value = i + 1;
@@ -450,8 +450,9 @@ function photosSheet(wb: ExcelJS.Workbook, m: ReportModel) {
     row.getCell(3).value = p.itemName;
     row.getCell(4).value = p.caption;
     row.getCell(5).value = PHOTO_SECTIONS.find((x) => x.section === p.section)?.title ?? "";
-    if (p.severity <= 1) for (let k = 1; k <= 5; k++) row.getCell(k).font = { bold: true, color: { argb: argb(REPORT_CATEGORY_COLOR.Safety) } };
-    for (let k = 1; k <= 5; k++) row.getCell(k).border = thin;
+    row.getCell(6).value = p.captionParts.note ?? ""; // W86
+    if (p.severity <= 1) for (let k = 1; k <= 6; k++) row.getCell(k).font = { bold: true, color: { argb: argb(REPORT_CATEGORY_COLOR.Safety) } };
+    for (let k = 1; k <= 6; k++) row.getCell(k).border = thin;
   });
 }
 

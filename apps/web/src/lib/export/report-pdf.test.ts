@@ -148,3 +148,35 @@ describe("W70 principal's minor-items report", () => {
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
   });
 });
+
+describe("W86 report PDF", () => {
+  const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+
+  it("a long list of safety alerts no longer pushes the speedometer up: the rest go on a page of their own", async () => {
+    const plain = buildReportModel(source);
+    const pagesBefore = (await PDFDocument.load(await renderReportPdf(plain, { generatedAt: at }))).getPageCount();
+    const many = { ...plain, alerts: Array.from({ length: 14 }, (_, i) => `Unsafe: Class ${i + 1} A (Ground) · Concrete/Plaster Soundness (Soundness beam) and Ceiling Condition i.e. cracks & seepage`) };
+    const bytes = await renderReportPdf(many, { generatedAt: at });
+    if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-alerts.pdf"), bytes);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(pagesBefore + 1);
+  });
+
+  it("a photo's caption carries the surveyor's note for that item and place", async () => {
+    const withNotes: ReportSource = {
+      ...source,
+      photos: [
+        { id: "a", itemName: "Ceiling Condition i.e. cracks & seepage", locationName: "Principal Room" },
+        { id: "b", itemName: "Paint", locationName: "KG A" },
+      ],
+      notes: [{ itemName: "Ceiling Condition i.e. cracks & seepage", locationName: "Principal Room", note: "Seepage near the fan hook after rain." }],
+    };
+    const m = buildReportModel(withNotes);
+    expect(m.photos.find((p) => p.id === "a")?.captionParts.note).toBe("Seepage near the fan hook after rain.");
+    expect(m.photos.find((p) => p.id === "b")?.captionParts.note).toBeUndefined();
+    const opts = { generatedAt: at, loadPhoto: async () => ({ bytes: png, mimeType: "image/png" }) };
+    const bytes = await renderReportPdf(m, opts);
+    if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-notes.pdf"), bytes);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(10);
+    expect((await PDFDocument.load(await renderMinorReportPdf(m, opts))).getPageCount()).toBeGreaterThan(0);
+  });
+});

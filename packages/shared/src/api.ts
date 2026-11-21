@@ -198,6 +198,8 @@ export interface FoundSurvey {
     schmidtAvailable?: string;
     schmidtReading?: string;
   }[];
+  /** W86: the surveyor's notes per item and location (attachments tab), for the report's photo captions. */
+  notes?: { itemName: string; locationName: string; note: string }[];
   /** v2 (W54): the survey's uploaded photos, for My assessments to load one by one (files.get). */
   photos?: { attachmentId: string; itemName: string; locationName: string }[];
 }

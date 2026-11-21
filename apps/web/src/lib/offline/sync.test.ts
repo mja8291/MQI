@@ -301,6 +301,18 @@ describe('sync engine', () => {
     expect(await db.sent.get(first.id)).toBeTruthy();
   });
 
+  test('W86: when the phone refuses to read a saved photo one way, another way is tried and the photo still goes', async () => {
+    const s = await makeQueued({ photoBytes: 1500 });
+    const spy = vi.spyOn(Blob.prototype, 'arrayBuffer').mockRejectedValue(new DOMException('The I/O read operation failed.', 'NotReadableError'));
+    try {
+      await flushPendingSubmissions();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await db.sent.get(s.id)).toBeTruthy();
+    expect(photoRows(s.id)).toHaveLength(1);
+  });
+
   test('W54: a confirmed survey frees the phone; photos not yet sent are never removed', async () => {
     const sent = await makeQueued({ photoBytes: 3000 });
     await flushPendingSubmissions();

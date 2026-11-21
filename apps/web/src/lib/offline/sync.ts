@@ -133,6 +133,42 @@ async function pushSurveys(force: boolean): Promise<boolean> {
   return true;
 }
 
+/** W86: the photo's saved file could not be read on this phone (its bytes are still listed). */
+export class PhotoReadError extends Error {
+  constructor(readonly reason: unknown) {
+    super(`This phone could not read a saved photo (${reason instanceof Error ? `${reason.name}: ${reason.message}` : String(reason)})`);
+    this.name = 'PhotoReadError';
+  }
+}
+
+/**
+ * W86: one chunk of a saved photo. iPhones (WebKit) sometimes refuse Blob.arrayBuffer() on a photo
+ * kept in IndexedDB after the app was closed; FileReader and Response read the same file another way.
+ */
+async function readPart(blob: Blob, start: number, end: number): Promise<Uint8Array> {
+  const part = blob.slice(start, end);
+  const attempts: (() => Promise<ArrayBuffer>)[] = [
+    () => part.arrayBuffer(),
+    () =>
+      new Promise<ArrayBuffer>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result as ArrayBuffer);
+        r.onerror = () => reject(r.error ?? new Error('FileReader failed'));
+        r.readAsArrayBuffer(part);
+      }),
+    () => new Response(part).arrayBuffer(),
+  ];
+  let first: unknown;
+  for (const read of attempts) {
+    try {
+      return new Uint8Array(await read());
+    } catch (e) {
+      first ??= e;
+    }
+  }
+  throw new PhotoReadError(first);
+}
+
 /**
  * Sends one photo; 'missing' when its bytes are no longer on the phone (W48). Full-size bytes are
  * only ever evicted after the server confirmed the photo, so an evicted photo is already done.
@@ -151,7 +187,7 @@ async function uploadPhoto(attachmentId: string): Promise<UploadResult | 'missin
     // server stored every chunk otherwise sends nothing and never learns the photo is done; the
     // server answers a repeated chunk from its ledger.
     if (fresh.uploadedChunks.includes(i) && !(i === count - 1 && last === null)) continue;
-    const part = new Uint8Array(await fresh.blob.slice(i * UPLOAD_CHUNK_BYTES, (i + 1) * UPLOAD_CHUNK_BYTES).arrayBuffer());
+    const part = await readPart(fresh.blob, i * UPLOAD_CHUNK_BYTES, (i + 1) * UPLOAD_CHUNK_BYTES);
     try {
       last = await api<UploadResult>('files.upload', { attachmentId, chunkIndex: i, chunkCount: count, totalSize: p.size, data: base64Encode(part), sha256: bytesToHex(sha256(part)) });
     } catch (e) {
@@ -191,8 +227,21 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
   const dueIds = new Set((await due('uploading', force)).map((s) => s.id));
   const entries = await db.outbox.orderBy('seq').filter((e) => e.kind === 'photo' && dueIds.has(e.surveyId)).toArray();
   const blocked = new Set<string>();
+  const unreadable = new Map<string, number>();
+  const reported = new Set<string>();
   let next = 0;
   let stopped = false;
+
+  /** W86: one line in the server's ErrorLog per stuck survey per run: what failed, on which photo. */
+  function reportStuck(entry: (typeof entries)[number], e: unknown) {
+    if (reported.has(entry.surveyId)) return;
+    reported.add(entry.surveyId);
+    const what = e instanceof ApiCallError ? `${e.code}: ${e.message}` : e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent.replace(/\s+/g, ' ').slice(0, 160) : '';
+    void import('@/lib/observability')
+      .then(({ reportError }) => reportError(new Error(`Photo upload stuck — survey ${entry.surveyId.slice(0, 8)}, photo ${String(entry.attachmentId).slice(0, 8)}: ${what} · ${ua}`), 'warn'))
+      .catch(() => undefined);
+  }
 
   async function worker(): Promise<void> {
     while (!stopped) {
@@ -245,6 +294,20 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
         if (kindOf(e) === 'offline' || isAuthError(e)) {
           stopped = true;
           return;
+        }
+        // W86: say what went wrong (once per survey per run), so a stuck queue can be diagnosed.
+        reportStuck(entry, e);
+        if (e instanceof PhotoReadError) {
+          // W86: this photo can't be read on this phone; the survey's other photos still go.
+          unreadable.set(entry.surveyId, (unreadable.get(entry.surveyId) ?? 0) + 1);
+          await db.surveys.update(entry.surveyId, {
+            lastError: {
+              kind: 'server',
+              message: `${unreadable.get(entry.surveyId)} photo(s) could not be read on this phone; the others keep uploading. Keep the App installed and tell the QA/QC team`,
+            },
+          });
+          notifyChanged();
+          continue;
         }
         // v2 (W15): any other photo trouble stays with its own survey — it waits out its backoff
         // (transient) or shows Retry (permanent) — and every other survey's photos carry on.

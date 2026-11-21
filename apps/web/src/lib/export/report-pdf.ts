@@ -119,6 +119,12 @@ function photoCaption(p: PDFPage, ctx: Ctx, parts: ReportPhoto["captionParts"], 
   const itemLines = item.length > 2 ? [item[0]!, fit(ctx, item.slice(1).join(" "), size, max)] : item;
   for (const l of itemLines) if (l) lines.push({ s: l, bold: false, color: C.soft });
   if (parts.rating) lines.push({ s: fit(ctx, parts.rating, size, max, true), bold: true, color: severity <= 1 ? C.red : severity === 2 ? C.amber : C.ink });
+  // W86: the surveyor's note on this item, up to two lines.
+  if (parts.note) {
+    const note = wrap(ctx, `Note: ${parts.note}`, size, max);
+    const noteLines = note.length > 2 ? [note[0]!, fit(ctx, note.slice(1).join(" "), size, max)] : note;
+    for (const l of noteLines) lines.push({ s: l, bold: false, color: C.teal });
+  }
   lines.forEach((l, j) => textCenter(p, ctx, l.s, x + w / 2, yTop - (j + 1) * lh, size, { bold: l.bold, color: l.color }));
 }
 
@@ -240,7 +246,16 @@ function summaryPage(ctx: Ctx) {
   y -= rows * rowH + 12;
 
   // Safety banner: first, above the score.
-  const alertLines = m.alerts.flatMap((a) => wrap(ctx, a, 9.5, W - 2 * M - 70).map((l, i) => ({ l, first: i === 0 })));
+  // W86: the banner takes only the room the speedometer leaves (it used to be pushed up into a long
+  // banner); further alerts are listed in full on the next page.
+  const r = 92;
+  const GAUGE_BLOCK = r + 28 + 64 + 8; // threshold labels above the arc, score and band text below
+  const allLines = m.alerts.flatMap((a) => wrap(ctx, a, 9.5, W - 2 * M - 70).map((l, i) => ({ l, first: i === 0 })));
+  const maxLines = Math.max(2, Math.floor((y - 16 - GAUGE_BLOCK - FOOT - 30) / 13));
+  const overflow = allLines.length > maxLines;
+  const alertLines = overflow
+    ? [...allLines.slice(0, maxLines - 1), { l: `… ${m.alerts.length - allLines.slice(0, maxLines - 1).filter((x) => x.first).length} more: every alert is listed on the next page.`, first: false }]
+    : allLines;
   const bh = m.alerts.length ? 30 + alertLines.length * 13 : 30;
   const red = m.alerts.length > 0;
   rect(p, M, y - bh, W - 2 * M, bh, { fill: red ? C.redBg : C.greenBg, border: red ? C.red : C.green, bw: 1 });
@@ -263,10 +278,9 @@ function summaryPage(ctx: Ctx) {
   }
   y -= bh + 16;
 
-  // Gauge (left) and category cards (right).
+  // Gauge (left) and category cards (right): always below the banner (W86).
   const gcx = M + 150;
-  const r = 92;
-  const gcy = Math.max(y - r - 18, FOOT + 120);
+  const gcy = Math.max(y - r - 28, FOOT + 72);
   gauge(p, ctx, gcx, gcy, r, m.overall.score, m.overall.band);
 
   const cardX = M + 320;
@@ -299,6 +313,34 @@ function summaryPage(ctx: Ctx) {
       ny -= 14;
     }
     ny -= 3;
+  }
+  if (overflow) alertsPage(ctx);
+}
+
+/** W86: every safety alert in full, when the summary banner had no room for them all. */
+function alertsPage(ctx: Ctx) {
+  const m = ctx.model;
+  let p = newPage(ctx, "Safety alerts");
+  let y = H - BAR - 26;
+  const head = () => {
+    const level = m.safetyLevel ? `${UNSAFE_LEVEL_LABEL[m.safetyLevel].toUpperCase()} — ` : "";
+    text(p, ctx, `${level}SAFETY ALERTS (${m.alerts.length})`, M, y, 13, { bold: true, color: C.red });
+    y -= 22;
+  };
+  head();
+  for (const a of m.alerts) {
+    const lines = wrap(ctx, a, 10, W - 2 * M - 20);
+    if (y - lines.length * 14 < FOOT + 8) {
+      p = newPage(ctx, "Safety alerts (continued)");
+      y = H - BAR - 26;
+      head();
+    }
+    p.drawCircle({ x: M + 6, y: y + 3, size: 2, color: C.red });
+    for (const l of lines) {
+      text(p, ctx, l, M + 16, y, 10);
+      y -= 14;
+    }
+    y -= 4;
   }
 }
 
@@ -931,7 +973,8 @@ async function photoPages(ctx: Ctx, opts: RenderOptions) {
   const cw = (W - 2 * M - gap * (cols - 1)) / cols;
   const ih = 150;
   // W81: room for four caption lines (place, item on up to two lines, rating).
-  const cellH = ih + 52;
+  // W86: and up to two note lines.
+  const cellH = ih + 74;
   // W68: one run of pages per section (Safety, Minor, Major, Site checks), worst ratings first in each.
   for (const { section, title } of PHOTO_SECTIONS) {
     const inSection = loaded.filter((ph) => ph.section === section);
@@ -1452,14 +1495,14 @@ export async function renderMinorReportPdf(model: ReportModel, opts: RenderOptio
     const cols = 3;
     const gap = 16;
     const cw = (W - 2 * M - gap * (cols - 1)) / cols;
-    const ih = 170;
+    const ih = 158;
     for (let i = 0; i < loaded.length; i += cols * 2) {
       const pg = page();
       text(pg, ctx, "Photos of these items", M, H - BAR - 30, 15, { bold: true, color: C.navy });
       text(pg, ctx, `${loaded.length} photo${loaded.length === 1 ? "" : "s"}, Very Poor first.`, M, H - BAR - 44, 8.5, { color: C.soft });
       loaded.slice(i, i + cols * 2).forEach((ph, k) => {
         const x = M + (k % cols) * (cw + gap);
-        const yTop = H - BAR - 58 - Math.floor(k / cols) * (ih + 58);
+        const yTop = H - BAR - 58 - Math.floor(k / cols) * (ih + 82);
         const sc = Math.min(cw / ph.img.width, ih / ph.img.height);
         rect(pg, x, yTop - ih, cw, ih, { fill: C.panel });
         pg.drawImage(ph.img, { x: x + (cw - ph.img.width * sc) / 2, y: yTop - ih + (ih - ph.img.height * sc) / 2, width: ph.img.width * sc, height: ph.img.height * sc });
