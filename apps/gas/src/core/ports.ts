@@ -21,6 +21,8 @@ export interface TablePort {
   removeRow(row: number): void;
   /** W76: the row whose cell in this column (1-based) is exactly `value`, below the header; 0 if none. */
   findRow(column: number, value: string): number;
+  /** W83: one column's cells (1-based column), numRows from startRow. */
+  readColumn(column: number, startRow: number, numRows: number): string[];
 }
 
 export interface SystemDbPort {

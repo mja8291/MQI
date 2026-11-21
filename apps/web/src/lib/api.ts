@@ -15,7 +15,8 @@ export const UPGRADE_EVENT = 'mqi-upgrade-required';
 /** A failed call: either a server error code, or NETWORK when no answer came back. */
 export class ApiCallError extends Error {
   constructor(
-    readonly code: ErrorCode | 'NETWORK',
+    /** NETWORK: no connection. TIMEOUT (W83): connected, but no usable answer in time. */
+    readonly code: ErrorCode | 'NETWORK' | 'TIMEOUT',
     message: string,
     readonly details?: unknown,
   ) {
@@ -26,6 +27,8 @@ export class ApiCallError extends Error {
 
 /** One bar of signal can "connect" and then never answer: a slow answer counts as none. */
 const TIMEOUT_MS = 45_000;
+/** W83: sending a whole survey (answers, and the list of its photos) may take longer on a busy server. */
+const SLOW_ACTIONS: Record<string, number> = { 'sync.push': 90_000 };
 
 export async function rawCall<T>(action: string, payload: unknown, session?: string | null): Promise<ApiResponse<T>> {
   // W70: the working sign is on while the server is being asked.
@@ -34,7 +37,7 @@ export async function rawCall<T>(action: string, payload: unknown, session?: str
 
 async function rawCallOnce<T>(action: string, payload: unknown, session?: string | null): Promise<ApiResponse<T>> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), SLOW_ACTIONS[action] ?? TIMEOUT_MS);
   try {
     const res = await fetch(API_URL, {
       method: 'POST',
@@ -44,10 +47,14 @@ async function rawCallOnce<T>(action: string, payload: unknown, session?: string
       cache: 'no-store',
       redirect: 'follow',
     });
-    if (!res.ok) throw new ApiCallError('NETWORK', `HTTP ${res.status}`);
+    // W83: the connection works but the server answered with an error page (busy): not "offline".
+    if (!res.ok) throw new ApiCallError('TIMEOUT', `The server is busy (HTTP ${res.status}); it will be tried again.`);
     return (await res.json()) as ApiResponse<T>;
   } catch (e) {
     if (e instanceof ApiCallError) throw e;
+    // W83: no answer within the time limit is a slow server or a weak line, not a lost connection:
+    // the sync engine retries that survey and carries on with the others instead of stopping.
+    if (controller.signal.aborted) throw new ApiCallError('TIMEOUT', 'The server took too long to answer; it will be tried again.');
     throw new ApiCallError('NETWORK', 'No connection');
   } finally {
     clearTimeout(timer);

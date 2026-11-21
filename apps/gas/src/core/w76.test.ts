@@ -46,3 +46,33 @@ describe('W81 campus.details', () => {
     expect(list.some((x) => 'cluster' in x || 'buildDonor' in x || 'schoolTypes' in x)).toBe(false);
   });
 });
+
+describe('W83 one-row writes for photos', () => {
+  test('patch changes one row without loading the tab; keys reads only the key column; insertMany is one write', () => {
+    const db = new MemorySystemDb();
+    const port = db.createTable('Files', ['attachmentId', 'state', 'updatedAt']);
+    port.append([
+      ['a', 'pending', ''],
+      ['b', 'pending', ''],
+    ]);
+    const reads: number[] = [];
+    const read = port.read.bind(port);
+    port.read = (start, n, w) => {
+      reads.push(n);
+      return read(start, n, w);
+    };
+    const t = new Table(port, 'attachmentId');
+    expect(t.patch('b', { state: 'done' })).toMatchObject({ attachmentId: 'b', state: 'done' });
+    expect(reads).toEqual([1]); // that row only
+    expect([...t.keys()]).toEqual(['a', 'b']);
+    let appends = 0;
+    const append = port.append.bind(port);
+    port.append = (rows) => {
+      appends++;
+      return append(rows);
+    };
+    t.insertMany([{ attachmentId: 'c', state: 'pending' }, { attachmentId: 'd', state: 'pending' }]);
+    expect(appends).toBe(1);
+    expect(new Table(port, 'attachmentId').all().map((r) => `${r.attachmentId}:${r.state}`)).toEqual(['a:pending', 'b:done', 'c:pending', 'd:pending']);
+  });
+});

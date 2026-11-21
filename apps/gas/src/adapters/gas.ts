@@ -66,6 +66,10 @@ class SheetTable implements TablePort {
     const hit = this.sheet.getRange(2, column, last - 1, 1).createTextFinder(value).matchEntireCell(true).matchCase(true).findNext();
     return hit ? hit.getRow() : 0;
   }
+  readColumn(column: number, startRow: number, numRows: number): string[] {
+    if (numRows <= 0) return [];
+    return this.sheet.getRange(startRow, column, numRows, 1).getDisplayValues().map((r) => String(r[0] ?? ''));
+  }
 }
 
 class SystemDb implements SystemDbPort {

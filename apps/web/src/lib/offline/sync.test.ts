@@ -14,6 +14,8 @@ let env: MemoryEnv;
 let offline = false;
 /** Fails the next N calls to this action with no answer (as a dropped connection would). */
 const dropNext: Record<string, number> = {};
+/** W83: answers the next N calls to this action with a server error page (busy), as Google does under load. */
+const busyNext: Record<string, number> = {};
 let seq = 0;
 const rnd = (n: number) => crypto.getRandomValues(new Uint8Array(n));
 
@@ -22,11 +24,16 @@ beforeEach(async () => {
   seedDevEnv(env);
   offline = false;
   for (const k of Object.keys(dropNext)) delete dropNext[k];
+  for (const k of Object.keys(busyNext)) delete busyNext[k];
   await Promise.all(db.tables.map((t) => t.clear()));
   vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
     if (offline) throw new TypeError('Failed to fetch');
     const body = String(init.body);
     const action = (JSON.parse(body) as { action: string }).action;
+    if (busyNext[action]) {
+      busyNext[action]--;
+      return new Response('busy', { status: 503 });
+    }
     if (dropNext[action]) {
       dropNext[action]--;
       // The request reaches the server, but the answer is lost.
@@ -267,12 +274,31 @@ describe('sync engine', () => {
     expect(after.nextAttemptAt).toBe(0);
   });
 
-  test('backoff is min(2^n × 5 s, 30 min) ± 20 %', () => {
+  test('backoff is min(2^n × 5 s, 10 min) ± 20 % (W83: was 30 min)', () => {
     expect(backoffMs(0, () => 0.5)).toBe(5_000);
     expect(backoffMs(3, () => 0.5)).toBe(40_000);
-    expect(backoffMs(20, () => 0.5)).toBe(30 * 60_000);
+    expect(backoffMs(20, () => 0.5)).toBe(10 * 60_000);
     expect(backoffMs(1, () => 0)).toBe(8_000);
     expect(backoffMs(1, () => 1)).toBe(12_000);
+  });
+
+  test('W83: a busy or slow server holds back only that survey; the rest of the queue still goes in the same run', async () => {
+    const first = await makeQueued({ photoBytes: 2000 });
+    const second = await makeQueued({ photoBytes: 2000 });
+    busyNext['sync.push'] = 1;
+    await flushPendingSubmissions();
+    // The second survey and its photo went; the first waits out a short backoff, still safe on the phone.
+    expect(await db.sent.get(second.id)).toBeTruthy();
+    const waiting = await db.surveys.get(first.id);
+    expect(waiting).toMatchObject({ status: 'pending' });
+    expect(waiting!.lastError?.message).toMatch(/busy server/);
+    expect(await db.photos.where('surveyId').equals(first.id).count()).toBe(1);
+    // A busy answer to a photo holds back only that survey's photos too.
+    busyNext['files.upload'] = 1;
+    await flushPendingSubmissions(true);
+    expect((await db.surveys.get(first.id))?.status).toBe('uploading');
+    await flushPendingSubmissions(true);
+    expect(await db.sent.get(first.id)).toBeTruthy();
   });
 
   test('W54: a confirmed survey frees the phone; photos not yet sent are never removed', async () => {

@@ -38,6 +38,9 @@ class MemoryTable implements TablePort {
     const i = this.rows.findIndex((r, n) => n > 0 && (r[column - 1] ?? '') === value);
     return i < 0 ? 0 : i + 1;
   }
+  readColumn(column: number, startRow: number, numRows: number): string[] {
+    return this.rows.slice(startRow - 1, startRow - 1 + numRows).map((r) => r[column - 1] ?? '');
+  }
 }
 
 export class MemorySystemDb implements SystemDbPort {

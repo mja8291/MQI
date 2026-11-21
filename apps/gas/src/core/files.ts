@@ -25,14 +25,15 @@ function received(row: Row): number[] {
   return (row.received ?? '').split(',').filter(Boolean).map(Number);
 }
 
-function writeAttachmentRow(ctx: Ctx, f: Row): void {
+function writeAttachmentRow(ctx: Ctx, f: Row, retry: boolean): void {
   const url = f.url ?? '';
-  const already = findRows(ctx.env, ATTACHMENTS_TAB, 'Photo URL', new Set([url])).length > 0;
+  // W83: a file just created has a new link, so only a retry looks for one already in the tab.
+  const already = retry && findRows(ctx.env, ATTACHMENTS_TAB, 'Photo URL', new Set([url])).length > 0;
   if (!already) {
     const meta = { surveyId: f.surveyId ?? '', itemName: f.itemName ?? '', locationName: f.locationName ?? '' } as AttachmentMeta;
     appendByHeader(ctx.env, ATTACHMENTS_TAB, ATTACHMENTS_HEADER, [photoRow(meta, url)]);
   }
-  withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').update(f.attachmentId!, { state: 'done', updatedAt: ctx.nowIso }));
+  withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').patch(f.attachmentId!, { state: 'done', updatedAt: ctx.nowIso }));
 }
 
 function result(f: Row, chunkCount: number): UploadResult {
@@ -47,7 +48,8 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
   // Claim the chunk under the lock; the Drive call happens outside it.
   const claim = withLock(ctx, () => {
     const files = Table.of(ctx.env, 'FILES', 'attachmentId');
-    const f = files.get(p.attachmentId);
+    // W83: this one row only (a text search), not the whole register.
+    const f = files.lookup(p.attachmentId);
     if (!f) return fail('NOT_FOUND', 'The survey for this photo has not reached the server yet.');
     if (f.ownerId !== me.id && me.role !== 'ADMIN') fail('FORBIDDEN', 'This photo belongs to another user.');
     if (Number(f.size) !== p.totalSize) fail('VALIDATION', 'Photo size does not match its record.');
@@ -58,12 +60,12 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
     if (p.chunkIndex !== have.length) fail('CONFLICT', 'Chunks must be sent in order.', { received: have });
     const [claimIdx, claimAt] = (f.state ?? '').startsWith('claim:') ? f.state!.slice(6).split('@') : [];
     if (claimIdx === String(p.chunkIndex) && ctx.nowMs - Number(claimAt) < CLAIM_MS) fail('LOCK_TIMEOUT', 'This photo is already uploading.');
-    return { f: files.update(p.attachmentId, { state: `claim:${p.chunkIndex}@${ctx.nowMs}`, updatedAt: ctx.nowIso }), skip: false };
+    return { f: files.patch(p.attachmentId, { state: `claim:${p.chunkIndex}@${ctx.nowMs}`, updatedAt: ctx.nowIso }), skip: false };
   });
 
   if (claim.skip) {
-    if (claim.f.state === 'uploaded') writeAttachmentRow(ctx, claim.f);
-    const fresh = Table.of(ctx.env, 'FILES', 'attachmentId').get(p.attachmentId)!;
+    if (claim.f.state === 'uploaded') writeAttachmentRow(ctx, claim.f, true);
+    const fresh = Table.of(ctx.env, 'FILES', 'attachmentId').lookup(p.attachmentId)!;
     return result(fresh, p.chunkCount);
   }
 
@@ -80,16 +82,16 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
         ? 'does not match its checksum'
         : '';
   if (damaged) {
-    withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').update(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
+    withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').patch(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
     fail('INTERNAL', `Photo chunk ${p.chunkIndex} ${damaged}; it will be sent again.`);
   }
   // v2 (W32): the bytes must really be the image type on record — nothing else reaches Drive.
   if (p.chunkIndex === 0 && !looksLike(bytes, claim.f.mimeType ?? 'image/jpeg')) {
-    withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').update(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
+    withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').patch(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
     fail('VALIDATION', 'This photo is not a JPEG, PNG or WebP image.');
   }
 
-  const survey = Table.of(ctx.env, 'SURVEYS', 'surveyId').get(f.surveyId ?? '');
+  const survey = Table.of(ctx.env, 'SURVEYS', 'surveyId').lookup(f.surveyId ?? '');
   const where = photoLocation({
     region: survey?.region ?? '',
     campusName: survey?.campusName ?? '',
@@ -117,12 +119,12 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
       if (r.done) fileId = r.fileId ?? '';
     }
   } catch (e) {
-    withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').update(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
+    withLock(ctx, () => Table.of(ctx.env, 'FILES', 'attachmentId').patch(p.attachmentId, { state: 'pending', updatedAt: ctx.nowIso }));
     throw e;
   }
 
   const updated = withLock(ctx, () =>
-    Table.of(ctx.env, 'FILES', 'attachmentId').update(p.attachmentId, {
+    Table.of(ctx.env, 'FILES', 'attachmentId').patch(p.attachmentId, {
       received: [...received(f), p.chunkIndex].join(','),
       session,
       state: fileId ? 'uploaded' : 'pending',
@@ -132,7 +134,7 @@ export function upload(ctx: Ctx, raw: unknown): UploadResult {
     }),
   );
   if (fileId) {
-    writeAttachmentRow(ctx, updated);
+    writeAttachmentRow(ctx, updated, false);
     return { received: Array.from({ length: p.chunkCount }, (_, i) => i), done: true, url: updated.url ?? '' };
   }
   return { received: received(updated), done: false };

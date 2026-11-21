@@ -123,6 +123,51 @@ export class Table {
     return r[this.key] === key ? r : this.get(key);
   }
 
+  /**
+   * W83: changes one row found by its key, reading and writing only that row (a sheet text search on
+   * the key column). Photo uploads used to read the whole Files register (7,500 rows by 21 Nov) up to
+   * four times per photo, mostly under the lock: uploads queued behind each other and timed out.
+   */
+  patch(key: string, patch: Row): Row {
+    if (this.loaded) return this.update(key, patch);
+    const header = this.port.header();
+    const col = header.indexOf(this.key) + 1;
+    const rowNumber = col ? this.port.findRow(col, key) : 0;
+    if (!rowNumber) return this.update(key, patch);
+    const cells = this.port.read(rowNumber, 1, header.length)[0] ?? [];
+    const current: Row = Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']));
+    if (current[this.key] !== key) return this.update(key, patch);
+    const next = { ...current, ...patch };
+    this.port.write(rowNumber, [header.map((h) => next[h] ?? '')]);
+    return next;
+  }
+
+  /** W83: the keys already in the tab, reading only the key column. */
+  keys(): Set<string> {
+    if (this.loaded) return new Set(this.rowIndex.keys());
+    const header = this.port.header();
+    const col = header.indexOf(this.key) + 1;
+    const last = this.port.lastRow();
+    if (!col || last < 2) return new Set();
+    const out = new Set<string>();
+    for (const r of this.port.readColumn(col, 2, last - 1)) if (r) out.add(r);
+    return out;
+  }
+
+  /** W83: appends several rows in one write (the caller has checked their keys are new). */
+  insertMany(rows: Row[]): void {
+    if (!rows.length) return;
+    const header = this.loaded ? this.header : this.port.header();
+    this.port.append(rows.map((r) => header.map((h) => r[h] ?? '')));
+    if (this.loaded) {
+      for (const r of rows) {
+        this.rows.push(r);
+        const k = r[this.key];
+        if (k) this.rowIndex.set(k, this.rows.length - 1);
+      }
+    }
+  }
+
   find(pred: (r: Row) => boolean): Row | undefined {
     return this.all().find(pred);
   }

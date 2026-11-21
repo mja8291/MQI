@@ -72,11 +72,18 @@ function validate(ctx: Ctx, item: PushItem): void {
   void ctx;
 }
 
+/**
+ * W83: the survey's photos are listed in the Files register in one write, after reading only the
+ * register's ID column (it was the whole register, then one write per photo: 234 for one survey).
+ */
 function registerFiles(ctx: Ctx, item: PushItem, ownerId: string): void {
   const files = Table.of(ctx.env, 'FILES', 'attachmentId');
+  const known = files.keys();
+  const rows: Record<string, string>[] = [];
   for (const a of item.attachments) {
-    if (files.get(a.id)) continue;
-    files.insert({
+    if (known.has(a.id)) continue;
+    known.add(a.id);
+    rows.push({
       attachmentId: a.id,
       surveyId: a.surveyId,
       ownerId,
@@ -93,6 +100,7 @@ function registerFiles(ctx: Ctx, item: PushItem, ownerId: string): void {
       updatedAt: ctx.nowIso,
     });
   }
+  files.insertMany(rows);
 }
 
 function pushOne(ctx: Ctx, item: PushItem): PushResult {

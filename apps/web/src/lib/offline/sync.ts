@@ -11,7 +11,7 @@ import type { OutboxSurvey, SyncFailureKind } from './db';
  * marks that survey failed and the queue moves on. Photos: queued once the server holds the
  * survey; chunked, resumable per chunk, checksummed. Survey data always goes before any photo, and a
  * stuck photo holds back only its own survey's photos (W15). Only LOCK_TIMEOUT, RATE_LIMITED and INTERNAL (and no
- * connection) retry, with backoff min(2^n × 5 s, 30 min) ± 20 %.
+ * connection, W83: or a slow answer) retry, with backoff min(2^n × 5 s, 10 min) ± 20 %.
  */
 
 export const SYNC_CHANGED_EVENT = 'mqi-sync-changed';
@@ -33,8 +33,11 @@ export function isSyncing(): boolean {
   return flushing;
 }
 
+/** W83: waits grow 5 s, 10 s, 20 s … up to 10 minutes (was 30), so a busy spell never parks a survey for long. */
+export const MAX_BACKOFF_MS = 10 * 60_000;
+
 export function backoffMs(attempts: number, random: () => number = Math.random): number {
-  const base = Math.min(2 ** attempts * 5_000, 30 * 60_000);
+  const base = Math.min(2 ** attempts * 5_000, MAX_BACKOFF_MS);
   return Math.round(base * (0.8 + 0.4 * random()));
 }
 
@@ -45,7 +48,7 @@ function kindOf(e: unknown): SyncFailureKind {
 }
 
 function isTransient(e: unknown): boolean {
-  return !(e instanceof ApiCallError) || e.code === 'NETWORK' || (TRANSIENT_ERRORS as readonly string[]).includes(e.code);
+  return !(e instanceof ApiCallError) || e.code === 'NETWORK' || e.code === 'TIMEOUT' || (TRANSIENT_ERRORS as readonly string[]).includes(e.code);
 }
 
 async function noteTransient(ids: string[], e: unknown): Promise<void> {
@@ -56,7 +59,13 @@ async function noteTransient(ids: string[], e: unknown): Promise<void> {
       if (!s) continue;
       const attempts = s.attempts + 1;
       const message =
-        kindOf(e) === 'auth' ? 'Sign in to sync' : kindOf(e) === 'offline' ? 'Waiting for a connection' : 'Server error — will retry';
+        kindOf(e) === 'auth'
+          ? 'Sign in to sync'
+          : kindOf(e) === 'offline'
+            ? 'Waiting for a connection'
+            : e instanceof ApiCallError && e.code === 'TIMEOUT'
+              ? 'Slow connection or busy server — will retry shortly'
+              : 'Server error — will retry';
       // No backoff when there is nothing to wait out: signed out (it goes the moment the user
       // signs in, FR-AUTH-9) or the phone knows it is offline (the online event sends it).
       const knownOffline = kindOf(e) === 'offline' && typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -89,6 +98,8 @@ async function pushSurveys(force: boolean): Promise<boolean> {
     } catch (e) {
       await noteTransient(surveys.map((s) => s.id), e);
       if (isAuthError(e)) notifyAuthRequired();
+      // W83: a slow answer holds back only this survey; the others (and photos) still go.
+      if (e instanceof ApiCallError && e.code === 'TIMEOUT') continue;
       if (isTransient(e) || isAuthError(e) || (e instanceof ApiCallError && e.code === 'UPGRADE_REQUIRED')) return false;
       // A whole-call permanent error (e.g. FORBIDDEN): mark these failed, keep going.
       await db.surveys.bulkUpdate(surveys.map((s) => ({ key: s.id, changes: { status: 'failed' as const } })));
