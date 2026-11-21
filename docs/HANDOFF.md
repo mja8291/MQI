@@ -1,7 +1,7 @@
 # MQI v2 — Handoff for a new Claude session
 
-Written 2026-11-11 after **W66**; updated 2026-11-14 after **W72** and 2026-11-17 after **W76** (latest code commit `592317f`, everything pushed to `main`).
-Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md` (one row per work item W1–W76; it is the project's change log and decision record).
+Written 2026-11-11 after **W66**; updated 2026-11-14 after **W72**, 2026-11-17 after **W76** and 2026-11-21 after **W84** (latest code commit `7f445d7`, everything pushed to `main`).
+Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md` (one row per work item W1–W84; it is the project's change log and decision record). The R&M Budget site (W78) has its own note: `docs/rm-budget.md`.
 
 ---
 
@@ -18,8 +18,9 @@ Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md
 
 | | Web | API (Apps Script deployment ID, same URL every deploy) | Current version |
 |---|---|---|---|
-| Production | https://tcfmqi.web.app | `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` | API @25 (rubric 2026-11-13) |
-| Staging | https://tcfmqi-staging.web.app | `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg` | API @23 (rubric 2026-11-13) |
+| Production | https://tcfmqi.web.app | `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` | API @30 (rubric 2026-11-18) |
+| Staging | https://tcfmqi-staging.web.app | `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg` | API @28 (rubric 2026-11-18) |
+| R&M Budget (W78) | https://tcfmqi-budget.web.app (staging https://tcfmqi-budget-staging.web.app) | same API as above | Cost Managers and Admins only; no service worker |
 
 - Android: a Trusted Web Activity `app.web.mqi_app_tcf.pk` (v1's Play Store listing reused; see `android/README.md` and `apps/web/env/.env.production`). **Signing is done by the user, never by Claude.**
 - Repo: https://github.com/mja8291/MQI. It is **public**, so never commit personal data (names, emails, phone numbers) or secrets.
@@ -31,6 +32,10 @@ Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md
 | **MQI Spreadsheet** (responses) | `1uLCnBNCUmy2skm6MS3uuxYhkRFc-Ad7eBwCSKvuT42o` | `MQI Assessment Rubrics` (source of truth for the rubric), `MQI Survey Responses` (one row per location, 141 columns), `MQI Survey Attachments` (photos), `Campus Survey Plan` (1531 campuses, drives the dashboard, W63), `R&M Plan 2026-27` (265 campuses, BOQ reminder, W64), `Removed trial responses` / `Removed trial attachments` (archive of the 15 deleted trial surveys) |
 | **MQI v2 System** | `1--5O3CpOI4DXROURC6vyj6l-a6qrmcHgtEXmQ6Y5j1M` | accounts, ledgers, files |
 | Schools list (v1, read only) | `1hfapS-fBBWB3kvOAzbYGau5V6aLazN129bxyblBaT-Q` | `Schools_Standardized` |
+| Last Maintenance job sheet (engineering team, read only, W81) | `1EVrG7jv-J2U62yFceb-mc0IV_diZQxD5Y1Cg-t9WIqY` | first tab; the server reads 6 columns (Campus ID, Fiscal Year, Job Category, Status, Contractor, Assigned Engineer) |
+| R&M Budget (W78) | created by the server on first budget use (property `BUDGET_SPREADSHEET_ID`) | Cycles, Scenarios, Campus Master, Imports, Region Zones |
+
+Also in the MQI Spreadsheet: `SMS 2026` (campus master for the budget import, W78) and `App Campus List Additions` (W73; row "Add 10-S AES Lal Pir Campus (Secondary)" added W80).
 
 **The user**: works in TCF's Engineering Department; an engineer, not a software developer. Write to them in plain words, keep answers short, and give clear yes/no decisions. They send requests as numbered lists, often with spreadsheets (`.xlsx`) or briefs (`.md`) from `D:\Working_Data\Downloads\`.
 
@@ -104,7 +109,7 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 
 ## 3. Status
 
-**Done and deployed (prod API @25, staging @23, both web apps):** W1–W76. Highlights from the latest sessions:
+**Done and deployed (prod API @30, staging @28, both web apps; budget sites since W78/W82):** W1–W84. Highlights from the latest sessions:
 
 | Item | What |
 |---|---|
@@ -127,6 +132,14 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 | W74 | Ceiling Unsafe asks cracks/seepage; Critically vs Partially Unsafe on the dashboard and in reports |
 | W75 | Manage users: create and delete accounts, folding sections, search; request count on Home |
 | W76 | Photo reads look up one row (report photos stopped timing out); audit of W73–W75 |
+| W77 | Rubric 2026-11-18: LED/TV/UPS only at the DLP lab, Art Room, Art Room/Library and Library (2026-11-13 frozen) |
+| W78 | **R&M Budget site** (separate site, role Cost Manager): SMS 2026 import, cycles (FY Jul–Jun), scenarios (clone, compare), categories by precedence with e-compound siblings, caps/TBD/waitlist, assumption register, budget book in Excel (live formulas), PPT, PDF. See `docs/rm-budget.md` |
+| W79 | Find school matches words in any order, best matches first |
+| W80 | Data fix: three surveys moved to their real campuses; new campus 10-S AES Lal Pir Campus (Secondary) |
+| W81 | Report photo captions centred and measured (no overlap); campus details on page 1 (location, cluster, e-compound, siblings, donor, build year, programme, school type) and **last maintenance** from the engineering job sheet (an Emergency also shows the last Regular/Special job); sent per campus (`campus.details`), not kept on phones |
+| W82 | Audit of simultaneous requests: lock release commits sheet writes (`SpreadsheetApp.flush`; one survey had been written twice, removed), photo folders and budget actions under the lock |
+| W83 | **Photo sync fix:** 774 photos of 14 surveys were stuck; each upload read the whole Files register (7,500 rows) under the lock. Now one row per photo (`Table.patch/keys/insertMany`); a slow answer (`TIMEOUT`) holds back only its survey; backoff max 10 min |
+| W84 | Export: **Tracker** and **Detail** sheets (worked out on the server, `export.summary`) plus **Descriptive** (the responses tab); reports named "Campus - Area - date"; queue says "Answers received (on the dashboard)"; dashboard says when it shows the phone's saved copy |
 
 **In progress / waiting on the user**
 - **Training sessions** with surveyors started 2026-11-14. Expect feedback and quick fixes. Trainees should open the app once with signal before going on site (Home: "✓ Ready to work offline").
@@ -134,10 +147,15 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 - **Umeed Ka Chiragh Campus** (survey 2026-11-13 13:44 UTC) has **no photos** on the server; its surveyor's phone may still hold them (Sync Pending).
 - **20 campuses from the R&M list need the user's decision** (yellow rows in `R&M-list-vs-App-review-2026-11-16.xlsx`, in the "MQI App" folder above the repo): inactive in v1 (Anisa Abaumer Gandhi, Sarfaraz & Shagufta, Syed Kumail Zaidi TBD), possible separate campuses (Lakson Group Campus II, Nafees Yasin Malik Campus II), uncertain matches (Crescent Steel Ibrahim Hyderi, Attock Cement Sakran, Yaqout, Dr. Azimna, Javat Foundation, Al Moiz), and campuses with no ID anywhere (SSDF Dada I/II, Mudassir Sheikha Nabi Bux Soomro I/II, GGPS Shala Khael, Madiha Ilyas Sekha, NJ- Shah Abdul Latif Bhittai, Halima & Abid Jaffery, TCF School Sacha Soda, The Merali Foundation Awan Dhai Wala). Their answers become rows in the "App Campus List Additions" tab (no code change needed).
 - **Data correction done 2026-11-16:** survey `01a1e2b5-b03d-782a-80c1-d0384341305b` was filed under GPS KHURSHID ABAD (Campus ID 839) but done at Syed Mohammad Hussain Memorial Campus; moved to Campus ID 1413 / North / Sheikhupura in the response rows 2144–2168, the System Surveys register row 112, and its Drive folder (renamed and moved under North). The now-empty Drive folder "GP Central Punjab" was left in place.
-- None of W67–W75 has been tried on a real phone by Claude (the user and surveyors use them).
+- **Stuck photos (W83, deployed 2026-11-21):** 774 photos of 14 surveys (16–20 Nov) were still "pending" in the Files register; they are safe on the surveyors' phones and go up once the App is opened online. Check progress: count Files rows with state `pending` (the K column).
+- **R&M Budget (W78):** live, but nobody has signed in yet. An admin must give someone the Cost Manager role; the first "Import campuses" creates the R&M Budget spreadsheet (not yet tried live). Build 2 (regional review, approvals) and Build 3 (phasing, BOQ release) are not started.
+- **Data corrections done:** 2026-11-19/20 (W80) surveys `01a1f242…` → Sardar Yasin Malik Campus VI (1056), `01a1edae…` → GBPS Ghazi Khan Markhand (M) (1278), `01a1edc1…` → AES Lal Pir Campus (Secondary) (10-S), with their Drive folders; 2026-11-20 (W82) the duplicate copy of `01a1d635…` (Mian Salahuddin Campus) removed.
+- **Duplicate photo folders** from before W82 (e.g. 3 copies for `01a1edc1…` on 18 Nov) are left as they are; photos open by file ID. Merge only if the user asks.
+- `APP_PROFILE.md` and `APP_SCHEMA.json` (repo root, untracked) were written for the user's integration planning on 2026-11-18; not committed.
+- None of W67–W84 has been tried on a real phone by Claude (the user and surveyors use them).
 
 **Exact next steps (in order)**
-1. Handle feedback from the training sessions and the user's decisions on the 20 campuses (next work item: **W77**).
+1. The user has more "minor changes" to send (said 2026-11-21). Next work item: **W85**.
 2. Open user-side follow-ups (remind, don't do):
    - The **16 "Survey with App" campuses not in the App list** (W68 workbook `MQI-campus-school-list-2026-11-11.xlsx`, in the folder above the repo): partly covered by W73 (e.g. GGPS Ali Garh); the rest can be added through the "App Campus List Additions" tab once the user gives the details.
    - Trash the 17 trial photos in Drive as the owner account. Claude had no permission; the links are in `Removed trial attachments`.
@@ -171,7 +189,11 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 - **No `gh` CLI.** Read CI with `curl -s "https://api.github.com/repos/mja8291/MQI/actions/runs?per_page=3"`. CI run #42 once failed with a GitHub internal server error; an empty commit re-ran it.
 - **Flaky e2e:** `e2e/robustness.spec.ts` test 1 is occasionally flaky (passes on retry). A full e2e run takes about 16 minutes.
 - **Staging and prod need a sign-in.** Claude must not enter passwords on hosted sites. Verify deploys by fetching the built assets (e.g. grep the `report-pdf-*.js` chunk for expected strings). For UI checks use local dev (`npm run dev:api` + `npm run dev`) with the dev logins.
-- **Dashboard cache:** the server caches dashboard reads. If new rows don't show, `forgetDashboard` must run (it does after every sync write).
+- **Dashboard cache:** the server caches dashboard reads. If new rows don't show, `forgetDashboard` must run (it does after every sync write). The phone shows its saved copy first; since W84 it says so when the fresh one can't load.
+- **The server's one lock (W82/W83):** keep work under `withLock` short, and never read a whole big tab inside it. The Files register passed 7,500 rows: use `Table.lookup`/`patch` (one row by text search), `keys` (one column) and `insertMany` (one write). `SpreadsheetApp.flush()` runs before every lock release so the next request sees the writes.
+- **Server-side caches:** campus list `schools.full.v1` (phones get it without the report-only fields: cluster, donor, programme, year, unit types, unit IDs), last maintenance `maintenance.v1` (30 min), export summary `export.summary.v1` and dashboard (5 min).
+- **CI:** `apps/budget/e2e/budget.spec.ts` once failed on CI (a retry found leftover scenarios; the source total read 10.00). Fixed in `ac87166` by finding scenarios by address; watch for it.
+- **The auto-mode permission check** refuses some commands: a `node -e` script containing `splice` (looked like a removal), and running a pdf.js render from Playwright. Use the Edit tool, or a script file.
 
 ---
 
@@ -204,6 +226,10 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 | Save photos to phone | `apps/web/src/lib/photos-to-phone.ts`, `components/survey/SavePhotosButton.tsx` |
 | Campus list additions, safety levels | `packages/shared/src/campus-additions.ts`, `packages/shared/src/safety-levels.ts` |
 | Manage users | `apps/web/src/pages/admin/page.tsx`, server `apps/gas/src/core/auth.ts` (`createUser`, `deleteUser`) |
+| Campus details and last maintenance for reports (W81) | `packages/shared/src/campus-maintenance.ts`, `reportCampus` in `report/model.ts`, server `campusDetails` in `apps/gas/src/core/reads.ts`, phone `apps/web/src/lib/export/campus.ts` |
+| Export workbook: Tracker, Detail, Descriptive (W84) | `packages/shared/src/export/campus-summary.ts` (server-side `exportSummary` in `reads.ts`), `apps/web/src/lib/export/all-responses-workbook.ts` |
+| Photo upload and sync (W83) | server `apps/gas/src/core/files.ts`, `sync.ts`, `system.ts` (`Table.patch/keys/insertMany`); phone `apps/web/src/lib/offline/sync.ts`, `lib/api.ts` (`TIMEOUT`) |
+| R&M Budget site (W78) | `apps/budget/`, engine `packages/shared/src/budget/`, server `apps/gas/src/core/budget.ts`; notes `docs/rm-budget.md` |
 | Decision log | `docs/parity-notes.md` |
 
 **Local-only files (not in git; copy them when moving PCs)**
@@ -233,7 +259,7 @@ npm run dev:api
 npm run dev
 ```
 
-The API runs at http://localhost:8787 on an in-memory fake, and the web app at http://localhost:5173. Dev logins (local fake only): `admin@tcf.test`, `surveyor@tcf.test`, `reviewer@tcf.test`, password `mqi-dev-pass-1`.
+The API runs at http://localhost:8787 on an in-memory fake, and the web app at http://localhost:5173. Dev logins (local fake only): `admin@tcf.test`, `surveyor@tcf.test`, `reviewer@tcf.test`, `costs@tcf.test` (Cost Manager), password `mqi-dev-pass-1`.
 
 **Test**
 
@@ -289,8 +315,20 @@ npm run deploy:prod -w @mqi/web
 
 `deploy -i <id>` updates the existing deployment, so the URL never changes. Run web deploys from the repo root. Afterwards, check that the deployed `api-*.js` contains the right deployment ID.
 
+R&M Budget site (W78; deploy only when it changed; it uses the same API):
+
+```bash
+npm run deploy:staging -w @mqi/budget
+```
+
+```bash
+npm run deploy:prod -w @mqi/budget
+```
+
+Budget dev: `npm run dev:api` plus `npm run dev -w @mqi/budget` (port 5174); dev login `costs@tcf.test` (Cost Manager). Budget e2e: `npm run e2e -w @mqi/budget`.
+
 **Conventions**
-- Each change is a numbered work item (next: **W77**). Add a row to `docs/parity-notes.md`, add tests (`packages/shared/src/wNN.test.ts`, `server.test.ts` cases, `apps/web/e2e/wNN.spec.ts` as fits), and write the commit message as one plain sentence ending with `(WNN)`.
+- Each change is a numbered work item (next: **W85**). Add a row to `docs/parity-notes.md`, add tests (`packages/shared/src/wNN.test.ts`, `server.test.ts` cases, `apps/web/e2e/wNN.spec.ts` as fits), and write the commit message as one plain sentence ending with `(WNN)`.
 - Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Work on `main` (the user's setup; there are no PRs).
 
