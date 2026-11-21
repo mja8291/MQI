@@ -16,7 +16,8 @@ describe('W74 Critically / Partially Unsafe', () => {
   });
 
   it('critical: Soundness, ceiling cracks, Column; partial: everything else; Wall alone is not unsafe', () => {
-    expect(unsafeLevel(['Concrete/Plaster Soundness'])).toBe('critical');
+    expect(unsafeLevel(['Concrete/Plaster Soundness'])).toBe('partial'); // W85: a soundness Unsafe from before W85 (no part)
+    expect(unsafeLevel(['Soundness slab'])).toBe('critical'); // W85
     expect(unsafeLevel(['Ceiling cracks'])).toBe('critical');
     expect(unsafeLevel(['Column'])).toBe('critical');
     expect(unsafeLevel([CEILING_ITEM])).toBe('critical'); // a ceiling Unsafe from before W74 (no detail)

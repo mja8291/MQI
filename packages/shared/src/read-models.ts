@@ -155,9 +155,16 @@ export function unsafeItemsInRow(r: SheetRow): string[] {
     const cell = (r[g.name] ?? '').trim();
     if (!cell) continue;
     if (g.unsafeParts && /\bUnsafe\b/.test(cell)) {
-      // "Column Unsafe, Wall Unsafe" (W21); "Cracks Unsafe, Seepage Unsafe" (W74, ceiling).
-      for (const part of cell.split(',').map((p) => p.trim().replace(/\s*Unsafe$/, '')))
-        if (part && !(g.name === COLUMN_ITEM && part === 'Wall')) out.push(unsafePartLabel(g.name, part));
+      // "Column Unsafe, Wall Unsafe" (W21); "Cracks Unsafe, Seepage Unsafe" (W74, ceiling);
+      // "Slab Unsafe, Beam Unsafe" (W85, soundness).
+      const parts = cell
+        .split(',')
+        .map((p) => p.trim().replace(/\s*Unsafe$/, ''))
+        .filter(Boolean);
+      // W85: a plain "Unsafe" from before the item asked which part counts as the item itself
+      // (it used to give no part at all, so the campus looked Safe).
+      if (!parts.length) out.push(g.label ?? g.name);
+      for (const part of parts) if (!(g.name === COLUMN_ITEM && part === 'Wall')) out.push(unsafePartLabel(g.name, part));
       continue;
     }
     if (isUnsafe(g, cellCondition(cell))) out.push(g.label ?? g.name);

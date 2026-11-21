@@ -104,6 +104,8 @@ const SHEET_GROUPS: RubricGroup[] = [
     locations: [CLASSROOM, TOILET, CORRIDOR, OTHER_ROOM, LAB, FACADE],
     conditionOverride: OK_UNSAFE,
     guidance: SOUNDNESS_GUIDANCE,
+    // W85 (2026-11-21): Unsafe says where: slab (Critically Unsafe); beam, column and/or wall (Partially Unsafe).
+    unsafeParts: ["Slab", "Beam", "Column", "Wall"],
   }),
   worst({
     name: "Ceiling Condition i.e. cracks & seepage",

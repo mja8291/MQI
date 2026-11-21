@@ -18,7 +18,7 @@ const row = (o: Record<string, string>) => ({
 const ROWS = [
   // Campus 947: an older survey and a newer one (the newer counts), one location Unsafe on soundness.
   row({ 'Survey ID': 's-old', Timestamp: '2026-11-01T05:00:00.000Z', 'Campus Name': 'OGS Trust Campus', 'School ID': '947', Region: 'South West', Area: 'Gadap', 'Overall Score': '40', Paint: 'Poor' }),
-  row({ 'Survey ID': 's-new', Timestamp: '2026-11-10T05:00:00.000Z', 'Campus Name': 'OGS Trust Campus', 'School ID': '947', Region: 'South West', Area: 'Gadap', 'Overall Score': '72', 'Functionality Score': '70', 'Safety Score': '80', 'Aesthetics Score': '68', 'Major Score': '71', 'Minor Score': '75', 'Submitted By': 'Surveyor A', Paint: 'Good', 'Concrete/Plaster Soundness': 'Unsafe' }),
+  row({ 'Survey ID': 's-new', Timestamp: '2026-11-10T05:00:00.000Z', 'Campus Name': 'OGS Trust Campus', 'School ID': '947', Region: 'South West', Area: 'Gadap', 'Overall Score': '72', 'Functionality Score': '70', 'Safety Score': '80', 'Aesthetics Score': '68', 'Major Score': '71', 'Minor Score': '75', 'Submitted By': 'Surveyor A', Paint: 'Good', 'Concrete/Plaster Soundness': 'Slab Unsafe' }),
   // A training survey never counts.
   row({ 'Survey ID': 's-train', Timestamp: '2026-11-12T05:00:00.000Z', 'Campus Name': 'Alfalah Campus', 'School ID': '499', Region: 'Lower Sindh', Area: 'Hyderabad', 'Overall Score': '90', 'Survey Purpose': 'Checking/Training' }),
 ];

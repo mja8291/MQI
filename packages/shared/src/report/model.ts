@@ -510,7 +510,7 @@ export function buildReportModel(src: ReportSource): ReportModel {
     } else if (g.name === "Access to roof area /tanks") {
       alerts.push(`Roof access not available (${joinList(bad.map(locationPlace))})`);
     } else if (g.unsafeParts) {
-      // W74: the ceiling says which — cracks and/or seepage — per location.
+      // W74: the ceiling says which (cracks and/or seepage); W85: soundness says where (slab, beam, wall).
       for (const l of bad) {
         const parts = (l.unsafeParts?.[g.name] ?? []).map((p) => p.toLowerCase());
         alerts.push(`${ALERT_NAME[g.name] ?? itemLabel(g)} unsafe in ${locationPlace(l)}${parts.length ? `: ${parts.join(" & ")}` : ""}`);
