@@ -32,6 +32,7 @@ const ROUTES: Record<ActionName, Route> = {
   'sync.pull': { handler: (c) => sync.pull(c) },
   'files.upload': { handler: files.upload, permission: 'survey' },
   'files.get': { handler: files.get, permission: 'surveyDownload' },
+  'files.status': { handler: files.status, permission: 'survey' },
   'dashboard.get': { handler: (c) => reads.dashboard(c), permission: 'dashboard' },
   'schools.list': { handler: (c) => reads.schools(c) },
   'schools.siblingExternal': { handler: reads.siblingExternal, permission: 'survey' },

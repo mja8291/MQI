@@ -22,6 +22,7 @@ import { DEV_PASSWORD, seedDevEnv } from '../dev/server';
 import { getSharded, putSharded } from './reads';
 import { columnRows } from './responses';
 import { handleRequest, scrub } from './router';
+import { Table } from './system';
 
 let env: MemoryEnv;
 let seq = 0;
@@ -405,6 +406,26 @@ describe('files.upload (chunked, idempotent)', () => {
     const found = ok(call<{ photos: { attachmentId: string; itemName: string; locationName: string }[] }>('surveys.get', { surveyId: item.survey.id }, t));
     expect(found.photos).toEqual([{ attachmentId: a.id, itemName: 'Roof Screeding/roof drainage', locationName: 'Roof 1' }]);
     expect(ok(call<{ data: string }>('files.get', { attachmentId: a.id }, t)).data).toBe(base64Encode(bytes)); // the owner can open it
+  });
+
+  test('W89: files.status tells the owner which photos are done, written off (lost) or still expected', () => {
+    const t = login('surveyor@tcf.test');
+    const one = makeSurvey();
+    const two = makeSurvey();
+    ok(push(t, one));
+    ok(push(t, two));
+    const a = one.attachments[0];
+    const b = two.attachments[0];
+    ok(upload(t, a!.id, jpeg(1000, 251), 0));
+    Table.of(env, 'FILES', 'attachmentId').patch(b!.id, { state: 'lost' });
+    const states = (id: string[], tok = t) => ok(call<{ states: Record<string, string> }>('files.status', { attachmentIds: id }, tok)).states;
+    expect(states([a!.id, b!.id, 'nope'])).toEqual({ [a!.id]: 'done', [b!.id]: 'lost', nope: 'unknown' });
+    // Another surveyor learns nothing about these photos.
+    const admin = login('admin@tcf.test');
+    ok(call('auth.signup', { name: 'Second Surveyor', email: 's2@tcf.test', password: 'second-secret' }));
+    const id = ok(call<{ users: { id: string; email: string }[] }>('admin.users.list', {}, admin)).users.find((u) => u.email === 's2@tcf.test')!.id;
+    ok(call('admin.users.approve', { userId: id, role: 'SURVEYOR' }, admin));
+    expect(states([a!.id], login('s2@tcf.test', 'second-secret'))).toEqual({ [a!.id]: 'unknown' });
   });
 
   test('W14: a damaged chunk is refused as retryable and nothing reaches Drive; the good one then goes', () => {

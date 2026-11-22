@@ -1,5 +1,5 @@
-import { ATTACHMENTS_HEADER, ATTACHMENTS_TAB, UPLOAD_CHUNK_BYTES, base64Decode, base64Encode, bytesToHex, can, fileGetPayload, photoLocation, photoRow, uploadPayload } from '@mqi/shared';
-import type { AttachmentMeta, FileGetResult, UploadResult } from '@mqi/shared';
+import { ATTACHMENTS_HEADER, ATTACHMENTS_TAB, UPLOAD_CHUNK_BYTES, base64Decode, base64Encode, bytesToHex, can, fileGetPayload, fileStatusPayload, photoLocation, photoRow, uploadPayload } from '@mqi/shared';
+import type { AttachmentMeta, FileGetResult, FileState, FileStatusResult, UploadResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import { withLock } from './lock';
@@ -150,6 +150,23 @@ export function get(ctx: Ctx, raw: unknown): FileGetResult {
   if (f.ownerId !== me.id && !can(me.role, 'surveyDownload')) fail('FORBIDDEN', 'You cannot open this photo.');
   const file = ctx.env.drive.read(f.driveFileId);
   return { mimeType: file.mime, data: base64Encode(file.bytes) };
+}
+
+/**
+ * W89: files.status — the state of a few of the caller's photos, one row each (no lock: read only).
+ * A photo is "lost" when the QA/QC team set its Files state to lost (it can't be recovered).
+ */
+export function status(ctx: Ctx, raw: unknown): FileStatusResult {
+  const p = fileStatusPayload.parse(raw);
+  const me = ctx.requireUser();
+  const files = Table.of(ctx.env, 'FILES', 'attachmentId');
+  const states: Record<string, FileState> = {};
+  for (const id of p.attachmentIds) {
+    const f = files.lookup(id);
+    if (!f || (f.ownerId !== me.id && me.role !== 'ADMIN')) states[id] = 'unknown';
+    else states[id] = f.state === 'done' ? 'done' : f.state === 'lost' ? 'lost' : 'pending';
+  }
+  return { states };
 }
 
 /** File signatures of the photo types the app saves (JPEG, PNG, WebP). */

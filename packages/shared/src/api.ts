@@ -138,6 +138,17 @@ export interface UploadResult {
 }
 
 export const fileGetPayload = z.object({ attachmentId: z.string().max(64) });
+
+/**
+ * W89: where the server stands on some of the caller's photos. "done": received (also when the QA/QC
+ * team filed it from a draft report); "lost": written off by the team; "pending": still expected;
+ * "unknown": no such photo of yours. The phone asks only about photos it can't read or no longer has.
+ */
+export const fileStatusPayload = z.object({ attachmentIds: z.array(z.string().max(64)).min(1).max(50) });
+export type FileState = 'done' | 'lost' | 'pending' | 'unknown';
+export interface FileStatusResult {
+  states: Record<string, FileState>;
+}
 export interface FileGetResult {
   mimeType: string;
   data: string;
@@ -404,6 +415,8 @@ export const ACTIONS = [
   'sync.pull',
   'files.upload',
   'files.get',
+  // W89: the state of a few of the caller's photos (done / lost / pending).
+  'files.status',
   'dashboard.get',
   'schools.list',
   'schools.siblingExternal',

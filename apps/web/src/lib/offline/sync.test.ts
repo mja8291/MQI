@@ -6,6 +6,7 @@ import { createMemoryEnv } from '../../../../gas/src/adapters/memory';
 import type { MemoryEnv } from '../../../../gas/src/adapters/memory';
 import { DEV_PASSWORD, seedDevEnv } from '../../../../gas/src/dev/server';
 import { handleRequest } from '../../../../gas/src/core/router';
+import { Table } from '../../../../gas/src/core/system';
 import { AUTH_REQUIRED_EVENT } from '../auth/events';
 import { db, enforcePhotoBudget, getDraft, getDrafts, putPhoto, queueSurvey, retrySurvey, saveDraft, setMeta } from './db';
 import { backoffMs, flushPendingSubmissions } from './sync';
@@ -355,6 +356,31 @@ describe('sync engine', () => {
     updateSpy.mockRestore();
     expect(await db.sent.get(s.id)).toBeTruthy();
     expect(photoRows(s.id)).toHaveLength(1);
+  });
+
+  test('W89: a photo this phone cannot read leaves the queue once the server has it (filed by QA/QC) or it is written off', async () => {
+    const s = await makeQueued({ photoBytes: 1500 });
+    const photoId = (await db.photos.where('surveyId').equals(s.id).first())!.id;
+    const realGet = db.photos.get.bind(db.photos);
+    const unreadable = { size: 1500, type: 'image/jpeg', slice: () => { throw new DOMException('The object can not be found here.', 'NotFoundError'); } };
+    const getSpy = vi.spyOn(db.photos, 'get').mockImplementation((async (id: string) => {
+      const row = await realGet(id);
+      return row ? { ...row, blob: unreadable } : row; // never readable, even after reconnecting
+    }) as never);
+    try {
+      await flushPendingSubmissions(true);
+      // The server still expects it: the photo stays queued and on the phone.
+      expect(await db.sent.get(s.id)).toBeUndefined();
+      expect(await db.outbox.where('surveyId').equals(s.id).count()).toBe(1);
+      // The QA/QC team writes it off (or files a copy): the next run clears the survey.
+      Table.of(env, 'FILES', 'attachmentId').patch(photoId, { state: 'lost' });
+      await flushPendingSubmissions(true);
+    } finally {
+      getSpy.mockRestore();
+    }
+    expect(await db.sent.get(s.id)).toBeTruthy();
+    expect(await db.outbox.where('surveyId').equals(s.id).count()).toBe(0);
+    expect(await db.photos.get(photoId)).toBeUndefined();
   });
 
   test('W54: a confirmed survey frees the phone; photos not yet sent are never removed', async () => {

@@ -1,5 +1,5 @@
 import { PUSH_BATCH_MAX, TRANSIENT_ERRORS, UPLOAD_CHUNK_BYTES, base64Encode, bytesToHex, sha256 } from '@mqi/shared';
-import type { PullResult, PushResult, UploadResult } from '@mqi/shared';
+import type { FileStatusResult, PullResult, PushResult, UploadResult } from '@mqi/shared';
 import { ApiCallError, api, isAuthError } from '@/lib/api';
 import { notifyAuthRequired } from '@/lib/auth/events';
 import { db, enforcePhotoBudget, forgetSentSurvey, getMeta, reconnectDb, saveOwnSurveys, withReconnect } from './db';
@@ -196,6 +196,21 @@ export async function savePhotoProgress(id: string, changes: Partial<Pick<PhotoB
   await withReconnect(() => db.photos.put({ ...p, ...changes, blob: new Blob([bytes as BlobPart], { type: p.blob.type || p.mimeType }) }));
 }
 
+/**
+ * W89: true when the server needs nothing more for this photo: it is there ("done", e.g. filed by the
+ * QA/QC team from a draft report) or the team wrote it off ("lost"). Used only for a photo this phone
+ * can't read or no longer has, so it leaves the queue. Any doubt (no answer, older server) is false.
+ */
+async function settledOnServer(attachmentId: string): Promise<boolean> {
+  try {
+    const r = await api<FileStatusResult>('files.status', { attachmentIds: [attachmentId] });
+    const state = r.states[attachmentId];
+    return state === 'done' || state === 'lost';
+  } catch {
+    return false;
+  }
+}
+
 /** W88: one reconnect per upload run, shared by the three upload slots. */
 let reconnecting: Promise<void> | null = null;
 
@@ -289,6 +304,25 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
       .catch(() => undefined);
   }
 
+  /** A photo is off the queue; a survey with nothing left is confirmed and freed (W54). */
+  async function finishEntry(entry: (typeof entries)[number], now: string, dropPhoto: boolean): Promise<void> {
+    let complete = false;
+    await db.transaction('rw', db.photos, db.outbox, db.surveys, async () => {
+      // W89: a photo the phone can't read is removed, never rewritten (Safari refuses that, W87).
+      if (dropPhoto) await db.photos.delete(entry.attachmentId!);
+      await db.outbox.delete(entry.seq!);
+      const left = await db.outbox.where('surveyId').equals(entry.surveyId).count();
+      if (left === 0) {
+        await db.surveys.update(entry.surveyId, { status: 'synced', syncedAt: now, lastError: undefined, attempts: 0 });
+        complete = true;
+      }
+    });
+    // W54: answers and every photo are confirmed on the server: free the phone.
+    if (complete) await forgetSentSurvey(entry.surveyId, now);
+    setLastSync(now);
+    notifyChanged();
+  }
+
   async function worker(): Promise<void> {
     while (!stopped) {
       // W33: survey answers always go first — a survey submitted while photos are uploading
@@ -304,6 +338,11 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
         const r = await uploadPhoto(entry.attachmentId!);
         const now = new Date().toISOString();
         if (r === 'missing') {
+          // W89: the QA/QC team may already have filed it (done) or written it off (lost).
+          if (await settledOnServer(entry.attachmentId!)) {
+            await finishEntry(entry, now, true);
+            continue;
+          }
           // W48: the photo's bytes are gone from this phone. Its entry can never succeed; the survey
           // is shown as failed with the reason instead of being counted as synced without it. The
           // server keeps the photo listed as expected (Files state "pending").
@@ -321,19 +360,7 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
         if (!r.done) throw new Error('The photo upload did not finish'); // retried with backoff
         // W87: marked sent first, on its own (it may need a fresh copy of the photo, see savePhotoProgress).
         await savePhotoProgress(entry.attachmentId!, { uploaded: true, url: r.url });
-        let complete = false;
-        await db.transaction('rw', db.photos, db.outbox, db.surveys, async () => {
-          await db.outbox.delete(entry.seq!);
-          const left = await db.outbox.where('surveyId').equals(entry.surveyId).count();
-          if (left === 0) {
-            await db.surveys.update(entry.surveyId, { status: 'synced', syncedAt: now, lastError: undefined, attempts: 0 });
-            complete = true;
-          }
-        });
-        // W54: answers and every photo are confirmed on the server: free the phone.
-        if (complete) await forgetSentSurvey(entry.surveyId, now);
-        setLastSync(now);
-        notifyChanged();
+        await finishEntry(entry, now, false);
       } catch (e) {
         await noteTransient([entry.surveyId], e);
         if (isAuthError(e)) notifyAuthRequired();
@@ -345,6 +372,11 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
         // W86: say what went wrong (once per survey per run), so a stuck queue can be diagnosed.
         reportStuck(entry, e);
         if (e instanceof PhotoReadError) {
+          // W89: the server already has it (filed by the QA/QC team) or it was written off: off the queue.
+          if (await settledOnServer(entry.attachmentId!)) {
+            await finishEntry(entry, new Date().toISOString(), true);
+            continue;
+          }
           // W86: this photo can't be read on this phone; the survey's other photos still go.
           unreadable.set(entry.surveyId, (unreadable.get(entry.surveyId) ?? 0) + 1);
           await db.surveys.update(entry.surveyId, {
