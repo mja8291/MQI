@@ -2,7 +2,7 @@ import { PUSH_BATCH_MAX, TRANSIENT_ERRORS, UPLOAD_CHUNK_BYTES, base64Encode, byt
 import type { PullResult, PushResult, UploadResult } from '@mqi/shared';
 import { ApiCallError, api, isAuthError } from '@/lib/api';
 import { notifyAuthRequired } from '@/lib/auth/events';
-import { db, enforcePhotoBudget, forgetSentSurvey, getMeta, saveOwnSurveys } from './db';
+import { db, enforcePhotoBudget, forgetSentSurvey, getMeta, reconnectDb, saveOwnSurveys, withReconnect } from './db';
 import type { OutboxSurvey, PhotoBlob, SyncFailureKind } from './db';
 
 /**
@@ -146,7 +146,12 @@ export class PhotoReadError extends Error {
  * kept in IndexedDB after the app was closed; FileReader and Response read the same file another way.
  */
 async function readPart(blob: Blob, start: number, end: number): Promise<Uint8Array> {
-  const part = blob.slice(start, end);
+  let part: Blob;
+  try {
+    part = blob.slice(start, end);
+  } catch (e) {
+    throw new PhotoReadError(e);
+  }
   const attempts: (() => Promise<ArrayBuffer>)[] = [
     () => part.arrayBuffer(),
     () =>
@@ -174,17 +179,38 @@ async function readPart(blob: Blob, start: number, end: number): Promise<Uint8Ar
  * included, and for a photo saved days earlier it can fail ("Error preparing Blob/File data to be
  * stored in object store"), so the photo was never marked sent and its survey stuck for good. Then
  * the photo is read (that still works) and stored again as a fresh copy, with the progress.
+ *
+ * W88: that failed write also left Safari unable to find the phone's other saved photos
+ * ("NotFoundError") for the rest of the run, so each run sent 3 photos a survey and no more. The
+ * failing write is no longer tried: progress is always saved with a fresh copy of the photo.
  */
 export async function savePhotoProgress(id: string, changes: Partial<Pick<PhotoBlob, 'uploadedChunks' | 'uploaded' | 'url'>>): Promise<void> {
-  try {
+  const p = await withReconnect(() => db.photos.get(id));
+  if (!p) return;
+  if (p.evicted || !p.blob.size) {
     await db.photos.update(id, changes);
     return;
+  }
+  const bytes = await readPart(p.blob, 0, p.blob.size);
+  if (bytes.byteLength !== p.blob.size) throw new PhotoReadError(new Error(`read ${bytes.byteLength} of ${p.blob.size} bytes`));
+  await withReconnect(() => db.photos.put({ ...p, ...changes, blob: new Blob([bytes as BlobPart], { type: p.blob.type || p.mimeType }) }));
+}
+
+/** W88: one reconnect per upload run, shared by the three upload slots. */
+let reconnecting: Promise<void> | null = null;
+
+/** W88: a photo Safari says it can't find is read again once after reconnecting to the phone's storage. */
+async function readPhotoPart(attachmentId: string, start: number, end: number): Promise<Uint8Array> {
+  const first = await withReconnect(() => db.photos.get(attachmentId));
+  if (!first) throw new PhotoReadError(new Error('photo row gone'));
+  try {
+    return await readPart(first.blob, start, end);
   } catch (e) {
-    const p = await db.photos.get(id);
-    if (!p || p.evicted) throw e;
-    const bytes = await readPart(p.blob, 0, p.blob.size);
-    if (bytes.byteLength !== p.blob.size) throw e;
-    await db.photos.put({ ...p, ...changes, blob: new Blob([bytes as BlobPart], { type: p.blob.type || p.mimeType }) });
+    if (!(e instanceof PhotoReadError)) throw e;
+    await (reconnecting ??= reconnectDb());
+    const again = await db.photos.get(attachmentId);
+    if (!again) throw e;
+    return readPart(again.blob, start, end);
   }
 }
 
@@ -206,7 +232,7 @@ async function uploadPhoto(attachmentId: string): Promise<UploadResult | 'missin
     // server stored every chunk otherwise sends nothing and never learns the photo is done; the
     // server answers a repeated chunk from its ledger.
     if (fresh.uploadedChunks.includes(i) && !(i === count - 1 && last === null)) continue;
-    const part = await readPart(fresh.blob, i * UPLOAD_CHUNK_BYTES, (i + 1) * UPLOAD_CHUNK_BYTES);
+    const part = await readPhotoPart(attachmentId, i * UPLOAD_CHUNK_BYTES, (i + 1) * UPLOAD_CHUNK_BYTES);
     try {
       last = await api<UploadResult>('files.upload', { attachmentId, chunkIndex: i, chunkCount: count, totalSize: p.size, data: base64Encode(part), sha256: bytesToHex(sha256(part)) });
     } catch (e) {
@@ -243,6 +269,7 @@ function pushSurveysOnce(force: boolean): Promise<boolean> {
 }
 
 async function uploadPhotos(force: boolean): Promise<boolean> {
+  reconnecting = null;
   const dueIds = new Set((await due('uploading', force)).map((s) => s.id));
   const entries = await db.outbox.orderBy('seq').filter((e) => e.kind === 'photo' && dueIds.has(e.surveyId)).toArray();
   const blocked = new Set<string>();

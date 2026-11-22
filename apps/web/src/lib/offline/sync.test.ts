@@ -329,6 +329,34 @@ describe('sync engine', () => {
     expect(photoRows(s.id)).toHaveLength(1);
   });
 
+  test('W88: a photo Safari "cannot find" is read again after reconnecting to storage, and progress never uses the failing write', async () => {
+    const s = await makeQueued({ photoBytes: 1500 });
+    let lost = true; // until the App reconnects, every saved photo reads as "not found"
+    const realGet = db.photos.get.bind(db.photos);
+    const unreadable = { size: 1500, type: 'image/jpeg', slice: () => { throw new DOMException('The object can not be found here.', 'NotFoundError'); } };
+    const getSpy = vi.spyOn(db.photos, 'get').mockImplementation((async (id: string) => {
+      const row = await realGet(id);
+      return row && lost ? { ...row, blob: unreadable } : row;
+    }) as never);
+    const realClose = db.close.bind(db);
+    const closeSpy = vi.spyOn(db, 'close').mockImplementation(((o?: never) => {
+      lost = false;
+      realClose(o);
+    }) as never);
+    const updateSpy = vi.spyOn(db.photos, 'update');
+    try {
+      await flushPendingSubmissions();
+    } finally {
+      getSpy.mockRestore();
+      closeSpy.mockRestore();
+    }
+    expect(lost).toBe(false); // the App reconnected
+    expect(updateSpy.mock.calls.filter(([, c]) => typeof c === 'object' && ('uploadedChunks' in c || 'uploaded' in c))).toHaveLength(0);
+    updateSpy.mockRestore();
+    expect(await db.sent.get(s.id)).toBeTruthy();
+    expect(photoRows(s.id)).toHaveLength(1);
+  });
+
   test('W54: a confirmed survey frees the phone; photos not yet sent are never removed', async () => {
     const sent = await makeQueued({ photoBytes: 3000 });
     await flushPendingSubmissions();

@@ -121,14 +121,19 @@ export async function withReconnect<T>(op: () => Promise<T>): Promise<T> {
     return await op();
   } catch (e) {
     if (!isConnectionLost(e)) throw e;
-    try {
-      db.close();
-    } catch {
-      // already closed
-    }
-    await db.open();
+    await reconnectDb();
     return op();
   }
+}
+
+/** Closes and reopens the phone's storage (W53; W88 also after Safari "can't find" a saved photo). */
+export async function reconnectDb(): Promise<void> {
+  try {
+    db.close({ disableAutoOpen: false });
+  } catch {
+    // already closed
+  }
+  await db.open();
 }
 
 // ---- meta ----
