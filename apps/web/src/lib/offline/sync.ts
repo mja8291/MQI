@@ -3,7 +3,7 @@ import type { PullResult, PushResult, UploadResult } from '@mqi/shared';
 import { ApiCallError, api, isAuthError } from '@/lib/api';
 import { notifyAuthRequired } from '@/lib/auth/events';
 import { db, enforcePhotoBudget, forgetSentSurvey, getMeta, saveOwnSurveys } from './db';
-import type { OutboxSurvey, SyncFailureKind } from './db';
+import type { OutboxSurvey, PhotoBlob, SyncFailureKind } from './db';
 
 /**
  * The sync engine. Single-flight (a Web Lock, so only one tab syncs), safe to call from any
@@ -170,6 +170,25 @@ async function readPart(blob: Blob, start: number, end: number): Promise<Uint8Ar
 }
 
 /**
+ * W87: saves upload progress on a photo row. Safari on iPhone writes the whole row again, photo
+ * included, and for a photo saved days earlier it can fail ("Error preparing Blob/File data to be
+ * stored in object store"), so the photo was never marked sent and its survey stuck for good. Then
+ * the photo is read (that still works) and stored again as a fresh copy, with the progress.
+ */
+export async function savePhotoProgress(id: string, changes: Partial<Pick<PhotoBlob, 'uploadedChunks' | 'uploaded' | 'url'>>): Promise<void> {
+  try {
+    await db.photos.update(id, changes);
+    return;
+  } catch (e) {
+    const p = await db.photos.get(id);
+    if (!p || p.evicted) throw e;
+    const bytes = await readPart(p.blob, 0, p.blob.size);
+    if (bytes.byteLength !== p.blob.size) throw e;
+    await db.photos.put({ ...p, ...changes, blob: new Blob([bytes as BlobPart], { type: p.blob.type || p.mimeType }) });
+  }
+}
+
+/**
  * Sends one photo; 'missing' when its bytes are no longer on the phone (W48). Full-size bytes are
  * only ever evicted after the server confirmed the photo, so an evicted photo is already done.
  */
@@ -194,14 +213,14 @@ async function uploadPhoto(attachmentId: string): Promise<UploadResult | 'missin
       // The server already has more (or fewer) chunks than we thought: adopt its list, retry from there.
       if (e instanceof ApiCallError && e.code === 'CONFLICT' && ++conflicts <= 3) {
         const received = (e.details as { received?: number[] } | undefined)?.received ?? [];
-        await db.photos.update(attachmentId, { uploadedChunks: received });
+        await savePhotoProgress(attachmentId, { uploadedChunks: received });
         i = -1;
         continue;
       }
       throw e;
     }
     // Progress is saved per chunk, so nothing is uploaded twice after an interruption.
-    await db.photos.update(attachmentId, { uploadedChunks: last.received });
+    await savePhotoProgress(attachmentId, { uploadedChunks: last.received });
     if (last.done) break;
   }
   if (!last) throw new Error('No chunk of the photo was sent'); // unreachable: the last chunk always goes
@@ -273,9 +292,10 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
           continue;
         }
         if (!r.done) throw new Error('The photo upload did not finish'); // retried with backoff
+        // W87: marked sent first, on its own (it may need a fresh copy of the photo, see savePhotoProgress).
+        await savePhotoProgress(entry.attachmentId!, { uploaded: true, url: r.url });
         let complete = false;
         await db.transaction('rw', db.photos, db.outbox, db.surveys, async () => {
-          await db.photos.update(entry.attachmentId!, { uploaded: true, url: r.url });
           await db.outbox.delete(entry.seq!);
           const left = await db.outbox.where('surveyId').equals(entry.surveyId).count();
           if (left === 0) {

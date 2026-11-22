@@ -313,6 +313,22 @@ describe('sync engine', () => {
     expect(photoRows(s.id)).toHaveLength(1);
   });
 
+  test('W87: when Safari cannot save progress on an old photo, a fresh copy is stored and the survey still completes', async () => {
+    const s = await makeQueued({ photoBytes: 1500 });
+    const real = db.photos.update.bind(db.photos);
+    const spy = vi.spyOn(db.photos, 'update').mockImplementation(((id: string, changes: Record<string, unknown>) =>
+      'uploadedChunks' in changes || 'uploaded' in changes
+        ? Promise.reject(new Error('Error modifying one or more objects. Errors: UnknownError: Error preparing Blob/File data to be stored in object store'))
+        : real(id, changes as never)) as never);
+    try {
+      await flushPendingSubmissions();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(await db.sent.get(s.id)).toBeTruthy();
+    expect(photoRows(s.id)).toHaveLength(1);
+  });
+
   test('W54: a confirmed survey frees the phone; photos not yet sent are never removed', async () => {
     const sent = await makeQueued({ photoBytes: 3000 });
     await flushPendingSubmissions();
