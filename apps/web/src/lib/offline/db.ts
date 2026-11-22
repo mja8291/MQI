@@ -47,11 +47,16 @@ export interface OutboxEntry {
   createdAt: string;
 }
 
-/** A photo's bytes. `uploadedChunks` makes a resumed upload skip what Drive already has. */
-export interface PhotoBlob {
+/**
+ * A photo as stored in `photos`. W90: a photo taken since W90 keeps its bytes in `photoBytes`
+ * (plain data, written once, never rewritten) and has no `blob` here. Safari on iPhone lost or
+ * refused to rewrite photos kept as Blobs (W86–W88), so this row must never carry new bytes again.
+ */
+export interface PhotoRow {
   id: string;
   surveyId: string;
-  blob: Blob;
+  /** Only photos saved before W90 (or a test's legacy row). */
+  blob?: Blob;
   mimeType: string;
   size: number;
   createdAt: string;
@@ -60,6 +65,17 @@ export interface PhotoBlob {
   url?: string;
   /** Uploaded full-size bytes may be evicted under the cache budget; never before upload. */
   evicted?: boolean;
+}
+
+/** A photo with its bytes, as the rest of the App reads it (`getPhoto`, `loadPhoto`). */
+export interface PhotoBlob extends PhotoRow {
+  blob: Blob;
+}
+
+/** W90: a photo's bytes, put once when the photo is taken and only ever deleted. */
+export interface PhotoBytes {
+  id: string;
+  data: ArrayBuffer;
 }
 
 /**
@@ -81,7 +97,8 @@ export class MqiDb extends Dexie {
   drafts!: Table<SurveyDraft, string>;
   surveys!: Table<OutboxSurvey, string>;
   outbox!: Table<OutboxEntry, number>;
-  photos!: Table<PhotoBlob, string>;
+  photos!: Table<PhotoRow, string>;
+  photoBytes!: Table<PhotoBytes, string>;
   meta!: Table<MetaRow, string>;
   sent!: Table<SentSurvey, string>;
 
@@ -96,6 +113,8 @@ export class MqiDb extends Dexie {
     });
     // W54: confirmed surveys leave only a marker here.
     this.version(2).stores({ sent: 'id, syncedAt' });
+    // W90: photo bytes apart from their row, as plain data (see PhotoRow).
+    this.version(3).stores({ photoBytes: 'id' });
   }
 }
 
@@ -214,9 +233,9 @@ export async function deleteDraft(surveyId: string): Promise<void> {
 
 /** The user discards a draft: the draft and its photos go (none of them can have been uploaded). */
 export async function discardDraft(surveyId: string): Promise<void> {
-  await db.transaction('rw', db.drafts, db.photos, db.surveys, async () => {
+  await db.transaction('rw', [db.drafts, db.photos, db.photoBytes, db.surveys], async () => {
     await db.drafts.delete(surveyId);
-    if (!(await db.surveys.get(surveyId))) await db.photos.where('surveyId').equals(surveyId).delete();
+    if (!(await db.surveys.get(surveyId))) await deletePhotos(await db.photos.where('surveyId').equals(surveyId).primaryKeys());
   });
 }
 
@@ -229,15 +248,40 @@ export async function missingPhotoIds(ids: readonly string[]): Promise<string[]>
 
 // ---- photos ----
 
-export async function putPhoto(p: Omit<PhotoBlob, 'uploadedChunks' | 'uploaded' | 'createdAt'>): Promise<void> {
-  await withReconnect(() => db.photos.put({ ...p, createdAt: new Date().toISOString(), uploadedChunks: [], uploaded: false }));
+/** W90: a photo's row and bytes leave together (call inside a transaction over both tables, or alone). */
+export async function deletePhotos(ids: readonly string[]): Promise<void> {
+  if (!ids.length) return;
+  await db.photos.bulkDelete([...ids]);
+  await db.photoBytes.bulkDelete([...ids]);
 }
+
+/** W90: the bytes are read before the write, then row and bytes are stored together. */
+export async function putPhoto(p: Omit<PhotoBlob, 'uploadedChunks' | 'uploaded' | 'createdAt'>): Promise<void> {
+  const { blob, ...row } = p;
+  const data = await blob.arrayBuffer();
+  await withReconnect(() =>
+    db.transaction('rw', db.photos, db.photoBytes, async () => {
+      await db.photoBytes.put({ id: p.id, data });
+      await db.photos.put({ ...row, createdAt: new Date().toISOString(), uploadedChunks: [], uploaded: false });
+    }),
+  );
+}
+
+/** A photo with its bytes: from `photoBytes` (W90), or the Blob a photo saved before W90 still has. */
+export async function loadPhoto(id: string): Promise<PhotoBlob | undefined> {
+  const row = await db.photos.get(id);
+  if (!row) return undefined;
+  const bytes = await db.photoBytes.get(id);
+  const blob = bytes ? new Blob([bytes.data], { type: row.mimeType }) : (row.blob ?? new Blob([], { type: row.mimeType }));
+  return { ...row, blob };
+}
+
 export async function getPhoto(id: string): Promise<PhotoBlob | undefined> {
-  return withReconnect(() => db.photos.get(id));
+  return withReconnect(() => loadPhoto(id));
 }
 export async function removePhoto(id: string): Promise<void> {
   const p = await db.photos.get(id);
-  if (p && !p.uploaded) await db.photos.delete(id);
+  if (p && !p.uploaded) await db.transaction('rw', db.photos, db.photoBytes, () => deletePhotos([id]));
 }
 
 /** Uploaded full-size photos are evicted oldest-first past this budget; unsent photos never are. */
@@ -250,7 +294,12 @@ export async function enforcePhotoBudget(budget = PHOTO_CACHE_BUDGET_BYTES): Pro
   for (const p of all) {
     if (total <= budget) break;
     if (!p.uploaded || p.evicted) continue;
-    await db.photos.update(p.id, { blob: new Blob([]), evicted: true });
+    // W90: the row is written again without its old Blob (Safari may refuse to rewrite one).
+    const { blob: _old, ...row } = p;
+    await db.transaction('rw', db.photos, db.photoBytes, async () => {
+      await db.photoBytes.delete(p.id);
+      await db.photos.put({ ...row, evicted: true });
+    });
     total -= p.size;
     evicted++;
   }
@@ -264,7 +313,7 @@ export async function queueSurvey(survey: SubmittedSurvey, attachments: Attachme
 }
 async function queueSurveyOnce(survey: SubmittedSurvey, attachments: AttachmentMeta[]): Promise<void> {
   const now = new Date().toISOString();
-  await db.transaction('rw', [db.surveys, db.outbox, db.drafts, db.photos, db.sent], async () => {
+  await db.transaction('rw', [db.surveys, db.outbox, db.drafts, db.photos, db.photoBytes, db.sent], async () => {
     // A double tap must not queue twice, nor a survey the server already has (W54).
     if ((await db.surveys.get(survey.id)) || (await db.sent.get(survey.id))) return;
     await db.surveys.put({ id: survey.id, status: 'pending', createdAt: now, survey, attachments, attempts: 0, nextAttemptAt: 0 });
@@ -272,7 +321,7 @@ async function queueSurveyOnce(survey: SubmittedSurvey, attachments: AttachmentM
     await db.drafts.delete(survey.id);
     // W49: photos removed from the form were kept until now; the ones the submission doesn't use go.
     const used = new Set(attachments.map((a) => a.id));
-    await db.photos.where('surveyId').equals(survey.id).filter((p) => !used.has(p.id)).delete();
+    await deletePhotos((await db.photos.where('surveyId').equals(survey.id).toArray()).filter((p) => !used.has(p.id)).map((p) => p.id));
   });
 }
 
@@ -281,10 +330,10 @@ async function queueSurveyOnce(survey: SubmittedSurvey, attachments: AttachmentM
  * photo bytes leave the phone in one step; only the SentSurvey marker stays.
  */
 export async function forgetSentSurvey(id: string, syncedAt = new Date().toISOString()): Promise<void> {
-  await db.transaction('rw', [db.surveys, db.outbox, db.photos, db.sent, db.drafts], async () => {
+  await db.transaction('rw', [db.surveys, db.outbox, db.photos, db.photoBytes, db.sent, db.drafts], async () => {
     await db.sent.put({ id, syncedAt });
     await db.outbox.where('surveyId').equals(id).delete();
-    await db.photos.where('surveyId').equals(id).delete();
+    await deletePhotos(await db.photos.where('surveyId').equals(id).primaryKeys());
     await db.drafts.delete(id);
     await db.surveys.delete(id);
   });
@@ -341,9 +390,9 @@ export async function retrySurvey(id: string): Promise<void> {
 
 /** Queue: Discard a failed survey and everything queued for it. */
 export async function discardSurvey(id: string): Promise<void> {
-  await db.transaction('rw', db.surveys, db.outbox, db.photos, async () => {
+  await db.transaction('rw', [db.surveys, db.outbox, db.photos, db.photoBytes], async () => {
     await db.outbox.where('surveyId').equals(id).delete();
-    await db.photos.where('surveyId').equals(id).delete();
+    await deletePhotos(await db.photos.where('surveyId').equals(id).primaryKeys());
     await db.surveys.delete(id);
   });
 }

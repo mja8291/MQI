@@ -302,6 +302,36 @@ describe('sync engine', () => {
     expect(await db.sent.get(first.id)).toBeTruthy();
   });
 
+  /** A survey's photos stored the pre-W90 way: the Blob in the photo row, no separate bytes. */
+  async function makeLegacy(surveyId: string): Promise<void> {
+    for (const row of await db.photos.where('surveyId').equals(surveyId).toArray()) {
+      const bytes = await db.photoBytes.get(row.id);
+      await db.photos.put({ ...row, blob: new Blob([bytes!.data], { type: row.mimeType }) });
+      await db.photoBytes.delete(row.id);
+    }
+  }
+
+  test('W90: a new photo keeps its bytes apart, written once; no write ever carries a photo again', async () => {
+    const s = await makeQueued({ photoBytes: 1500 });
+    const row = (await db.photos.where('surveyId').equals(s.id).first())!;
+    expect(row.blob).toBeUndefined();
+    expect((await db.photoBytes.get(row.id))!.data.byteLength).toBe(1500);
+    const realPut = db.photos.put.bind(db.photos);
+    const realUpdate = db.photos.update.bind(db.photos);
+    const refuse = () => Promise.reject(new Error('Error preparing Blob/File data to be stored in object store'));
+    const putSpy = vi.spyOn(db.photos, 'put').mockImplementation(((r: { blob?: Blob }) => (r.blob ? refuse() : realPut(r as never))) as never);
+    const updSpy = vi.spyOn(db.photos, 'update').mockImplementation(((id: string, c: Record<string, unknown>) => ('blob' in c ? refuse() : realUpdate(id, c as never))) as never);
+    try {
+      await flushPendingSubmissions();
+    } finally {
+      putSpy.mockRestore();
+      updSpy.mockRestore();
+    }
+    expect(await db.sent.get(s.id)).toBeTruthy();
+    expect(photoRows(s.id)).toHaveLength(1);
+    expect(await db.photoBytes.count()).toBe(0); // freed with the survey (W54)
+  });
+
   test('W86: when the phone refuses to read a saved photo one way, another way is tried and the photo still goes', async () => {
     const s = await makeQueued({ photoBytes: 1500 });
     const spy = vi.spyOn(Blob.prototype, 'arrayBuffer').mockRejectedValue(new DOMException('The I/O read operation failed.', 'NotReadableError'));
@@ -316,9 +346,12 @@ describe('sync engine', () => {
 
   test('W87: when Safari cannot save progress on an old photo, a fresh copy is stored and the survey still completes', async () => {
     const s = await makeQueued({ photoBytes: 1500 });
+    await makeLegacy(s.id);
     const real = db.photos.update.bind(db.photos);
-    const spy = vi.spyOn(db.photos, 'update').mockImplementation(((id: string, changes: Record<string, unknown>) =>
-      'uploadedChunks' in changes || 'uploaded' in changes
+    const realGet = db.photos.get.bind(db.photos);
+    // Safari refuses to rewrite a row that still holds an old photo Blob.
+    const spy = vi.spyOn(db.photos, 'update').mockImplementation((async (id: string, changes: Record<string, unknown>) =>
+      (await realGet(id))?.blob && ('uploadedChunks' in changes || 'uploaded' in changes)
         ? Promise.reject(new Error('Error modifying one or more objects. Errors: UnknownError: Error preparing Blob/File data to be stored in object store'))
         : real(id, changes as never)) as never);
     try {
@@ -332,6 +365,7 @@ describe('sync engine', () => {
 
   test('W88: a photo Safari "cannot find" is read again after reconnecting to storage, and progress never uses the failing write', async () => {
     const s = await makeQueued({ photoBytes: 1500 });
+    await makeLegacy(s.id);
     let lost = true; // until the App reconnects, every saved photo reads as "not found"
     const realGet = db.photos.get.bind(db.photos);
     const unreadable = { size: 1500, type: 'image/jpeg', slice: () => { throw new DOMException('The object can not be found here.', 'NotFoundError'); } };
@@ -352,7 +386,8 @@ describe('sync engine', () => {
       closeSpy.mockRestore();
     }
     expect(lost).toBe(false); // the App reconnected
-    expect(updateSpy.mock.calls.filter(([, c]) => typeof c === 'object' && ('uploadedChunks' in c || 'uploaded' in c))).toHaveLength(0);
+    // No write ever carries a photo's bytes again (W90), so Safari has nothing to refuse.
+    expect(updateSpy.mock.calls.filter(([, c]) => typeof c === 'object' && 'blob' in c)).toHaveLength(0);
     updateSpy.mockRestore();
     expect(await db.sent.get(s.id)).toBeTruthy();
     expect(photoRows(s.id)).toHaveLength(1);
@@ -360,6 +395,7 @@ describe('sync engine', () => {
 
   test('W89: a photo this phone cannot read leaves the queue once the server has it (filed by QA/QC) or it is written off', async () => {
     const s = await makeQueued({ photoBytes: 1500 });
+    await makeLegacy(s.id);
     const photoId = (await db.photos.where('surveyId').equals(s.id).first())!.id;
     const realGet = db.photos.get.bind(db.photos);
     const unreadable = { size: 1500, type: 'image/jpeg', slice: () => { throw new DOMException('The object can not be found here.', 'NotFoundError'); } };

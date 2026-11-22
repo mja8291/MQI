@@ -1,5 +1,5 @@
 import { ATTACHMENTS_HEADER, ATTACHMENTS_TAB, UPLOAD_CHUNK_BYTES, base64Decode, base64Encode, bytesToHex, can, fileGetPayload, fileStatusPayload, photoLocation, photoRow, uploadPayload } from '@mqi/shared';
-import type { AttachmentMeta, FileGetResult, FileState, FileStatusResult, UploadResult } from '@mqi/shared';
+import type { AttachmentMeta, FileGetResult, FileState, FileStatusResult, StalledUpload, StalledUploadsResult, UploadResult } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import { withLock } from './lock';
@@ -167,6 +167,47 @@ export function status(ctx: Ctx, raw: unknown): FileStatusResult {
     else states[id] = f.state === 'done' ? 'done' : f.state === 'lost' ? 'lost' : 'pending';
   }
   return { states };
+}
+
+/** W90: photos still expected this long after their survey arrived count as stalled. */
+export const STALLED_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * W90: files.stalled — surveys whose photos have waited more than a day (admins). Reads the photo
+ * register once (no lock: read only) and is kept 10 minutes.
+ */
+export function stalled(ctx: Ctx): StalledUploadsResult {
+  ctx.requireUser();
+  const key = 'files.stalled';
+  const cached = ctx.env.cache.get(key);
+  if (cached) return JSON.parse(cached) as StalledUploadsResult;
+  const bySurvey = new Map<string, { owner: string; waiting: number; total: number; since: string; lastReceived: string }>();
+  for (const r of Table.of(ctx.env, 'FILES', 'attachmentId').all()) {
+    const id = r.surveyId ?? '';
+    if (!id) continue;
+    const s = bySurvey.get(id) ?? { owner: r.ownerId ?? '', waiting: 0, total: 0, since: r.createdAt ?? '', lastReceived: '' };
+    s.total++;
+    if (r.state === 'done') {
+      if ((r.updatedAt ?? '') > s.lastReceived) s.lastReceived = r.updatedAt ?? '';
+    } else if (r.state !== 'lost') s.waiting++;
+    if ((r.createdAt ?? '') < s.since) s.since = r.createdAt ?? '';
+    bySurvey.set(id, s);
+  }
+  const late = [...bySurvey].filter(([, s]) => s.waiting > 0 && s.since && ctx.nowMs - Date.parse(s.since) > STALLED_AFTER_MS);
+  const users = Table.of(ctx.env, 'USERS', 'id');
+  const surveys = Table.of(ctx.env, 'SURVEYS', 'surveyId');
+  const out: StalledUpload[] = late.map(([surveyId, s]) => {
+    const u = users.get(s.owner);
+    return { surveyId, campusName: surveys.lookup(surveyId)?.campusName ?? '', surveyor: u?.name || u?.email || s.owner, waiting: s.waiting, total: s.total, since: s.since, lastReceived: s.lastReceived };
+  });
+  out.sort((x, y) => x.since.localeCompare(y.since));
+  const result = { surveys: out };
+  try {
+    ctx.env.cache.put(key, JSON.stringify(result), 600);
+  } catch {
+    // Too big to keep: worked out again next time.
+  }
+  return result;
 }
 
 /** File signatures of the photo types the app saves (JPEG, PNG, WebP). */

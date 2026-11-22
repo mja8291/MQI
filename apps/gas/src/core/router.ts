@@ -33,6 +33,7 @@ const ROUTES: Record<ActionName, Route> = {
   'files.upload': { handler: files.upload, permission: 'survey' },
   'files.get': { handler: files.get, permission: 'surveyDownload' },
   'files.status': { handler: files.status, permission: 'survey' },
+  'files.stalled': { handler: (c) => files.stalled(c), permission: 'users' },
   'dashboard.get': { handler: (c) => reads.dashboard(c), permission: 'dashboard' },
   'schools.list': { handler: (c) => reads.schools(c) },
   'schools.siblingExternal': { handler: reads.siblingExternal, permission: 'survey' },

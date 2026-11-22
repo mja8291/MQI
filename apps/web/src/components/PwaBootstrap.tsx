@@ -27,6 +27,12 @@ export function PwaBootstrap() {
 
   useEffect(() => startSyncTriggers(), []);
 
+  // W90: ask the phone to keep this App's storage (answers and unsent photos) instead of clearing it
+  // when space runs low. Android Chrome and installed iPhone apps grant it; refusal is harmless.
+  useEffect(() => {
+    void navigator.storage?.persist?.().catch(() => false);
+  }, []);
+
   useEffect(() => {
     if (!("serviceWorker" in navigator) || import.meta.env.DEV) return;
     const workbox = new Workbox("/sw.js");

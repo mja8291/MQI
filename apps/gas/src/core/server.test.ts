@@ -428,6 +428,23 @@ describe('files.upload (chunked, idempotent)', () => {
     expect(states([a!.id], login('s2@tcf.test', 'second-secret'))).toEqual({ [a!.id]: 'unknown' });
   });
 
+  test('W90: files.stalled lists surveys whose photos have waited more than a day (admins only)', () => {
+    const t = login('surveyor@tcf.test');
+    const late = makeSurvey();
+    const fine = makeSurvey();
+    ok(push(t, late));
+    ok(push(t, fine));
+    ok(upload(t, fine.attachments[0]!.id, jpeg(1000, 251), 0));
+    const admin = login('admin@tcf.test');
+    expect(ok(call<{ surveys: unknown[] }>('files.stalled', {}, admin)).surveys).toEqual([]); // not a day yet
+    env.clock.now += 25 * 3_600_000;
+    env.cache.remove?.('files.stalled');
+    const list = ok(call<{ surveys: { surveyId: string; campusName: string; surveyor: string; waiting: number; total: number }[] }>('files.stalled', {}, login('admin@tcf.test'))).surveys;
+    expect(list.map((x) => [x.surveyId, x.campusName, x.waiting, x.total])).toEqual([[late.survey.id, 'OGS Trust Campus', 1, 1]]);
+    expect(list[0]!.surveyor).toBeTruthy();
+    expect(code(call('files.stalled', {}, login('surveyor@tcf.test')))).toBe('FORBIDDEN');
+  });
+
   test('W14: a damaged chunk is refused as retryable and nothing reaches Drive; the good one then goes', () => {
     const t = login('surveyor@tcf.test');
     const item = makeSurvey();

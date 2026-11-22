@@ -136,11 +136,17 @@ async function attach(page: Page, kind: Kind): Promise<Outcome> {
     const saved = await new Promise<{ type: string; size: number; blob: Blob }>((resolve) => {
       const open = indexedDB.open('mqi-v2');
       open.onsuccess = () => {
-        const req = open.result.transaction('photos').objectStore('photos').getAll();
+        const tx = open.result.transaction(['photos', 'photoBytes']);
+        const req = tx.objectStore('photos').getAll();
         req.onsuccess = () => {
-          const all = req.result as { blob: Blob; mimeType: string; size: number; createdAt: string }[];
+          const all = req.result as { id: string; mimeType: string; size: number; createdAt: string }[];
           const last = all.sort((a, b) => a.createdAt.localeCompare(b.createdAt)).pop()!;
-          resolve({ type: last.mimeType, size: last.size, blob: last.blob });
+          // W90: the bytes are kept apart from the row, as plain data.
+          const bytes = tx.objectStore('photoBytes').get(last.id);
+          bytes.onsuccess = () => {
+            const data = (bytes.result as { data: ArrayBuffer }).data;
+            resolve({ type: last.mimeType, size: last.size, blob: new Blob([data], { type: last.mimeType }) });
+          };
         };
       };
     });

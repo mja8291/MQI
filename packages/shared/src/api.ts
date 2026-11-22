@@ -146,6 +146,26 @@ export const fileGetPayload = z.object({ attachmentId: z.string().max(64) });
  */
 export const fileStatusPayload = z.object({ attachmentIds: z.array(z.string().max(64)).min(1).max(50) });
 export type FileState = 'done' | 'lost' | 'pending' | 'unknown';
+
+/**
+ * W90: admin view of surveys whose photos have waited more than a day after the answers arrived,
+ * so a phone that can't send is followed up the same day instead of found days later.
+ */
+export interface StalledUpload {
+  surveyId: string;
+  campusName: string;
+  surveyor: string;
+  /** Photos the server still expects / all photos of the survey. */
+  waiting: number;
+  total: number;
+  /** When the answers arrived (ISO). */
+  since: string;
+  /** Last time any photo of this survey arrived (ISO), or "" when none has. */
+  lastReceived: string;
+}
+export interface StalledUploadsResult {
+  surveys: StalledUpload[];
+}
 export interface FileStatusResult {
   states: Record<string, FileState>;
 }
@@ -417,6 +437,8 @@ export const ACTIONS = [
   'files.get',
   // W89: the state of a few of the caller's photos (done / lost / pending).
   'files.status',
+  // W90: surveys whose photos have waited more than a day (admins).
+  'files.stalled',
   'dashboard.get',
   'schools.list',
   'schools.siblingExternal',

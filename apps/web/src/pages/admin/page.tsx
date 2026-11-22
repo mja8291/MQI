@@ -6,6 +6,7 @@ import type { AdminUser, CreateUserResult, IssuePasswordResult, Role } from "@mq
 import { ScreenShell } from "@/components/ui/ScreenShell";
 import { TopBar } from "@/components/ui/TopBar";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { StalledUploads } from "@/components/admin/StalledUploads";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth/client";
 
@@ -131,6 +132,9 @@ export default function AdminPage() {
           </button>
         </div>
       ) : null}
+
+      {/* W90: surveys whose photos have waited more than a day. */}
+      <StalledUploads />
 
       {/* W75: create an account. */}
       <div className="rounded-xl border border-border bg-card mb-3 overflow-hidden">

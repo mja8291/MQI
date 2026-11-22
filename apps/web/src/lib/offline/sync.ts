@@ -2,7 +2,7 @@ import { PUSH_BATCH_MAX, TRANSIENT_ERRORS, UPLOAD_CHUNK_BYTES, base64Encode, byt
 import type { FileStatusResult, PullResult, PushResult, UploadResult } from '@mqi/shared';
 import { ApiCallError, api, isAuthError } from '@/lib/api';
 import { notifyAuthRequired } from '@/lib/auth/events';
-import { db, enforcePhotoBudget, forgetSentSurvey, getMeta, reconnectDb, saveOwnSurveys, withReconnect } from './db';
+import { db, deletePhotos, enforcePhotoBudget, forgetSentSurvey, getMeta, loadPhoto, reconnectDb, saveOwnSurveys, withReconnect } from './db';
 import type { OutboxSurvey, PhotoBlob, SyncFailureKind } from './db';
 
 /**
@@ -183,17 +183,26 @@ async function readPart(blob: Blob, start: number, end: number): Promise<Uint8Ar
  * W88: that failed write also left Safari unable to find the phone's other saved photos
  * ("NotFoundError") for the rest of the run, so each run sent 3 photos a survey and no more. The
  * failing write is no longer tried: progress is always saved with a fresh copy of the photo.
+ *
+ * W90: a photo's bytes live in `photoBytes` and its row has no Blob, so progress is a plain row
+ * update. A photo saved before W90 moves its bytes there first (read once, then never rewritten).
  */
 export async function savePhotoProgress(id: string, changes: Partial<Pick<PhotoBlob, 'uploadedChunks' | 'uploaded' | 'url'>>): Promise<void> {
   const p = await withReconnect(() => db.photos.get(id));
   if (!p) return;
-  if (p.evicted || !p.blob.size) {
-    await db.photos.update(id, changes);
+  if (!p.blob) {
+    await withReconnect(() => db.photos.update(id, changes));
     return;
   }
-  const bytes = await readPart(p.blob, 0, p.blob.size);
-  if (bytes.byteLength !== p.blob.size) throw new PhotoReadError(new Error(`read ${bytes.byteLength} of ${p.blob.size} bytes`));
-  await withReconnect(() => db.photos.put({ ...p, ...changes, blob: new Blob([bytes as BlobPart], { type: p.blob.type || p.mimeType }) }));
+  const { blob, ...row } = p;
+  const data = blob.size && !p.evicted ? await readPart(blob, 0, blob.size) : null;
+  if (data && data.byteLength !== blob.size) throw new PhotoReadError(new Error(`read ${data.byteLength} of ${blob.size} bytes`));
+  await withReconnect(() =>
+    db.transaction('rw', db.photos, db.photoBytes, async () => {
+      if (data) await db.photoBytes.put({ id, data: data.slice().buffer });
+      await db.photos.put({ ...row, ...changes });
+    }),
+  );
 }
 
 /**
@@ -216,14 +225,14 @@ let reconnecting: Promise<void> | null = null;
 
 /** W88: a photo Safari says it can't find is read again once after reconnecting to the phone's storage. */
 async function readPhotoPart(attachmentId: string, start: number, end: number): Promise<Uint8Array> {
-  const first = await withReconnect(() => db.photos.get(attachmentId));
+  const first = await withReconnect(() => loadPhoto(attachmentId));
   if (!first) throw new PhotoReadError(new Error('photo row gone'));
   try {
     return await readPart(first.blob, start, end);
   } catch (e) {
     if (!(e instanceof PhotoReadError)) throw e;
     await (reconnecting ??= reconnectDb());
-    const again = await db.photos.get(attachmentId);
+    const again = await loadPhoto(attachmentId);
     if (!again) throw e;
     return readPart(again.blob, start, end);
   }
@@ -307,9 +316,9 @@ async function uploadPhotos(force: boolean): Promise<boolean> {
   /** A photo is off the queue; a survey with nothing left is confirmed and freed (W54). */
   async function finishEntry(entry: (typeof entries)[number], now: string, dropPhoto: boolean): Promise<void> {
     let complete = false;
-    await db.transaction('rw', db.photos, db.outbox, db.surveys, async () => {
+    await db.transaction('rw', [db.photos, db.photoBytes, db.outbox, db.surveys], async () => {
       // W89: a photo the phone can't read is removed, never rewritten (Safari refuses that, W87).
-      if (dropPhoto) await db.photos.delete(entry.attachmentId!);
+      if (dropPhoto) await deletePhotos([entry.attachmentId!]);
       await db.outbox.delete(entry.seq!);
       const left = await db.outbox.where('surveyId').equals(entry.surveyId).count();
       if (left === 0) {
