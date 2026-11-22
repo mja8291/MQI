@@ -1,7 +1,7 @@
 # MQI v2 — Handoff for a new Claude session
 
-Written 2026-11-11 after **W66**; updated 2026-11-14 after **W72**, 2026-11-17 after **W76** and 2026-11-21 after **W84** (latest code commit `7f445d7`, everything pushed to `main`).
-Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md` (one row per work item W1–W84; it is the project's change log and decision record). The R&M Budget site (W78) has its own note: `docs/rm-budget.md`.
+Written 2026-11-11 after **W66**; updated 2026-11-14 after **W72**, 2026-11-17 after **W76**, 2026-11-21 after **W84** and 2026-11-23 after **W90** (latest code commit `fff8292`, everything pushed to `main`).
+Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md` (one row per work item W1–W90; it is the project's change log and decision record). The R&M Budget site (W78) has its own note: `docs/rm-budget.md`.
 
 ---
 
@@ -18,8 +18,8 @@ Read this first, then `README.md`, then the newest rows of `docs/parity-notes.md
 
 | | Web | API (Apps Script deployment ID, same URL every deploy) | Current version |
 |---|---|---|---|
-| Production | https://tcfmqi.web.app | `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` | API @30 (rubric 2026-11-18) |
-| Staging | https://tcfmqi-staging.web.app | `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg` | API @28 (rubric 2026-11-18) |
+| Production | https://tcfmqi.web.app | `AKfycbzTivMQLta6b4lNEjuiFFanlNN6f6A5RxYEhnN2rATS_Ey4ZivBgVfZ-c_3dzOUZYa3` | API @34 (rubric 2026-11-18) |
+| Staging | https://tcfmqi-staging.web.app | `AKfycbwsqkM66cHVFVslpJfrRCpUP9GxCoDfRtq2dI1IOh_LFtncjHkwIrerl4ieNwLnIYGHhg` | API @32 (rubric 2026-11-18) |
 | R&M Budget (W78) | https://tcfmqi-budget.web.app (staging https://tcfmqi-budget-staging.web.app) | same API as above | Cost Managers and Admins only; no service worker |
 
 - Android: a Trusted Web Activity `app.web.mqi_app_tcf.pk` (v1's Play Store listing reused; see `android/README.md` and `apps/web/env/.env.production`). **Signing is done by the user, never by Claude.**
@@ -109,7 +109,7 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 
 ## 3. Status
 
-**Done and deployed (prod API @30, staging @28, both web apps; budget sites since W78/W82):** W1–W84. Highlights from the latest sessions:
+**Done and deployed (prod API @34, staging @32, both web apps; budget sites since W78/W82):** W1–W90. Highlights from the latest sessions:
 
 | Item | What |
 |---|---|
@@ -140,6 +140,12 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 | W82 | Audit of simultaneous requests: lock release commits sheet writes (`SpreadsheetApp.flush`; one survey had been written twice, removed), photo folders and budget actions under the lock |
 | W83 | **Photo sync fix:** 774 photos of 14 surveys were stuck; each upload read the whole Files register (7,500 rows) under the lock. Now one row per photo (`Table.patch/keys/insertMany`); a slow answer (`TIMEOUT`) holds back only its survey; backoff max 10 min |
 | W84 | Export: **Tracker** and **Detail** sheets (worked out on the server, `export.summary`) plus **Descriptive** (the responses tab); reports named "Campus - Area - date"; queue says "Answers received (on the dashboard)"; dashboard says when it shows the phone's saved copy |
+| W85 | Concrete/Plaster Soundness Unsafe asks **Slab, Beam, Column, Wall**: slab = Critically Unsafe, the rest Partially Unsafe; every earlier soundness Unsafe counts as Partially Unsafe (`safety-levels.ts`) |
+| W86 | Report page 1: the safety banner takes only the room the speedometer leaves; extra alerts go on a "Safety alerts" page. Photo captions (PDF) and the Excel Photos sheet show the surveyor's note. Sync diagnostics: each stuck survey writes "Photo upload stuck — survey, photo, code, phone" to ErrorLog; the server logs LOCK_TIMEOUT at most once a minute; a photo is read three ways before giving up, and an unreadable photo no longer blocks its survey |
+| W87 | iPhone: Safari refused to save "sent" on a photo row holding a days-old Blob ("Error preparing Blob/File data…"); the photo is read and stored again as a fresh copy |
+| W88 | iPhone: after that refused write Safari couldn't find the other photos ("NotFoundError"), so each run sent 3 photos a survey. Progress always saved with a fresh copy; an unreadable photo is retried after reconnecting to storage (`reconnectDb`) |
+| W89 | New action **files.status**: the phone asks about a photo it can't read or no longer has; "done" or **"lost"** (Files state set by QA/QC) takes it off the queue and frees the survey. the surveyor's photos rescued (see below) |
+| W90 | **Prevention:** photo bytes stored as plain data in their own table `photoBytes` (Dexie v3), written once and never rewritten (older photos move over when first touched); the App asks for persistent storage; **Manage users** opens with "Photos waiting more than a day" (action `files.stalled`, admins) |
 
 **In progress / waiting on the user**
 - **Training sessions** with surveyors started 2026-11-14. Expect feedback and quick fixes. Trainees should open the app once with signal before going on site (Home: "✓ Ready to work offline").
@@ -147,15 +153,20 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 - **Umeed Ka Chiragh Campus** (survey 2026-11-13 13:44 UTC) has **no photos** on the server; its surveyor's phone may still hold them (Sync Pending).
 - **20 campuses from the R&M list need the user's decision** (yellow rows in `R&M-list-vs-App-review-2026-11-16.xlsx`, in the "MQI App" folder above the repo): inactive in v1 (Anisa Abaumer Gandhi, Sarfaraz & Shagufta, Syed Kumail Zaidi TBD), possible separate campuses (Lakson Group Campus II, Nafees Yasin Malik Campus II), uncertain matches (Crescent Steel Ibrahim Hyderi, Attock Cement Sakran, Yaqout, Dr. Azimna, Javat Foundation, Al Moiz), and campuses with no ID anywhere (SSDF Dada I/II, Mudassir Sheikha Nabi Bux Soomro I/II, GGPS Shala Khael, Madiha Ilyas Sekha, NJ- Shah Abdul Latif Bhittai, Halima & Abid Jaffery, TCF School Sacha Soda, The Merali Foundation Awan Dhai Wala). Their answers become rows in the "App Campus List Additions" tab (no code change needed).
 - **Data correction done 2026-11-16:** survey `01a1e2b5-b03d-782a-80c1-d0384341305b` was filed under GPS KHURSHID ABAD (Campus ID 839) but done at Syed Mohammad Hussain Memorial Campus; moved to Campus ID 1413 / North / Sheikhupura in the response rows 2144–2168, the System Surveys register row 112, and its Drive folder (renamed and moved under North). The now-empty Drive folder "GP Central Punjab" was left in place.
-- **Stuck photos (W83, deployed 2026-11-21):** 774 photos of 14 surveys (16–20 Nov) were still "pending" in the Files register; they are safe on the surveyors' phones and go up once the App is opened online. Check progress: count Files rows with state `pending` (the K column).
+- **Stuck photos (W83, deployed 2026-11-21):** 774 photos of 14 surveys (16–20 Nov) were still "pending" in the Files register; they go up once the App is opened online. Since W90 the list is on **Manage users → Photos waiting more than a day**.
+- **One surveyor's iPhone (W86–W89, 2026-11-22):** 7 surveys, 211 photos, stuck since 18–20 Nov. All are now on the server: 195 originals from his phone after W87/W88, and **16 Uch Power II photos filed from his draft PDF** (900 px copies, Drive folder "Recovered from draft PDF (900 px)" in that survey's folder; Files rows 6631–6646 marked done; photos-tab rows 8858–8873). The extracted photos and the matching plan are in `tools/fixtures/raw/wajid-rescue/` and `wajid-upload/` (git-ignored raw data; delete when no longer needed). His Sync Pending should empty the next time he opens the App online (W89).
+- **JDW Sugar Mills Campus** (survey `01a201c2…`, an Android phone): 70 of 152 photos received, 82 waiting; single-photo timeouts on 22 Nov, then nothing because the App wasn't open. The surveyor needs to open the App on Wi-Fi and keep it on screen.
+- **Four empty Drive folders** "Recovered from draft PDF (900 px)" (in the M.R. & Hamida, Mudassir, TCF Girls Uch and UCH IV survey folders) are owned by the user's personal account; Claude couldn't trash them. The user removes them.
+- **Marking a photo lost:** if a photo can't be recovered (no phone copy, no PDF), set its Files row state (K) to `lost`, with the user's OK. The phone then drops it from its queue (W89) and it leaves the "waiting" list (W90).
 - **R&M Budget (W78):** live, but nobody has signed in yet. An admin must give someone the Cost Manager role; the first "Import campuses" creates the R&M Budget spreadsheet (not yet tried live). Build 2 (regional review, approvals) and Build 3 (phasing, BOQ release) are not started.
 - **Data corrections done:** 2026-11-19/20 (W80) surveys `01a1f242…` → Sardar Yasin Malik Campus VI (1056), `01a1edae…` → GBPS Ghazi Khan Markhand (M) (1278), `01a1edc1…` → AES Lal Pir Campus (Secondary) (10-S), with their Drive folders; 2026-11-20 (W82) the duplicate copy of `01a1d635…` (Mian Salahuddin Campus) removed.
 - **Duplicate photo folders** from before W82 (e.g. 3 copies for `01a1edc1…` on 18 Nov) are left as they are; photos open by file ID. Merge only if the user asks.
 - `APP_PROFILE.md` and `APP_SCHEMA.json` (repo root, untracked) were written for the user's integration planning on 2026-11-18; not committed.
-- None of W67–W84 has been tried on a real phone by Claude (the user and surveyors use them).
+- `EvalError … 'unsafe-eval'` from one surveyor's phone on `/survey/locations/category` (ErrorLog, 19 and 21 Nov) is not investigated yet.
+- None of W67–W90 has been tried on a real phone by Claude (the user and surveyors use them).
 
 **Exact next steps (in order)**
-1. The user has more "minor changes" to send (said 2026-11-21). Next work item: **W85**.
+1. Check that surveyor's Sync Pending emptied and JDW Sugar Mills' 82 photos arrived (Manage users → Photos waiting more than a day). Then the user's next request. Next work item: **W91**.
 2. Open user-side follow-ups (remind, don't do):
    - The **16 "Survey with App" campuses not in the App list** (W68 workbook `MQI-campus-school-list-2026-11-11.xlsx`, in the folder above the repo): partly covered by W73 (e.g. GGPS Ali Garh); the rest can be added through the "App Campus List Additions" tab once the user gives the details.
    - Trash the 17 trial photos in Drive as the owner account. Claude had no permission; the links are in `Removed trial attachments`.
@@ -193,6 +204,8 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 - **The server's one lock (W82/W83):** keep work under `withLock` short, and never read a whole big tab inside it. The Files register passed 7,500 rows: use `Table.lookup`/`patch` (one row by text search), `keys` (one column) and `insertMany` (one write). `SpreadsheetApp.flush()` runs before every lock release so the next request sees the writes.
 - **Server-side caches:** campus list `schools.full.v1` (phones get it without the report-only fields: cluster, donor, programme, year, unit types, unit IDs), last maintenance `maintenance.v1` (30 min), export summary `export.summary.v1` and dashboard (5 min).
 - **CI:** `apps/budget/e2e/budget.spec.ts` once failed on CI (a retry found leftover scenarios; the source total read 10.00). Fixed in `ac87166` by finding scenarios by address; watch for it.
+- **iPhone (Safari) storage, W86–W90:** never keep a Blob in a row that is later updated: Safari may refuse the rewrite days later and then fail to find other Blobs. Photo bytes live in `photoBytes` (plain ArrayBuffer, put once, only deleted); photo rows hold metadata only. Dexie `update` deep-clones a row and turns an ArrayBuffer field into `{}`, which is why the bytes have their own table. Read a photo with `loadPhoto`/`getPhoto`, delete with `deletePhotos`.
+- **Google Drive connector = engineering account** (since 2026-11-22). The user's personal Drive is full: uploads through it fail with "storage quota exceeded". Google Sheets stays on the user's account. A connector switched on claude.ai doesn't reach a running session; the user reconnects it with /mcp in that session.
 - **The auto-mode permission check** refuses some commands: a `node -e` script containing `splice` (looked like a removal), and running a pdf.js render from Playwright. Use the Edit tool, or a script file.
 
 ---
@@ -228,7 +241,7 @@ docs/             parity-notes.md (decision log per W item), migration/cutover/p
 | Manage users | `apps/web/src/pages/admin/page.tsx`, server `apps/gas/src/core/auth.ts` (`createUser`, `deleteUser`) |
 | Campus details and last maintenance for reports (W81) | `packages/shared/src/campus-maintenance.ts`, `reportCampus` in `report/model.ts`, server `campusDetails` in `apps/gas/src/core/reads.ts`, phone `apps/web/src/lib/export/campus.ts` |
 | Export workbook: Tracker, Detail, Descriptive (W84) | `packages/shared/src/export/campus-summary.ts` (server-side `exportSummary` in `reads.ts`), `apps/web/src/lib/export/all-responses-workbook.ts` |
-| Photo upload and sync (W83) | server `apps/gas/src/core/files.ts`, `sync.ts`, `system.ts` (`Table.patch/keys/insertMany`); phone `apps/web/src/lib/offline/sync.ts`, `lib/api.ts` (`TIMEOUT`) |
+| Photo upload and sync (W83–W90) | server `apps/gas/src/core/files.ts` (`upload`, `status`, `stalled`), `sync.ts`, `system.ts` (`Table.patch/keys/insertMany`); phone `apps/web/src/lib/offline/sync.ts` (`savePhotoProgress`, `readPhotoPart`, `settledOnServer`), `offline/db.ts` (`photoBytes`, `putPhoto`, `loadPhoto`, `deletePhotos`), `lib/api.ts` (`TIMEOUT`); admin panel `components/admin/StalledUploads.tsx` |
 | R&M Budget site (W78) | `apps/budget/`, engine `packages/shared/src/budget/`, server `apps/gas/src/core/budget.ts`; notes `docs/rm-budget.md` |
 | Decision log | `docs/parity-notes.md` |
 
@@ -328,7 +341,7 @@ npm run deploy:prod -w @mqi/budget
 Budget dev: `npm run dev:api` plus `npm run dev -w @mqi/budget` (port 5174); dev login `costs@tcf.test` (Cost Manager). Budget e2e: `npm run e2e -w @mqi/budget`.
 
 **Conventions**
-- Each change is a numbered work item (next: **W85**). Add a row to `docs/parity-notes.md`, add tests (`packages/shared/src/wNN.test.ts`, `server.test.ts` cases, `apps/web/e2e/wNN.spec.ts` as fits), and write the commit message as one plain sentence ending with `(WNN)`.
+- Each change is a numbered work item (next: **W91**). Add a row to `docs/parity-notes.md`, add tests (`packages/shared/src/wNN.test.ts`, `server.test.ts` cases, `apps/web/e2e/wNN.spec.ts` as fits), and write the commit message as one plain sentence ending with `(WNN)`.
 - Commit messages end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Work on `main` (the user's setup; there are no PRs).
 

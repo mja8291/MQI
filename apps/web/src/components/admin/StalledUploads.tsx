@@ -11,7 +11,7 @@ const ago = (iso: string) => {
 
 /**
  * W90 (2026-11-23): surveys whose photos have waited more than a day after the answers arrived, with
- * the surveyor, so QA/QC can call them the same day (Wajid's phone held 185 photos for four days
+ * the surveyor, so QA/QC can call them the same day (a surveyor's phone held 185 photos for four days
  * before anyone knew). The surveyor's next step is always the same: open the App on Wi-Fi, keep it on
  * screen and tap Sync now.
  */
