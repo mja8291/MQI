@@ -3,6 +3,8 @@ import type {
   AssumptionRow,
   BudgetCampus,
   BudgetResult,
+  BudgetCut,
+  CutUnit,
   CapStatus,
   BudgetCategory,
   CategoryResult,
@@ -234,6 +236,10 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
     };
   });
 
+  // W103: the budget cut takes whole campuses (with their siblings) out, bottom category first.
+  const cut = applyBudgetCut(results, config.budgetCut ?? 0);
+  if (cut?.short) warnings.push(`Budget cut: only Rs ${cut.achieved.toFixed(2)}M of Rs ${cut.target.toFixed(2)}M could be cut without touching the Unsafe categories.`);
+
   // W92: R&M Plan campuses sharing an e-compound that no category took, grouped by their own MQI.
   const sibRows = rmPlanSiblingRows(campuses, campusCats, placement, config);
   results.splice(results.filter((r) => r.category.kind === 'campus').length, 0, ...sibRows);
@@ -311,7 +317,62 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
     ceiling,
     unplaced,
     warnings,
+    ...(cut ? { cut } : {}),
   };
+}
+
+/**
+ * W103: budget cut. Takes campuses out of the campus categories until about `target` Rs M is saved:
+ * the bottom category first, its highest-MQI campus first, each with the e-compound siblings costed
+ * with it (one unit); then the category above, and so on. The Unsafe categories are never cut. The
+ * last unit is kept out only if that lands closer to the target than leaving it in. Changes `results`.
+ */
+export function applyBudgetCut(results: CategoryResult[], target: number): BudgetCut | undefined {
+  if (!(target > 0)) return undefined;
+  const before = results.reduce((t, r) => t + r.budget, 0);
+  const cats = results.filter((r) => r.category.kind === 'campus' && !r.section && r.category.rule?.type !== 'unsafe').reverse();
+  const order: { r: CategoryResult; unit: PlacedCampus[] }[] = [];
+  for (const r of cats) {
+    const units = new Map<number, PlacedCampus[]>();
+    for (const p of r.selected) units.set(p.unit, [...(units.get(p.unit) ?? []), p]);
+    const score = (u: PlacedCampus[]) => Math.max(...u.filter((p) => p.role === 'primary').map((p) => p.campus.score ?? -1));
+    for (const unit of [...units.values()].sort((a, b) => score(b) - score(a))) order.push({ r, unit });
+  }
+  const taken: typeof order = [];
+  let saved = 0;
+  for (const item of order) {
+    if (saved >= target - EPS) break;
+    const cost = item.unit.reduce((t, p) => t + p.rate, 0);
+    // Taking this one overshoots: keep it if not taking it is closer to the target.
+    if (saved + cost > target && target - saved < saved + cost - target) break;
+    taken.push(item);
+    saved += cost;
+  }
+  const units: CutUnit[] = taken.map(({ r, unit }) => {
+    const main = unit.find((p) => p.role === 'primary') ?? unit[0]!;
+    return {
+      categoryId: r.category.id,
+      categoryName: r.category.name,
+      campusId: main.campus.campusId,
+      name: main.campus.name,
+      region: main.campus.region,
+      score: main.campus.score,
+      band: main.campus.band ?? 'No survey',
+      siblings: unit.filter((p) => p !== main).map((p) => ({ campusId: p.campus.campusId, name: p.campus.name, band: p.campus.band ?? 'No survey' })),
+      cost: unit.reduce((t, p) => t + p.rate, 0),
+    };
+  });
+  // Take them out of their categories.
+  const out = new Set(taken.flatMap(({ unit }) => unit.map((p) => p.campus.campusId)));
+  for (const r of cats) {
+    const kept = r.selected.filter((p) => !out.has(p.campus.campusId));
+    if (kept.length === r.selected.length) continue;
+    r.selected = kept;
+    r.primaries = kept.filter((p) => p.role === 'primary').length;
+    r.siblings = kept.filter((p) => p.role === 'sibling').length;
+    r.budget = kept.reduce((t, p) => t + p.rate, 0) + r.tbd * r.rate;
+  }
+  return { target, achieved: saved, before, units, short: saved < target - EPS && taken.length === order.length };
 }
 
 export const RM_SIBLING_PREFIX = 'rmsib:';

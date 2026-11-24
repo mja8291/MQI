@@ -408,6 +408,12 @@ export function SettingsEditor({
             <Num label="Last year's total" width="w-28" value={config.lastYearTotal} onChange={(v) => onChange({ ...config, lastYearTotal: v })} />
           </div>
         </label>
+        <label>
+          Budget cut required (Rs M)
+          <div className="mt-1">
+            <Num label="Budget cut required" width="w-28" placeholder="none" value={config.budgetCut} onChange={(v) => onChange({ ...config, budgetCut: v })} />
+          </div>
+        </label>
         <p className="basis-full text-ink-soft">
           Rate per campus = last year&apos;s actual cost per campus × (1 + inflation). E-compound siblings are costed at their host category&apos;s rate and count against its cap. Unsafe categories are never trimmed by a cap.
         </p>
@@ -725,13 +731,70 @@ export function SettingsEditor({
               <td>Anticipated categories</td>
               <td className="num">Rs {rs(anticipatedTotal)}M</td>
             </tr>
+            {result?.cut ? (
+              <tr className="text-ink-soft">
+                <td>Before the budget cut: Rs {rs(result.cut.before)}M; cut made</td>
+                <td className="num">− Rs {rs(result.cut.achieved)}M</td>
+              </tr>
+            ) : null}
             <tr className="font-semibold text-brand-deep text-[15px]">
-              <td>Grand total</td>
+              <td>Grand total{result?.cut ? ' (after the cut)' : ''}</td>
               <td className="num" data-testid="grand-total-value">Rs {rs(campusTotal + shortlistedSibTotal + sibTotal + anticipatedTotal)}M</td>
             </tr>
           </tbody>
         </table>
       </section>
+
+      {/* W103: the campuses the budget cut took out (trade-offs), each with the siblings that went with it. */}
+      {result?.cut ? (
+        <section className="card p-4 overflow-x-auto" data-testid="budget-cut">
+          <h2 className="font-semibold text-brand-deep mb-1">Budget cut: trade-off campuses</h2>
+          <p className="text-ink-soft mb-2">
+            Cut asked for <b>Rs {rs(result.cut.target)}M</b>; cut made <b>Rs {rs(result.cut.achieved)}M</b> ({int(result.cut.units.length)} {result.cut.units.length === 1 ? 'campus' : 'campuses'}
+            {result.cut.units.some((u) => u.siblings.length) ? ` + ${int(result.cut.units.reduce((n, u) => n + u.siblings.length, 0))} siblings` : ''}), whole campuses only. Taken from the bottom campus
+            category first, highest MQI first, each with its e-compound siblings; the Unsafe categories are never cut.
+          </p>
+          {result.cut.short ? (
+            <p className="mb-2 rounded-lg bg-warn-tint p-2 text-[13px] text-warn" role="alert">
+              Every campus outside the Unsafe categories has been taken and the cut is still Rs {rs(result.cut.target - result.cut.achieved)}M short.
+            </p>
+          ) : null}
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th className="num">#</th>
+                <th>Category</th>
+                <th>Campus</th>
+                <th>Campus ID</th>
+                <th className="num">MQI</th>
+                <th>Band</th>
+                <th>Region</th>
+                <th>Siblings taken out with it</th>
+                <th className="num">Saved (Rs M)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.cut.units.map((u, i) => (
+                <tr key={u.campusId}>
+                  <td className="num text-ink-faint">{i + 1}</td>
+                  <td>{u.categoryName}</td>
+                  <td className="font-semibold">{u.name}</td>
+                  <td>{u.campusId}</td>
+                  <td className="num">{score(u.score)}</td>
+                  <td>{u.band}</td>
+                  <td>{u.region}</td>
+                  <td>{u.siblings.map((x) => `${x.name} (${x.band})`).join(', ')}</td>
+                  <td className="num">{rs(u.cost)}</td>
+                </tr>
+              ))}
+              <tr className="font-semibold bg-surface/60">
+                <td colSpan={8}>Total cut</td>
+                <td className="num">{rs(result.cut.achieved)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      ) : null}
     </div>
   );
 }

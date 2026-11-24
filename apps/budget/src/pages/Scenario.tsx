@@ -134,7 +134,7 @@ function Dashboard({ scenario, result }: { scenario: Scenario; result: BudgetRes
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card label="Total budget (Rs M)" value={rs(result.total)} testId="total" />
+        <Card label="Total budget (Rs M)" value={rs(result.total)} testId="total" sub={result.cut ? `After a cut of Rs ${rs(result.cut.achieved)}M (${int(result.cut.units.length)} campuses; see Settings)` : undefined} />
         <Card label={last ? `vs last year (Rs ${rs(last)}M)` : 'vs last year'} value={last ? signed(result.total - last) : '–'} />
         <Card label="Campuses selected (incl. siblings)" value={int(selected)} sub={waiting ? `${int(waiting)} on waitlists` : undefined} />
         <Card

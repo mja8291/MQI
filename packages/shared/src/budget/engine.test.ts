@@ -31,6 +31,34 @@ const cat = (r: ReturnType<typeof runBudget>, id: string) => r.categories.find((
 const ids = (list: { campus: BudgetCampus }[]) => list.map((p) => p.campus.campusId);
 
 describe('budgetEngine', () => {
+  it('W103: budget cut takes the bottom category first, highest MQI first, with its siblings; closest to the target; Unsafe never cut', () => {
+    const crit = campus({ campusId: 'U1', score: 30, unsafe: 'critical' });
+    const p1 = campus({ campusId: 'P1', score: 35 });
+    const p2 = campus({ campusId: 'P2', score: 48, eCompoundNo: 'Q' });
+    const p2sib = campus({ campusId: 'P2S', score: 92, eCompoundNo: 'Q' }); // Excellent sibling, goes with P2
+    const a1 = campus({ campusId: 'A1', score: 55 });
+    const a2 = campus({ campusId: 'A2', score: 65 });
+    const list = [crit, p1, p2, p2sib, a1, a2];
+    const cats = [CRIT, POOR, AVG]; // rates 6, 2, 1.5
+    const full = runBudget(list, config(cats));
+    expect(full.total).toBeCloseTo(6 + 3 * 2 + 2 * 1.5); // 15
+    // Cut 3: Average goes first, highest MQI first (A2 then A1) = 3.0 exactly.
+    const r = runBudget(list, config(cats, { budgetCut: 3 }));
+    expect(r.cut!.units.map((u) => u.campusId)).toEqual(['A2', 'A1']);
+    expect(r.cut!.achieved).toBeCloseTo(3);
+    expect(r.total).toBeCloseTo(12);
+    // Cut 6: Average (3) then Poor's highest MQI P2 with its sibling P2S (4) = 7, closer than stopping at 3.
+    const r2 = runBudget(list, config(cats, { budgetCut: 6 }));
+    expect(r2.cut!.units.map((u) => [u.campusId, u.siblings.map((x) => x.campusId)])).toEqual([['A2', []], ['A1', []], ['P2', ['P2S']]]);
+    expect(r2.cut!.achieved).toBeCloseTo(7);
+    expect(r2.categories.find((c) => c.category.id === 'poor')!.selected.map((p) => p.campus.campusId)).toEqual(['P1']);
+    // Cut 20: everything but the critically unsafe campus; reported short.
+    const r3 = runBudget(list, config(cats, { budgetCut: 20 }));
+    expect(r3.cut!.short).toBe(true);
+    expect(r3.total).toBeCloseTo(6);
+    expect(r3.categories.find((c) => c.category.id === 'critical')!.selected).toHaveLength(1);
+  });
+
   it('W102: siblings at their main campus category rate by default, at the rate entered for their own MQI band (default inflation) when set', () => {
     const host = campus({ campusId: 'H1', score: 40, eCompoundNo: 'Z1' });
     const sib = campus({ campusId: 'S1', score: 90, eCompoundNo: 'Z1' }); // Excellent

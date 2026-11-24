@@ -107,6 +107,8 @@ export interface ScenarioConfig {
    * "No survey"), default inflation added; blank = the sibling keeps its main campus's category rate.
    */
   siblingBandRates?: Record<string, number | null>;
+  /** W103: budget cut required (Rs M); campuses are taken out (see BudgetResult.cut). Blank or 0 = no cut. */
+  budgetCut?: number | null;
   rmPlanSiblings?: {
     otherLastYearRate?: number | null;
     unknownLastYearRate?: number | null;
@@ -176,6 +178,32 @@ export interface CategoryResult {
   section?: 'rmPlanSibling';
 }
 
+/** W103: one campus taken out by the budget cut, with the siblings that went with it. */
+export interface CutUnit {
+  categoryId: string;
+  categoryName: string;
+  campusId: string;
+  name: string;
+  region: string;
+  score: number | null;
+  band: string;
+  siblings: { campusId: string; name: string; band: string }[];
+  /** Rs M saved: the campus and its siblings. */
+  cost: number;
+}
+
+export interface BudgetCut {
+  /** Cut asked for (Rs M). */
+  target: number;
+  /** Cut made (Rs M): close to the target, whole campuses only. */
+  achieved: number;
+  /** Budget before the cut (Rs M). */
+  before: number;
+  units: CutUnit[];
+  /** True when every campus outside the Unsafe categories was taken and the target was still not reached. */
+  short: boolean;
+}
+
 export interface RegionLine {
   region: string;
   zone: string;
@@ -193,6 +221,8 @@ export interface BudgetResult {
   ceiling: { ceilingRs: number; overrun: number; byCategory: { id: string; name: string; budget: number }[] } | null;
   /** Campuses with a survey in the window that land in no category. */
   unplaced: number;
+  /** W103: the budget cut, when one is asked for. */
+  cut?: BudgetCut;
   warnings: string[];
 }
 

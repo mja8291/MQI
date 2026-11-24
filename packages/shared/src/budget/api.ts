@@ -46,6 +46,7 @@ export const scenarioConfigSchema = z.object({
   categories: z.array(categorySchema).min(1).max(40),
   assumptions: z.record(z.string().max(120), metaSchema),
   siblingBandRates: z.record(z.string().max(20), money.nullable()).optional(),
+  budgetCut: money.nullable().optional(),
   rmPlanSiblings: z
     .object({ otherLastYearRate: money.nullable().optional(), unknownLastYearRate: money.nullable().optional(), rates: z.record(z.string().max(80), money.nullable()).optional() })
     .optional(),
