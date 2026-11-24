@@ -32,6 +32,11 @@ Specs: `RM_Budget_Module_Spec.md` and `RM_Budget_Build1_Prompt.md` (kept by the 
 - Units (host + siblings, same eCompoundNo) fill caps worst MQI first. TBD slots are reserved first. The first unit that doesn't fit and every unit after it go to the waitlist (one cut-off line). Unsafe categories are never trimmed: over the cap → overrun warning.
 - Anticipated categories: count × rate, or a lump sum (not inflated).
 - Overall ceiling: overrun shown, nothing trimmed.
+- Caps are optional (W91): a blank cap (projects or Rs) is not applied.
+- List adjustments (W91, Settings → List view): a campus removed from a category's list (`excludeIds`) never lands in that category, by rule or as a sibling, and falls to the next one it qualifies for; a campus added (`includeIds`) goes into that category whatever its rule (the earliest such category wins). Saved with the scenario.
+- TBD by region (W91): picked from the region list; the TBD count is at least what the regions add up to.
+- "Pull latest MQI categories" (W91) has the server work the dashboard's figures out again (`budget.campuses` with `fresh`).
+- Funding source removed (W91). Reviewers see the budget as "under construction" (Home card and budget site) until it is designed for them; the server still gives them no budget data.
 
 ## Assumptions and open points (for the user)
 

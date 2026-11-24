@@ -60,10 +60,16 @@ function matches(rule: CategoryRule, c: BudgetCampus): boolean {
 /** Campus-backed category index (precedence order) of each campus that qualifies on its own. */
 export function assignPrimaries(campuses: readonly BudgetCampus[], categories: readonly BudgetCategory[]): Map<string, number> {
   const out = new Map<string, number>();
+  // W91: campuses added to a category in its list go there first (the earliest such category wins).
+  const known = new Set(campuses.map((c) => c.campusId));
+  categories.forEach((cat, i) => {
+    for (const id of cat.includeIds ?? []) if (known.has(id) && !out.has(id) && !(cat.excludeIds ?? []).includes(id)) out.set(id, i);
+  });
   categories.forEach((cat, i) => {
     if (!cat.rule) return;
     const rule = cat.rule;
-    let picked = campuses.filter((c) => !out.has(c.campusId) && (c.score !== null || rule.type === 'manual') && matches(rule, c));
+    const excluded = new Set(cat.excludeIds ?? []);
+    let picked = campuses.filter((c) => !out.has(c.campusId) && !excluded.has(c.campusId) && (c.score !== null || rule.type === 'manual') && matches(rule, c));
     if (rule.type === 'bottomN') {
       picked = [...picked].sort((a, b) => (a.score ?? 0) - (b.score ?? 0) || a.name.localeCompare(b.name)).slice(0, Math.max(0, Math.floor(rule.n)));
     }
@@ -87,7 +93,8 @@ export function placeCampuses(campuses: readonly BudgetCampus[], categories: rea
     const ec = c.eCompoundNo.trim();
     if (ec) byEc.set(ec, [...(byEc.get(ec) ?? []), c]);
   }
-  categories.forEach((_, i) => {
+  categories.forEach((cat, i) => {
+    const excluded = new Set(cat.excludeIds ?? []);
     const hosts = campuses.filter((c) => {
       const p = placement.get(c.campusId);
       return p?.cat === i && p.role === 'primary';
@@ -96,7 +103,7 @@ export function placeCampuses(campuses: readonly BudgetCampus[], categories: rea
       const ec = host.eCompoundNo.trim();
       if (!ec) continue;
       for (const s of byEc.get(ec) ?? []) {
-        if (s.campusId === host.campusId) continue;
+        if (s.campusId === host.campusId || excluded.has(s.campusId)) continue;
         const current = placement.get(s.campusId);
         // A campus already in this or a higher category stays where it is (higher category wins).
         if (current && current.cat <= i) continue;

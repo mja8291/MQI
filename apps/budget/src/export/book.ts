@@ -51,7 +51,6 @@ export function categoryRows(res: BudgetResult) {
       capRs: c.category.capRs ?? null,
       capStatus: c.capStatus,
       waitlist: c.waitlist.length,
-      funding: c.category.fundingSource ?? '',
       lump,
     };
   });

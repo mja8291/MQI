@@ -15,7 +15,7 @@ import type { Ctx } from './context';
 import { fail } from './errors';
 import { withLock } from './lock';
 import type { Env, TablePort } from './ports';
-import { dashboard } from './reads';
+import { dashboard, forgetDashboard } from './reads';
 import { toRow } from './responses';
 import { Table } from './system';
 import type { Row } from './system';
@@ -171,7 +171,9 @@ export function state(ctx: Ctx): BudgetState {
 
 /** The imported master joined with each campus's latest MQI survey in the cycle's window (the dashboard's figures). */
 export function campuses(ctx: Ctx, raw: unknown): BudgetCampusesResult {
-  const { cycleId } = budgetCampusesPayload.parse(raw);
+  const { cycleId, fresh } = budgetCampusesPayload.parse(raw);
+  // W91: "Pull latest MQI categories" works the dashboard's figures out again instead of using the saved copy.
+  if (fresh) forgetDashboard(ctx.env);
   // W82: the budget sheet is read under the lock (its first use creates it); the dashboard outside it.
   const [row, master] = withLock(ctx, () => [table(ctx.env, 'CYCLES', 'id').get(cycleId), readMaster(ctx.env)] as const);
   if (!row) return fail('NOT_FOUND', 'Budget cycle not found.');

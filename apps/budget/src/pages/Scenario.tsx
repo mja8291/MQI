@@ -29,6 +29,15 @@ export function ScenarioPage() {
   const setDraft = (config: ScenarioConfig) => setEdit({ version, config });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
+  const [pulling, setPulling] = useState(false);
+  const pull = async () => {
+    setPulling(true);
+    try {
+      await campuses.pull();
+    } finally {
+      setPulling(false);
+    }
+  };
 
   const dirty = useMemo(() => !!scenario && !!draft && JSON.stringify(draft) !== JSON.stringify(scenario.config), [scenario, draft]);
   useEffect(() => {
@@ -96,7 +105,16 @@ export function ScenarioPage() {
       </p>
       {campuses.error ? <p className="text-warn" role="alert">{campuses.error}</p> : null}
       {tab === 'settings' ? (
-        <SettingsEditor config={draft} onChange={setDraft} regions={state.master.regions} />
+        <SettingsEditor
+          config={draft}
+          onChange={setDraft}
+          regions={state.master.regions}
+          result={result}
+          campuses={campuses.data?.campuses ?? []}
+          onPull={() => void pull()}
+          pulling={pulling}
+          mqiAsOf={campuses.data?.generatedAt ?? ''}
+        />
       ) : tab === 'assumptions' ? (
         <Assumptions config={draft} onChange={setDraft} />
       ) : result ? (
@@ -161,7 +179,6 @@ function Dashboard({ scenario, result }: { scenario: Scenario; result: BudgetRes
                   ) : (
                     <span className="font-semibold">{c.category.name}</span>
                   )}
-                  {c.category.fundingSource ? <span className="ml-2 text-[11px] text-ink-faint">{c.category.fundingSource}</span> : null}
                 </td>
                 <td className="num">{c.category.kind === 'campus' ? int(c.primaries) : c.category.lumpSum != null ? 'Lump sum' : int(c.anticipatedCount)}</td>
                 <td className="num">{c.category.kind === 'campus' ? int(c.siblings) : ''}</td>

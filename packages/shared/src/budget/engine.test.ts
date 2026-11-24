@@ -31,6 +31,23 @@ const cat = (r: ReturnType<typeof runBudget>, id: string) => r.categories.find((
 const ids = (list: { campus: BudgetCampus }[]) => list.map((p) => p.campus.campusId);
 
 describe('budgetEngine', () => {
+  it('W91: blank caps are not applied; a campus removed from a list falls to the next category, an added one goes in, a removed sibling stays out', () => {
+    const p1 = campus({ campusId: 'P1', score: 40, eCompoundNo: 'EC9' });
+    const sib = campus({ campusId: 'S9', score: 92, eCompoundNo: 'EC9' });
+    const p2 = campus({ campusId: 'P2', score: 45 });
+    const a1 = campus({ campusId: 'A1', score: 60 });
+    const ex = campus({ campusId: 'X1', score: 95 });
+    const base = runBudget([p1, sib, p2, a1, ex], config([{ ...POOR, capCount: null, capRs: undefined }, AVG]));
+    expect(cat(base, 'poor').capStatus).toBe('none');
+    expect(ids(cat(base, 'poor').selected).sort()).toEqual(['P1', 'P2', 'S9']);
+    // P2 removed from Poor (it scores 45, so no other category takes it); X1 (Excellent) added to Average; sibling S9 removed.
+    const r = runBudget([p1, sib, p2, a1, ex], config([{ ...POOR, excludeIds: ['P2', 'S9'] }, { ...AVG, includeIds: ['X1'] }]));
+    expect(ids(cat(r, 'poor').selected)).toEqual(['P1']);
+    expect(ids(cat(r, 'average').selected).sort()).toEqual(['A1', 'X1']);
+    expect(r.unplaced).toBe(2); // P2 and S9 are in no category now
+    expect(r.total).toBeCloseTo(2 + 2 * 1.5);
+  });
+
   it('precedence: a campus that qualifies for two categories lands in the higher one', () => {
     const a = campus({ campusId: 'A', score: 40, unsafe: 'critical' });
     const r = runBudget([a], config([CRIT, POOR]));

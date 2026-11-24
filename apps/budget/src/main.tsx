@@ -18,7 +18,7 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen">
       <header className="bg-brand-deep text-white">
-        <div className="mx-auto max-w-7xl px-4 h-14 flex items-center gap-3">
+        <div className="mx-auto max-w-[1720px] px-4 h-14 flex items-center gap-3">
           <img src="/tcf-logo.png" alt="" className="h-8 w-8 rounded bg-white p-0.5" />
           <Link to="/" className="font-semibold text-[15px]">
             R&amp;M Budget
@@ -37,7 +37,7 @@ function Shell({ children }: { children: ReactNode }) {
           ) : null}
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
+      <main className="mx-auto max-w-[1720px] px-4 py-6">{children}</main>
     </div>
   );
 }
@@ -81,7 +81,7 @@ function SignIn() {
 }
 
 function Gate() {
-  const { status, signOut } = useAuth();
+  const { status, signOut, user } = useAuth();
   if (status === 'loading') return <p className="text-ink-soft">Opening…</p>;
   if (status === 'signedOut') return <SignIn />;
   if (status === 'mustChange')
@@ -98,7 +98,14 @@ function Gate() {
   if (status === 'noAccess')
     return (
       <div className="card mx-auto mt-10 max-w-md p-6 text-[14px]" role="alert">
-        This account doesn&apos;t have access to the R&amp;M Budget. Ask an administrator to give you the Cost Manager role.
+        {user?.role === 'REVIEWER' ? (
+          // W91: Reviewers will get the budget once it is designed for them.
+          <>
+            <b>Site under construction.</b> The R&amp;M Budget for reviewers is being designed and will open here when it is launched.
+          </>
+        ) : (
+          <>This account doesn&apos;t have access to the R&amp;M Budget. Ask an administrator to give you the Cost Manager role.</>
+        )}
         <div className="mt-4">
           <button type="button" className="btn" onClick={signOut}>
             Sign out

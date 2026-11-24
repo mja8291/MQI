@@ -142,6 +142,14 @@ export function HomeTabs() {
             >
               Open R&amp;M Budget
             </a>
+          ) : user?.role === "REVIEWER" ? (
+            // W91: Reviewers will use the budget later; until it is designed for them it shows as under construction (no link, no data).
+            <div
+              aria-disabled="true"
+              className="w-full min-h-11 rounded-xl px-5 py-3 text-sm text-center border border-dashed border-border text-ink-soft mt-2.5"
+            >
+              <span className="font-semibold">R&amp;M Budget</span> · under construction
+            </div>
           ) : null}
           <OfflineReadyLine />
           {queue.pending.length > 0 ? (

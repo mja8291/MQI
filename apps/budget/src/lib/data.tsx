@@ -12,7 +12,8 @@ interface Data {
   putScenario(s: Scenario): void;
   campuses(cycleId: string): BudgetCampusesResult | null;
   campusError(cycleId: string): string;
-  loadCampuses(cycleId: string, force?: boolean): Promise<void>;
+  /** `fresh` (W91, "Pull latest MQI categories"): the server works the MQI results out again. */
+  loadCampuses(cycleId: string, force?: boolean, fresh?: boolean): Promise<void>;
 }
 
 const Ctx = createContext<Data | null>(null);
@@ -36,10 +37,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     void reload();
   }, [reload]);
 
-  const loadCampuses = useCallback(async (cycleId: string, force = false) => {
+  const loadCampuses = useCallback(async (cycleId: string, force = false, fresh = false) => {
     if (!force && byCycle[cycleId]) return;
     try {
-      const r = await api<BudgetCampusesResult>('budget.campuses', { cycleId });
+      const r = await api<BudgetCampusesResult>('budget.campuses', fresh ? { cycleId, fresh: true } : { cycleId });
       setByCycle((m) => ({ ...m, [cycleId]: r }));
       setCycleErrors((m) => ({ ...m, [cycleId]: '' }));
     } catch (e) {
@@ -68,7 +69,7 @@ export function useData(): Data {
 }
 
 /** The campuses of a cycle, loaded once. */
-export function useCycleCampuses(cycleId: string | undefined): { data: BudgetCampusesResult | null; error: string; refresh(): void } {
+export function useCycleCampuses(cycleId: string | undefined): { data: BudgetCampusesResult | null; error: string; refresh(): void; pull(): Promise<void> } {
   const d = useData();
   const { loadCampuses } = d;
   useEffect(() => {
@@ -78,6 +79,9 @@ export function useCycleCampuses(cycleId: string | undefined): { data: BudgetCam
     data: cycleId ? d.campuses(cycleId) : null,
     error: cycleId ? d.campusError(cycleId) : '',
     refresh: () => cycleId && void loadCampuses(cycleId, true),
+    pull: async () => {
+      if (cycleId) await loadCampuses(cycleId, true, true);
+    },
   };
 }
 

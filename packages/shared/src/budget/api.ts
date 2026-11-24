@@ -31,7 +31,9 @@ export const categorySchema = z.object({
   capCount: count.nullable().optional(),
   capRs: money.nullable().optional(),
   colour: z.string().max(20).optional(),
-  fundingSource: z.string().max(80).optional(),
+  // W91: list adjustments (funding source removed; old saves drop it).
+  includeIds: z.array(z.string().max(20)).max(3000).optional(),
+  excludeIds: z.array(z.string().max(20)).max(3000).optional(),
 });
 
 const metaSchema = z.object({ source: z.string().max(300), owner: z.string().max(120), date: z.string().max(20), note: z.string().max(1000) });
@@ -66,7 +68,8 @@ export const budgetZonesSavePayload = z.object({
   rows: z.array(z.object({ region: z.string().trim().min(1).max(80), zone: z.string().trim().max(80) })).max(200),
 });
 
-export const budgetCampusesPayload = z.object({ cycleId: z.string().min(1).max(64) });
+/** W91: `fresh` = "Pull latest MQI categories": the dashboard's figures are worked out again first. */
+export const budgetCampusesPayload = z.object({ cycleId: z.string().min(1).max(64), fresh: z.boolean().optional() });
 
 export interface BudgetState {
   cycles: BudgetCycle[];

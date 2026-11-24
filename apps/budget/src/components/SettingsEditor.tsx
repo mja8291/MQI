@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
-import { rateFor } from '@mqi/shared';
-import type { BudgetCategory, CategoryRule, RatingBand, ScenarioConfig } from '@mqi/shared';
-import { rs } from '../lib/format';
+import { Fragment, useEffect, useState } from 'react';
+import { UNSAFE_LEVEL_LABEL, rateFor } from '@mqi/shared';
+import type { BudgetCampus, BudgetCategory, BudgetResult, CategoryResult, CategoryRule, PlacedCampus, RatingBand, ScenarioConfig } from '@mqi/shared';
+import { dateTime, int, rs, score } from '../lib/format';
+import { CapBadge } from './CapBadge';
 
 const SEEDED = new Set(['critical', 'partial', 'poor', 'average', 'bottomGood', 'emergencies', 'minor', 'special']);
 const BANDS: RatingBand[] = ['Poor', 'Average', 'Good', 'Excellent'];
 
 /** A number box: empty means "not set" (null). */
-function Num({ value, onChange, label, width = 'w-20', step = 'any' }: { value: number | null | undefined; onChange: (v: number | null) => void; label: string; width?: string; step?: string }) {
+function Num({ value, onChange, label, width = 'w-20', step = 'any', placeholder }: { value: number | null | undefined; onChange: (v: number | null) => void; label: string; width?: string; step?: string; placeholder?: string }) {
   const [text, setText] = useState(value === null || value === undefined ? '' : String(value));
   useEffect(() => {
     setText((t) => (Number(t) === value && t !== '' ? t : value === null || value === undefined ? '' : String(value)));
@@ -19,6 +20,7 @@ function Num({ value, onChange, label, width = 'w-20', step = 'any' }: { value: 
       aria-label={label}
       value={text}
       step={step}
+      placeholder={placeholder}
       onChange={(e) => {
         const t = e.target.value;
         setText(t);
@@ -103,42 +105,183 @@ function RuleEditor({ rule, onChange, name }: { rule: CategoryRule; onChange: (r
   );
 }
 
-function parseByRegion(text: string): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const part of text.split(/[;\n]/)) {
-    const m = /^(.+?)\s*[:=]\s*(\d+)\s*$/.exec(part.trim());
-    if (m) out[m[1]!.trim()] = Number(m[2]);
-  }
-  return out;
-}
-const byRegionText = (r: Record<string, number> | undefined) =>
-  Object.entries(r ?? {})
-    .map(([k, v]) => `${k}: ${v}`)
-    .join('; ');
-
-function ByRegion({ value, onChange, label, regions }: { value: Record<string, number> | undefined; onChange: (v: Record<string, number>) => void; label: string; regions: string[] }) {
-  const [text, setText] = useState(byRegionText(value));
-  useEffect(() => setText((t) => (byRegionText(parseByRegion(t)) === byRegionText(value) ? t : byRegionText(value))), [value]);
+/** W91: TBD slots per region, picked from the region list (no typing). */
+function ByRegion({ value, onChange, name, regions }: { value: Record<string, number> | undefined; onChange: (v: Record<string, number>) => void; name: string; regions: string[] }) {
+  const entries = Object.entries(value ?? {});
+  const free = regions.filter((r) => !(r in (value ?? {})));
+  const set = (region: string, n: number | null) => onChange({ ...(value ?? {}), [region]: Math.floor(n ?? 0) });
+  const drop = (region: string) => onChange(Object.fromEntries(entries.filter(([r]) => r !== region)));
   return (
-    <input
-      className="cell w-44"
-      aria-label={label}
-      placeholder={regions[0] ? `${regions[0]}: 2; …` : 'Region: 2; …'}
-      title="Optional: how many TBD slots per region, e.g. North: 2; South: 1"
-      value={text}
-      onChange={(e) => {
-        setText(e.target.value);
-        onChange(parseByRegion(e.target.value));
-      }}
-    />
+    <div className="space-y-1 min-w-36">
+      {entries.map(([r, n]) => (
+        <div key={r} className="flex items-center gap-1">
+          <span className="text-[12px] flex-1 whitespace-nowrap">{r}</span>
+          <Num label={`TBD in ${r} for ${name}`} width="w-14" step="1" value={n} onChange={(v) => set(r, v)} />
+          <button type="button" className="px-1 text-ink-faint" aria-label={`Remove ${r} from TBD of ${name}`} onClick={() => drop(r)}>
+            ✕
+          </button>
+        </div>
+      ))}
+      {free.length ? (
+        <select className="cell w-full" aria-label={`Add a region to TBD of ${name}`} value="" onChange={(e) => e.target.value && set(e.target.value, 1)}>
+          <option value="">+ Region…</option>
+          {free.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      ) : null}
+    </div>
   );
 }
 
-export function SettingsEditor({ config, onChange, regions }: { config: ScenarioConfig; onChange: (c: ScenarioConfig) => void; regions: string[] }) {
+/**
+ * W91: a category's campuses, right under its row. Removing a campus keeps it out of this category (it
+ * falls to the next one it qualifies for); a campus can be added by ID or name. The row's figures and the
+ * totals update at once; Save keeps the adjustments with the scenario.
+ */
+function ListView({ result, campuses, category, onChange }: { result: CategoryResult | undefined; campuses: BudgetCampus[]; category: BudgetCategory; onChange: (patch: Partial<BudgetCategory>) => void }) {
+  const [add, setAdd] = useState('');
+  const [msg, setMsg] = useState('');
+  const include = category.includeIds ?? [];
+  const exclude = category.excludeIds ?? [];
+  const byId = new Map(campuses.map((c) => [c.campusId, c]));
+  const remove = (id: string) => onChange({ includeIds: include.filter((x) => x !== id), excludeIds: [...new Set([...exclude, id])] });
+  const restore = (id: string) => onChange({ excludeIds: exclude.filter((x) => x !== id) });
+  const addCampus = () => {
+    const q = add.trim().toLowerCase();
+    if (!q) return;
+    const found = byId.get(add.trim()) ?? campuses.find((c) => c.name.toLowerCase() === q) ?? campuses.find((c) => `${c.campusId} · ${c.name}`.toLowerCase() === q);
+    if (!found) return setMsg('No campus with that ID or name in the master list.');
+    onChange({ includeIds: [...new Set([...include, found.campusId])], excludeIds: exclude.filter((x) => x !== found.campusId) });
+    setAdd('');
+    setMsg(`${found.name} added.`);
+  };
+  const rows = (list: PlacedCampus[], muted = false) =>
+    list.map((p) => (
+      <tr key={p.campus.campusId} className={muted ? 'opacity-70' : ''}>
+        <td className="num text-ink-faint">{p.unit}</td>
+        <td className="font-semibold">{p.campus.name}</td>
+        <td>{p.campus.campusId}</td>
+        <td className="num">{score(p.campus.score)}</td>
+        <td>{p.campus.band ?? ''}</td>
+        <td>{p.campus.unsafe ? UNSAFE_LEVEL_LABEL[p.campus.unsafe] : ''}</td>
+        <td>{p.campus.region}</td>
+        <td>{p.campus.eCompoundNo}</td>
+        <td>
+          {p.tag ? <span className="rounded bg-brand-tint px-1.5 py-0.5 text-[11.5px] text-brand">{p.tag}</span> : null}
+          {include.includes(p.campus.campusId) ? <span className="ml-1 rounded bg-surface px-1.5 py-0.5 text-[11.5px]">added</span> : null}
+          {muted ? <span className="ml-1 text-[11.5px] text-warn">waitlist</span> : null}
+        </td>
+        <td className="num">{rs(p.rate)}</td>
+        <td>
+          <button type="button" className="btn" onClick={() => remove(p.campus.campusId)}>
+            Remove
+          </button>
+        </td>
+      </tr>
+    ));
+  return (
+    <div className="rounded-lg border border-border bg-surface/50 p-3" data-testid={`list-${category.id}`}>
+      <div className="flex flex-wrap items-center gap-2 mb-2">
+        <b className="text-brand-deep">{category.name}: campus list</b>
+        <span className="text-ink-soft">Remove a campus to keep it out of this category; add one by Campus ID or name.</span>
+        <div className="flex-1" />
+        <input
+          className="cell w-64"
+          list={`campus-options-${category.id}`}
+          placeholder="Campus ID or name"
+          aria-label={`Add a campus to ${category.name}`}
+          value={add}
+          onChange={(e) => {
+            setAdd(e.target.value);
+            setMsg('');
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && addCampus()}
+        />
+        <datalist id={`campus-options-${category.id}`}>
+          {campuses.slice(0, 2000).map((c) => (
+            <option key={c.campusId} value={c.campusId}>
+              {c.name}
+            </option>
+          ))}
+        </datalist>
+        <button type="button" className="btn" onClick={addCampus}>
+          Add
+        </button>
+        {msg ? <span className="text-[12px] text-ink-soft" role="status">{msg}</span> : null}
+      </div>
+      {result && (result.selected.length || result.waitlist.length) ? (
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th className="num">Unit</th>
+              <th>Campus</th>
+              <th>Campus ID</th>
+              <th className="num">MQI</th>
+              <th>Band</th>
+              <th>Unsafe</th>
+              <th>Region</th>
+              <th>E-compound</th>
+              <th>Tags</th>
+              <th className="num">Rs M</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows(result.selected)}
+            {rows(result.waitlist, true)}
+          </tbody>
+        </table>
+      ) : (
+        <p className="text-ink-soft">No campuses in this category.</p>
+      )}
+      {exclude.length ? (
+        <div className="mt-2 text-[12.5px]">
+          <span className="text-ink-soft">Removed from this category: </span>
+          {exclude.map((id) => (
+            <span key={id} className="mr-2 inline-flex items-center gap-1 rounded bg-white border border-border px-1.5 py-0.5">
+              {byId.get(id)?.name ?? id}
+              <button type="button" className="text-brand underline" onClick={() => restore(id)}>
+                Restore
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function SettingsEditor({
+  config,
+  onChange,
+  regions,
+  result,
+  campuses,
+  onPull,
+  pulling,
+  mqiAsOf,
+}: {
+  config: ScenarioConfig;
+  onChange: (c: ScenarioConfig) => void;
+  regions: string[];
+  result: BudgetResult | null;
+  campuses: BudgetCampus[];
+  onPull: () => void;
+  pulling: boolean;
+  mqiAsOf: string;
+}) {
+  const [open, setOpen] = useState<string | null>(null);
   const cats = config.categories;
   const setCat = (id: string, patch: Partial<BudgetCategory>) => onChange({ ...config, categories: cats.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
   const campusCats = cats.filter((c) => c.kind === 'campus');
   const anticipated = cats.filter((c) => c.kind === 'anticipated');
+  const live = (id: string) => result?.categories.find((r) => r.category.id === id);
+  const sum = (list: BudgetCategory[], f: (r: CategoryResult) => number) => list.reduce((s, c) => s + (live(c.id) ? f(live(c.id)!) : 0), 0);
+  const campusTotal = sum(campusCats, (r) => r.budget);
+  const anticipatedTotal = sum(anticipated, (r) => r.budget);
   const move = (id: string, dir: -1 | 1) => {
     const order = campusCats.map((c) => c.id);
     const i = order.indexOf(id);
@@ -160,6 +303,7 @@ export function SettingsEditor({ config, onChange, regions }: { config: Scenario
         : { id, name: 'New item', kind, lastYearRate: null, count: 0, colour: '#667085' };
     onChange({ ...config, categories: kind === 'campus' ? [...campusCats, c, ...anticipated] : [...cats, c] });
   };
+  const CAMPUS_COLS = 16;
 
   return (
     <div className="space-y-4 text-[13px]">
@@ -188,70 +332,114 @@ export function SettingsEditor({ config, onChange, regions }: { config: Scenario
       </section>
 
       <section className="card p-4 overflow-x-auto">
-        <h2 className="font-semibold text-brand-deep mb-1">Campus categories (in precedence order)</h2>
-        <p className="text-ink-soft mb-2">A campus goes to the first category it qualifies for. Caps fill worst MQI first; TBD slots count against the cap.</p>
+        <div className="flex flex-wrap items-center gap-3 mb-1">
+          <h2 className="font-semibold text-brand-deep">Campus categories (in precedence order)</h2>
+          <div className="flex-1" />
+          <span className="text-[12px] text-ink-faint">{mqiAsOf ? `MQI results as of ${dateTime(mqiAsOf)}` : ''}</span>
+          <button type="button" className="btn" onClick={onPull} disabled={pulling}>
+            {pulling ? 'Pulling…' : 'Pull latest MQI categories'}
+          </button>
+        </div>
+        <p className="text-ink-soft mb-2">
+          A campus goes to the first category it qualifies for. Campuses, Rate and Budget update live from the latest MQI results. Caps are optional: leave them blank for no cap; when set they fill worst MQI first and TBD slots count against them.
+        </p>
         <table className="tbl" data-testid="campus-settings">
           <thead>
             <tr>
               <th>Order</th>
               <th>Name</th>
               <th>Rule</th>
-              <th className="num">Last year cost / campus (Rs M)</th>
-              <th className="num">Inflation % (blank = default)</th>
-              <th className="num">Rate now</th>
+              <th className="num whitespace-normal w-24">Last year cost / campus (Rs M)</th>
+              <th className="num whitespace-normal w-20" title="Leave blank to use the default inflation">Inflation % (blank = default)</th>
+              <th className="num">Rate (Rs M)</th>
+              <th className="num">Campuses</th>
+              <th className="num">Siblings</th>
               <th className="num">TBD</th>
               <th>TBD by region</th>
               <th className="num">Cap (projects)</th>
               <th className="num">Cap (Rs M)</th>
-              <th>Colour</th>
-              <th>Funding source</th>
+              <th>Cap</th>
+              <th className="num">Budget (Rs M)</th>
+              <th />
               <th />
             </tr>
           </thead>
           <tbody>
-            {campusCats.map((c, i) => (
-              <tr key={c.id}>
-                <td className="whitespace-nowrap">
-                  {i + 1}
-                  <button type="button" className="ml-1 px-1" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={() => move(c.id, -1)}>
-                    ▲
-                  </button>
-                  <button type="button" className="px-1" aria-label={`Move ${c.name} down`} disabled={i === campusCats.length - 1} onClick={() => move(c.id, 1)}>
-                    ▼
-                  </button>
-                </td>
-                <td>
-                  <input className="cell w-36" aria-label={`Name of ${c.name}`} value={c.name} onChange={(e) => setCat(c.id, { name: e.target.value })} />
-                </td>
-                <td>{c.rule ? <RuleEditor rule={c.rule} name={c.name} onChange={(rule) => setCat(c.id, { rule })} /> : null}</td>
-                <td className="num">
-                  <Num label={`Last year cost of ${c.name}`} value={c.lastYearRate} onChange={(v) => setCat(c.id, { lastYearRate: v })} />
-                </td>
-                <td className="num">
-                  <Num label={`Inflation of ${c.name}`} width="w-16" value={c.inflationPct} onChange={(v) => setCat(c.id, { inflationPct: v })} />
-                </td>
-                <td className="num">{c.lastYearRate === null ? <span className="text-warn">not set</span> : rs(rateFor(c, config))}</td>
-                <td className="num">
-                  <Num label={`TBD of ${c.name}`} width="w-16" step="1" value={c.tbdCount ?? 0} onChange={(v) => setCat(c.id, { tbdCount: Math.floor(v ?? 0) })} />
-                </td>
-                <td>
-                  <ByRegion label={`TBD by region of ${c.name}`} regions={regions} value={c.tbdByRegion} onChange={(tbdByRegion) => setCat(c.id, { tbdByRegion })} />
-                </td>
-                <td className="num">
-                  <Num label={`Cap count of ${c.name}`} width="w-16" step="1" value={c.capCount} onChange={(v) => setCat(c.id, { capCount: v === null ? null : Math.floor(v) })} />
-                </td>
-                <td className="num">
-                  <Num label={`Cap Rs of ${c.name}`} width="w-20" value={c.capRs} onChange={(v) => setCat(c.id, { capRs: v })} />
-                </td>
-                <td>
-                  <input type="color" aria-label={`Colour of ${c.name}`} value={c.colour ?? '#667085'} onChange={(e) => setCat(c.id, { colour: e.target.value })} />
-                </td>
-                <td>
-                  <input className="cell w-28" aria-label={`Funding source of ${c.name}`} value={c.fundingSource ?? ''} onChange={(e) => setCat(c.id, { fundingSource: e.target.value })} />
-                </td>
-                <td>{SEEDED.has(c.id) ? null : <button type="button" className="btn btn-danger" onClick={() => remove(c)}>Remove</button>}</td>
-              </tr>
-            ))}
+            {campusCats.map((c, i) => {
+              const r = live(c.id);
+              return (
+                <Fragment key={c.id}>
+                  <tr>
+                    <td className="whitespace-nowrap">
+                      {i + 1}
+                      <button type="button" className="ml-1 px-1" aria-label={`Move ${c.name} up`} disabled={i === 0} onClick={() => move(c.id, -1)}>
+                        ▲
+                      </button>
+                      <button type="button" className="px-1" aria-label={`Move ${c.name} down`} disabled={i === campusCats.length - 1} onClick={() => move(c.id, 1)}>
+                        ▼
+                      </button>
+                    </td>
+                    <td className="whitespace-nowrap">
+                      <input type="color" className="mr-1 align-middle h-6 w-6" aria-label={`Colour of ${c.name}`} value={c.colour ?? '#667085'} onChange={(e) => setCat(c.id, { colour: e.target.value })} />
+                      <input className="cell w-32" aria-label={`Name of ${c.name}`} value={c.name} onChange={(e) => setCat(c.id, { name: e.target.value })} />
+                    </td>
+                    <td>{c.rule ? <RuleEditor rule={c.rule} name={c.name} onChange={(rule) => setCat(c.id, { rule })} /> : null}</td>
+                    <td className="num">
+                      <Num label={`Last year cost of ${c.name}`} value={c.lastYearRate} onChange={(v) => setCat(c.id, { lastYearRate: v })} />
+                    </td>
+                    <td className="num">
+                      <Num label={`Inflation of ${c.name}`} width="w-16" value={c.inflationPct} onChange={(v) => setCat(c.id, { inflationPct: v })} />
+                    </td>
+                    <td className="num" data-testid={`rate-${c.id}`}>{c.lastYearRate === null ? <span className="text-warn">not set</span> : rs(rateFor(c, config))}</td>
+                    <td className="num" data-testid={`campuses-${c.id}`}>{r ? int(r.primaries) : '…'}</td>
+                    <td className="num">{r ? int(r.siblings) : '…'}</td>
+                    <td className="num">
+                      <Num label={`TBD of ${c.name}`} width="w-16" step="1" value={c.tbdCount ?? 0} onChange={(v) => setCat(c.id, { tbdCount: Math.floor(v ?? 0) })} />
+                    </td>
+                    <td>
+                      <ByRegion
+                        name={c.name}
+                        regions={regions}
+                        value={c.tbdByRegion}
+                        // The TBD count is at least what the regions add up to.
+                        onChange={(tbdByRegion) => setCat(c.id, { tbdByRegion, tbdCount: Math.max(c.tbdCount ?? 0, Object.values(tbdByRegion).reduce((s, n) => s + n, 0)) })}
+                      />
+                    </td>
+                    <td className="num">
+                      <Num label={`Cap count of ${c.name}`} width="w-16" step="1" placeholder="none" value={c.capCount} onChange={(v) => setCat(c.id, { capCount: v === null ? null : Math.floor(v) })} />
+                    </td>
+                    <td className="num">
+                      <Num label={`Cap Rs of ${c.name}`} width="w-20" placeholder="none" value={c.capRs} onChange={(v) => setCat(c.id, { capRs: v })} />
+                    </td>
+                    <td>{r ? <CapBadge status={r.capStatus} category={c} /> : null}</td>
+                    <td className="num font-semibold" data-testid={`budget-${c.id}`}>{r ? rs(r.budget) : '…'}</td>
+                    <td>
+                      <button type="button" className="btn" aria-expanded={open === c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>
+                        {open === c.id ? 'Close list' : 'List view'}
+                      </button>
+                    </td>
+                    <td>{SEEDED.has(c.id) ? null : <button type="button" className="btn btn-danger" onClick={() => remove(c)}>Remove</button>}</td>
+                  </tr>
+                  {open === c.id ? (
+                    <tr>
+                      <td colSpan={CAMPUS_COLS}>
+                        <ListView result={r} campuses={campuses} category={c} onChange={(patch) => setCat(c.id, patch)} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+            <tr className="font-semibold bg-surface/60" data-testid="campus-total">
+              <td />
+              <td colSpan={5}>Total, campus categories</td>
+              <td className="num">{int(sum(campusCats, (r) => r.primaries))}</td>
+              <td className="num">{int(sum(campusCats, (r) => r.siblings))}</td>
+              <td className="num">{int(sum(campusCats, (r) => r.tbd))}</td>
+              <td colSpan={4} />
+              <td className="num">{rs(campusTotal)}</td>
+              <td colSpan={2} />
+            </tr>
           </tbody>
         </table>
         <button type="button" className="btn mt-3" onClick={() => add('campus')}>
@@ -271,14 +459,16 @@ export function SettingsEditor({ config, onChange, regions }: { config: Scenario
               <th className="num">Last year cost / item (Rs M)</th>
               <th className="num">Inflation %</th>
               <th className="num">Lump sum (Rs M)</th>
+              <th className="num">Rate (Rs M)</th>
+              <th className="num">Budget (Rs M)</th>
               <th>Colour</th>
-              <th>Funding source</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {anticipated.map((c) => {
               const lump = c.lumpSum !== null && c.lumpSum !== undefined;
+              const r = live(c.id);
               return (
                 <tr key={c.id}>
                   <td>
@@ -294,21 +484,46 @@ export function SettingsEditor({ config, onChange, regions }: { config: Scenario
                   <td className="num">{lump ? '' : <Num label={`Last year cost of ${c.name}`} value={c.lastYearRate} onChange={(v) => setCat(c.id, { lastYearRate: v })} />}</td>
                   <td className="num">{lump ? '' : <Num label={`Inflation of ${c.name}`} width="w-16" value={c.inflationPct} onChange={(v) => setCat(c.id, { inflationPct: v })} />}</td>
                   <td className="num">{lump ? <Num label={`Lump sum of ${c.name}`} width="w-24" value={c.lumpSum} onChange={(v) => setCat(c.id, { lumpSum: v ?? 0 })} /> : ''}</td>
+                  <td className="num">{lump ? '' : c.lastYearRate === null ? <span className="text-warn">not set</span> : rs(rateFor(c, config))}</td>
+                  <td className="num font-semibold" data-testid={`budget-${c.id}`}>{r ? rs(r.budget) : '…'}</td>
                   <td>
                     <input type="color" aria-label={`Colour of ${c.name}`} value={c.colour ?? '#667085'} onChange={(e) => setCat(c.id, { colour: e.target.value })} />
-                  </td>
-                  <td>
-                    <input className="cell w-28" aria-label={`Funding source of ${c.name}`} value={c.fundingSource ?? ''} onChange={(e) => setCat(c.id, { fundingSource: e.target.value })} />
                   </td>
                   <td>{SEEDED.has(c.id) ? null : <button type="button" className="btn btn-danger" onClick={() => remove(c)}>Remove</button>}</td>
                 </tr>
               );
             })}
+            <tr className="font-semibold bg-surface/60" data-testid="anticipated-total">
+              <td colSpan={2}>Total, anticipated categories</td>
+              <td className="num">{int(anticipated.reduce((s, c) => s + (c.lumpSum != null ? 0 : (c.count ?? 0)), 0))}</td>
+              <td colSpan={4} />
+              <td className="num">{rs(anticipatedTotal)}</td>
+              <td colSpan={2} />
+            </tr>
           </tbody>
         </table>
         <button type="button" className="btn mt-3" onClick={() => add('anticipated')}>
           Add anticipated category
         </button>
+      </section>
+
+      <section className="card p-4" data-testid="grand-total">
+        <table className="tbl max-w-xl">
+          <tbody>
+            <tr>
+              <td>Campus categories</td>
+              <td className="num">Rs {rs(campusTotal)}M</td>
+            </tr>
+            <tr>
+              <td>Anticipated categories</td>
+              <td className="num">Rs {rs(anticipatedTotal)}M</td>
+            </tr>
+            <tr className="font-semibold text-brand-deep text-[15px]">
+              <td>Grand total</td>
+              <td className="num" data-testid="grand-total-value">Rs {rs(campusTotal + anticipatedTotal)}M</td>
+            </tr>
+          </tbody>
+        </table>
       </section>
     </div>
   );

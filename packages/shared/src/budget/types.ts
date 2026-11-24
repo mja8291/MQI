@@ -57,10 +57,18 @@ export interface BudgetCategory {
   tbdCount?: number;
   /** Optional split of the TBD slots by region (counts should add up to tbdCount). */
   tbdByRegion?: Record<string, number>;
+  /** Blank (null/undefined) = no cap on the number of projects (W91: optional). */
   capCount?: number | null;
+  /** Blank (null/undefined) = no cap on the amount (W91: optional). */
   capRs?: number | null;
   colour?: string;
-  fundingSource?: string;
+  /**
+   * W91: adjustments made in a category's list. `includeIds` are put in this category whatever its rule
+   * (first category in precedence wins); `excludeIds` never land in it, by rule or as a sibling, and
+   * fall through to the next category they qualify for.
+   */
+  includeIds?: string[];
+  excludeIds?: string[];
 }
 
 /** Where a figure came from (assumption register). */

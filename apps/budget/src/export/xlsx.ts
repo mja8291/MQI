@@ -65,7 +65,7 @@ function scenarioSheets(wb: ExcelJS.Workbook, book: Book, s: BookScenario, prefi
 
   // Summary with live formulas.
   title(ws, `Budget book — ${bookTitle(book)}`, sub);
-  const cols = ['Category', 'Precedence', 'Campuses', 'Siblings', 'TBD', 'Anticipated count', 'Rate (Rs M)', 'Budget (Rs M)', 'Cap (projects)', 'Cap (Rs M)', 'Cap status', 'Waitlist', 'Funding source'];
+  const cols = ['Category', 'Precedence', 'Campuses', 'Siblings', 'TBD', 'Anticipated count', 'Rate (Rs M)', 'Budget (Rs M)', 'Cap (projects)', 'Cap (Rs M)', 'Cap status', 'Waitlist'];
   header(ws, 4, cols);
   const cats = categoryRows(res);
   const C = q(names.campuses);
@@ -93,7 +93,6 @@ function scenarioSheets(wb: ExcelJS.Workbook, book: Book, s: BookScenario, prefi
     ws.getCell(r, 10).value = c.capRs ?? '';
     ws.getCell(r, 11).value = CAP_STATUS_TEXT[c.capStatus] ?? '';
     ws.getCell(r, 12).value = c.waitlist || '';
-    ws.getCell(r, 13).value = c.funding;
   });
   const first = 5;
   const last = 4 + cats.length;
