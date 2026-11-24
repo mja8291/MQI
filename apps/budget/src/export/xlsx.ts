@@ -90,8 +90,8 @@ function scenarioSheets(wb: ExcelJS.Workbook, book: Book, s: BookScenario, prefi
     ws.getCell(r, 7).numFmt = MONEY;
     ws.getCell(r, 7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF7E0' } };
     ws.getCell(r, 8).value =
-      c.sibRate != null
-        ? { formula: `(C${r}+E${r}+F${r})*G${r}+D${r}*${r2(c.sibRate)}`, result: r2(c.budget) } // W100: siblings at their own rate
+      c.sibCost != null
+        ? { formula: `(C${r}+E${r}+F${r})*G${r}+${r2(c.sibCost)}`, result: r2(c.budget) } // W102: siblings at their band rates
         : { formula: `(C${r}+D${r}+E${r}+F${r})*G${r}`, result: r2(c.budget) };
     ws.getCell(r, 8).numFmt = MONEY;
     ws.getCell(r, 9).value = c.capCount ?? '';
@@ -124,7 +124,7 @@ function scenarioSheets(wb: ExcelJS.Workbook, book: Book, s: BookScenario, prefi
     ws.getCell(lyRow + 3, 8).value = { formula: `MAX(0,H${tr}-H${lyRow + 2})`, result: r2(res.ceiling.overrun) };
     ws.getCell(lyRow + 3, 8).numFmt = MONEY;
   }
-  ws.getCell(lyRow + 5, 1).value = 'Rates (yellow) can be changed: counts come from the Campuses sheet and budgets recalculate. Siblings are costed at their host category\'s rate, or at the sibling rate entered for it.';
+  ws.getCell(lyRow + 5, 1).value = 'Rates (yellow) can be changed: counts come from the Campuses sheet and budgets recalculate. Siblings are costed at their host category\'s rate, or at the rate entered for their own MQI band.';
   ws.getCell(lyRow + 5, 1).font = { italic: true, color: { argb: 'FF4B5C50' } };
   if (res.warnings.length) {
     ws.getCell(lyRow + 7, 1).value = 'Warnings';

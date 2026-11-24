@@ -255,6 +255,9 @@ function ListView({ result, campuses, category, onChange }: { result: CategoryRe
   );
 }
 
+/** W102: the sibling bands, in this order. */
+const SIB_BANDS = ['Poor', 'Average', 'Good', 'Excellent', 'No survey'] as const;
+
 export function SettingsEditor({
   config,
   onChange,
@@ -299,13 +302,13 @@ export function SettingsEditor({
    * W101: one row of the simplified Sibling campuses table, with its campus list (band, safety, main
    * campus or survey plan).
    */
-  const sibLine = (o: { key: string; label: React.ReactNode; catRate?: number | null; rateCell: React.ReactNode; rate: number | null; list: PlacedCampus[]; budget: number }) => (
+  const sibLine = (o: { key: string; label: React.ReactNode; catRate?: number | null; rateCell: React.ReactNode; rate: number | null; rateNote?: string; list: PlacedCampus[]; budget: number }) => (
     <Fragment key={o.key}>
       <tr>
         <td>{o.label}</td>
         <td className="num">{o.catRate === undefined ? '' : o.catRate === null ? <span className="text-warn">not set</span> : rs(o.catRate)}</td>
         <td className="num">{o.rateCell}</td>
-        <td className="num">{o.rate === null ? <span className="text-warn">not set</span> : rs(o.rate)}</td>
+        <td className="num">{o.rateNote ? <span className="text-ink-faint">{o.rateNote}</span> : o.rate === null ? <span className="text-warn">not set</span> : rs(o.rate)}</td>
         <td className="num" data-testid={`sib-campuses-${o.key}`}>{int(o.list.length)}</td>
         <td className="num font-semibold">{rs(o.budget)}</td>
         <td>
@@ -324,7 +327,6 @@ export function SettingsEditor({
                   <th>Campus ID</th>
                   <th className="num">MQI</th>
                   <th>Band</th>
-                  <th>Safety</th>
                   <th>Main campus / survey plan</th>
                   <th>Region</th>
                   <th>E-compound</th>
@@ -338,7 +340,6 @@ export function SettingsEditor({
                     <td>{p.campus.campusId}</td>
                     <td className="num">{score(p.campus.score)}</td>
                     <td>{p.campus.band ?? 'No survey'}</td>
-                    <td>{p.campus.unsafe ? UNSAFE_LEVEL_LABEL[p.campus.unsafe] : p.campus.score !== null ? 'Safe' : ''}</td>
                     <td>{p.hostId ? `With ${hostName.get(p.hostId) ?? p.hostId}` : [p.campus.planCategory, p.campus.planAssessment].filter(Boolean).join(' · ')}</td>
                     <td>{p.campus.region}</td>
                     <td>{p.campus.eCompoundNo}</td>
@@ -556,14 +557,14 @@ export function SettingsEditor({
       <section className="card p-4 overflow-x-auto" data-testid="rm-siblings">
         <h2 className="font-semibold text-brand-deep mb-1">Sibling campuses</h2>
         <p className="text-ink-soft mb-2">
-          <b>A. Siblings of shortlisted campuses</b>: share an e-compound with a campus in a category above; costed at that category&apos;s rate unless you enter another (they count against its cap).{' '}
+          <b>A. Siblings of shortlisted campuses</b>: share an e-compound with a campus in a category above; shown by their own MQI band; each sibling is costed at its main campus&apos;s category rate unless you enter a rate for its band (they count against that cap).{' '}
           <b>B. R&amp;M Plan siblings</b>: on the R&amp;M Plan list, share an e-compound, in no category; costed at the rate of the category their own MQI matches, or at the rate entered on their line.
         </p>
         <table className="tbl">
           <thead>
             <tr>
               <th>Line</th>
-              <th className="num">Category rate (Rs M)</th>
+              <th className="num" />
               <th className="num">Last year cost / campus (Rs M)</th>
               <th className="num">Rate (Rs M)</th>
               <th className="num">Campuses</th>
@@ -573,7 +574,7 @@ export function SettingsEditor({
           </thead>
           <tbody>
             <tr className="bg-surface/40" data-testid="sib-group-shortlisted">
-              <td className="font-semibold" colSpan={5}>A. Siblings of shortlisted campuses — by main campus&apos;s category</td>
+              <td className="font-semibold" colSpan={5}>A. Siblings of shortlisted campuses — by their own MQI band</td>
               <td className="num font-semibold">{rs(shortlistedSibTotal)}</td>
               <td />
             </tr>
@@ -582,18 +583,26 @@ export function SettingsEditor({
                 <td colSpan={7} className="text-ink-faint pl-4">None.</td>
               </tr>
             )}
-            {withSiblings.map((r) => {
-              const list = r.selected.filter((p) => p.role === 'sibling');
+            {SIB_BANDS.map((band) => {
+              const list = withSiblings.flatMap((r) => r.selected.filter((p) => p.role === 'sibling' && (p.campus.band ?? 'No survey') === band));
+              if (!list.length) return null;
+              const own = config.siblingBandRates?.[band];
               return sibLine({
-                key: `sibof:${r.category.id}`,
-                label: <span className="pl-4">{r.category.name}</span>,
-                catRate: r.category.lastYearRate === null ? null : r.rate,
+                key: `sibband:${band}`,
+                label: <span className="pl-4 font-semibold">{band}</span>,
+                catRate: undefined,
                 rateCell: (
-                  <Num label={`Sibling last year cost of ${r.category.name}`} placeholder="same" value={r.category.siblingLastYearRate} onChange={(v) => setCat(r.category.id, { siblingLastYearRate: v })} />
+                  <Num
+                    label={`Sibling last year cost for ${band}`}
+                    placeholder="main campus"
+                    value={own}
+                    onChange={(v) => onChange({ ...config, siblingBandRates: { ...(config.siblingBandRates ?? {}), [band]: v } })}
+                  />
                 ),
-                rate: r.category.lastYearRate === null && r.category.siblingLastYearRate == null ? null : (list[0]?.rate ?? r.rate),
+                rate: own != null ? (list[0]?.rate ?? null) : null,
+                rateNote: own != null ? undefined : 'main campus rate',
                 list,
-                budget: sibCost(r),
+                budget: list.reduce((t, p) => t + p.rate, 0),
               });
             })}
             <tr className="bg-surface/40">

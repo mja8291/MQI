@@ -75,7 +75,7 @@ export interface BudgetCategory {
    */
   includeIds?: string[];
   excludeIds?: string[];
-  /** W100: last year's cost per sibling campus (Rs M), inflated like the category; blank = the category's rate. */
+  /** W100 (replaced by ScenarioConfig.siblingBandRates in W102; kept so older saves still load). */
   siblingLastYearRate?: number | null;
 }
 
@@ -102,6 +102,11 @@ export interface ScenarioConfig {
    * table, by the category their own MQI matches. These two rates (last year's cost per campus, Rs M,
    * default inflation applied) cover the ones no category matches and the ones with no survey.
    */
+  /**
+   * W102: last year's cost per sibling campus (Rs M) by the sibling's own MQI band ("Poor"…"Excellent",
+   * "No survey"), default inflation added; blank = the sibling keeps its main campus's category rate.
+   */
+  siblingBandRates?: Record<string, number | null>;
   rmPlanSiblings?: {
     otherLastYearRate?: number | null;
     unknownLastYearRate?: number | null;

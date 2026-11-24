@@ -31,17 +31,17 @@ const cat = (r: ReturnType<typeof runBudget>, id: string) => r.categories.find((
 const ids = (list: { campus: BudgetCampus }[]) => list.map((p) => p.campus.campusId);
 
 describe('budgetEngine', () => {
-  it('W100: siblings at the category rate by default, at the entered sibling rate (inflated) when set; the cap counts their cost', () => {
+  it('W102: siblings at their main campus category rate by default, at the rate entered for their own MQI band (default inflation) when set', () => {
     const host = campus({ campusId: 'H1', score: 40, eCompoundNo: 'Z1' });
-    const sib = campus({ campusId: 'S1', score: 90, eCompoundNo: 'Z1' });
+    const sib = campus({ campusId: 'S1', score: 90, eCompoundNo: 'Z1' }); // Excellent
     const base = runBudget([host, sib], config([POOR]));
     expect(base.categories[0]!.budget).toBeCloseTo(4); // 2 + 2
-    const r = runBudget([host, sib], config([{ ...POOR, siblingLastYearRate: 1, inflationPct: 10 }]));
+    const r = runBudget([host, sib], config([POOR], { inflationPct: 10, siblingBandRates: { Excellent: 1, Good: 5 } }));
     const c = r.categories[0]!;
     expect(c.selected.find((p) => p.role === 'sibling')!.rate).toBeCloseTo(1.1);
     expect(c.budget).toBeCloseTo(2.2 + 1.1);
     // A Rs cap of 3.4 fits host + cheaper sibling (3.3), not two at the category rate (4.4).
-    expect(runBudget([host, sib], config([{ ...POOR, siblingLastYearRate: 1, inflationPct: 10, capRs: 3.4 }])).categories[0]!.capStatus).toBe('within');
+    expect(runBudget([host, sib], config([{ ...POOR, capRs: 3.4 }], { inflationPct: 10, siblingBandRates: { Excellent: 1 } })).categories[0]!.capStatus).toBe('within');
   });
 
   it('W96: no-category siblings split by MQI band, unknown-MQI siblings by survey plan category; a line rate overrides its group rate', () => {

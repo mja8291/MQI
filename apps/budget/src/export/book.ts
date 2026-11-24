@@ -46,8 +46,10 @@ export function categoryRows(res: BudgetResult) {
       tbd: c.category.kind === 'campus' ? c.tbd : 0,
       anticipated: c.category.kind === 'anticipated' ? c.anticipatedCount : 0,
       rate: lump ? (c.category.lumpSum ?? 0) : c.rate,
-      /** W100: the siblings' own rate when one is entered (else null: the category rate). */
-      sibRate: c.category.siblingLastYearRate != null ? (c.selected.find((p) => p.role === 'sibling')?.rate ?? null) : null,
+      /** W102: the siblings' cost when any of them has its own band rate (else null: all at the category rate). */
+      sibCost: c.selected.some((p) => p.role === 'sibling' && Math.abs(p.rate - c.rate) > 1e-9)
+        ? c.selected.filter((p) => p.role === 'sibling').reduce((t, p) => t + p.rate, 0)
+        : null,
       budget: c.budget,
       capCount: c.category.capCount ?? null,
       capRs: c.category.capRs ?? null,

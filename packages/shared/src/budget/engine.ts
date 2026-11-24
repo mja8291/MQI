@@ -127,8 +127,11 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
 
   const results: CategoryResult[] = config.categories.map((category) => {
     const rate = rateFor(category, config);
-    // W100: e-compound siblings at the category rate unless a sibling rate is entered for it.
-    const sibRate = category.siblingLastYearRate != null ? category.siblingLastYearRate * (1 + inflationFor(category, config) / 100) : rate;
+    // W102: an e-compound sibling at the rate entered for its own MQI band (default inflation added), else the category rate.
+    const sibRateOf = (c: BudgetCampus) => {
+      const ly = config.siblingBandRates?.[c.band ?? 'No survey'];
+      return ly != null ? ly * (1 + (config.inflationPct ?? 0) / 100) : rate;
+    };
     const inflationPct = inflationFor(category, config);
     const catWarnings: string[] = [];
     if (category.kind === 'anticipated') {
@@ -187,7 +190,7 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
           role: p.role,
           tag: p.role === 'sibling' ? `${category.name} sibling` : '',
           ...(p.hostId ? { hostId: p.hostId } : {}),
-          rate: p.role === 'sibling' ? sibRate : rate,
+          rate: p.role === 'sibling' ? sibRateOf(c) : rate,
           unit: u + 1,
         };
       });
