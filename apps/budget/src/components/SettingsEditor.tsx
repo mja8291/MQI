@@ -255,6 +255,108 @@ function ListView({ result, campuses, category, onChange }: { result: CategoryRe
   );
 }
 
+const BAND_ROWS = ['Poor', 'Average', 'Good', 'Excellent', 'No survey'] as const;
+
+/**
+ * W98: siblings of shortlisted campuses broken up by their own MQI band, with the Critically unsafe /
+ * Partially unsafe / Safe split of each band; budget at each sibling's category rate. A band's list opens below it.
+ */
+function SiblingBreakup({ placed, hostName }: { placed: PlacedCampus[]; hostName: Map<string, string> }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const bandOf = (p: PlacedCampus) => p.campus.band ?? 'No survey';
+  const rows = BAND_ROWS.map((band) => {
+    const list = placed.filter((p) => bandOf(p) === band);
+    return {
+      band,
+      list,
+      critical: list.filter((p) => p.campus.unsafe === 'critical').length,
+      partial: list.filter((p) => p.campus.unsafe === 'partial').length,
+      safe: list.filter((p) => !p.campus.unsafe && p.campus.score !== null).length,
+      budget: list.reduce((t, p) => t + p.rate, 0),
+    };
+  }).filter((r) => r.list.length);
+  const total = (f: (r: (typeof rows)[number]) => number) => rows.reduce((t, r) => t + f(r), 0);
+  return (
+    <table className="tbl" data-testid="sibling-breakup">
+      <thead>
+        <tr>
+          <th>MQI band</th>
+          <th className="num">Critically unsafe</th>
+          <th className="num">Partially unsafe</th>
+          <th className="num">Safe</th>
+          <th className="num">Campuses</th>
+          <th className="num">Budget (Rs M)</th>
+          <th />
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <Fragment key={r.band}>
+            <tr>
+              <td>{r.band}</td>
+              <td className="num">{r.critical ? int(r.critical) : ''}</td>
+              <td className="num">{r.partial ? int(r.partial) : ''}</td>
+              <td className="num">{r.safe ? int(r.safe) : ''}</td>
+              <td className="num font-semibold">{int(r.list.length)}</td>
+              <td className="num font-semibold">{rs(r.budget)}</td>
+              <td>
+                <button type="button" className="btn" aria-expanded={open === r.band} onClick={() => setOpen(open === r.band ? null : r.band)}>
+                  {open === r.band ? 'Close list' : 'List view'}
+                </button>
+              </td>
+            </tr>
+            {open === r.band ? (
+              <tr>
+                <td colSpan={7}>
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th>Campus</th>
+                        <th>Campus ID</th>
+                        <th className="num">MQI</th>
+                        <th>Unsafe</th>
+                        <th>Costed with</th>
+                        <th>Category</th>
+                        <th>Region</th>
+                        <th>E-compound</th>
+                        <th className="num">Rs M</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.list.map((p) => (
+                        <tr key={p.campus.campusId}>
+                          <td className="font-semibold">{p.campus.name}</td>
+                          <td>{p.campus.campusId}</td>
+                          <td className="num">{score(p.campus.score)}</td>
+                          <td>{p.campus.unsafe ? UNSAFE_LEVEL_LABEL[p.campus.unsafe] : p.campus.score !== null ? 'Safe' : ''}</td>
+                          <td>{p.hostId ? (hostName.get(p.hostId) ?? p.hostId) : ''}</td>
+                          <td>{p.tag.replace(/ sibling$/, '')}</td>
+                          <td>{p.campus.region}</td>
+                          <td>{p.campus.eCompoundNo}</td>
+                          <td className="num">{rs(p.rate)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+            ) : null}
+          </Fragment>
+        ))}
+        <tr className="font-semibold">
+          <td>All siblings of shortlisted campuses</td>
+          <td className="num">{int(total((r) => r.critical))}</td>
+          <td className="num">{int(total((r) => r.partial))}</td>
+          <td className="num">{int(total((r) => r.safe))}</td>
+          <td className="num">{int(total((r) => r.list.length))}</td>
+          <td className="num">{rs(total((r) => r.budget))}</td>
+          <td />
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
 export function SettingsEditor({
   config,
   onChange,
@@ -281,7 +383,13 @@ export function SettingsEditor({
   const anticipated = cats.filter((c) => c.kind === 'anticipated');
   const live = (id: string) => result?.categories.find((r) => r.category.id === id);
   const sum = (list: BudgetCategory[], f: (r: CategoryResult) => number) => list.reduce((s, c) => s + (live(c.id) ? f(live(c.id)!) : 0), 0);
-  const campusTotal = sum(campusCats, (r) => r.budget);
+  // W98: the campus categories table shows each category's own campuses and TBD; the e-compound siblings
+  // costed with them are shown in the sibling table below (same rate, same total).
+  const ownBudget = (r: CategoryResult) => (r.primaries + r.tbd) * r.rate;
+  const campusTotal = sum(campusCats, ownBudget);
+  const withSiblings = campusCats.map((c) => live(c.id)).filter((r): r is CategoryResult => !!r && r.siblings > 0);
+  const shortlistedSibTotal = withSiblings.reduce((t, r) => t + r.siblings * r.rate, 0);
+  const hostName = new Map(campuses.map((c) => [c.campusId, c.name]));
   const anticipatedTotal = sum(anticipated, (r) => r.budget);
   // W92: R&M Plan siblings not in any category, by the category their own MQI matches.
   const sibRows = (result?.categories ?? []).filter((r) => r.section === 'rmPlanSibling');
@@ -317,6 +425,7 @@ export function SettingsEditor({
                   <th>Campus ID</th>
                   <th className="num">MQI</th>
                   <th>Band</th>
+                  <th>Main campus</th>
                   <th>Survey plan</th>
                   <th>Region</th>
                   <th>E-compound</th>
@@ -330,6 +439,7 @@ export function SettingsEditor({
                     <td>{p.campus.campusId}</td>
                     <td className="num">{score(p.campus.score)}</td>
                     <td>{p.campus.band ?? ''}</td>
+                    <td>{p.hostId ? (hostName.get(p.hostId) ?? p.hostId) : ''}</td>
                     <td>{[p.campus.planCategory, p.campus.planAssessment].filter(Boolean).join(' · ')}</td>
                     <td>{p.campus.region}</td>
                     <td>{p.campus.eCompoundNo}</td>
@@ -424,7 +534,7 @@ export function SettingsEditor({
               <th className="num whitespace-normal w-24">Last year cost / campus (Rs M)</th>
               <th className="num whitespace-normal w-20" title="Leave blank to use the default inflation">Inflation % (blank = default)</th>
               <th className="num">Rate (Rs M)</th>
-              <th className="num" title="Every campus costed in this category, e-compound siblings of its campuses included">Campuses (incl. siblings)</th>
+              <th className="num" title="This category's own campuses; their e-compound siblings are shown in the sibling table below">Campuses</th>
               <th className="num">
                 <Fold label="TBD" isOpen={tbdOpen} onClick={() => setTbdOpen((v) => !v)} />
               </th>
@@ -473,8 +583,8 @@ export function SettingsEditor({
                       <Num label={`Inflation of ${c.name}`} width="w-16" value={c.inflationPct} onChange={(v) => setCat(c.id, { inflationPct: v })} />
                     </td>
                     <td className="num" data-testid={`rate-${c.id}`}>{c.lastYearRate === null ? <span className="text-warn">not set</span> : rs(rateFor(c, config))}</td>
-                    <td className="num" data-testid={`campuses-${c.id}`} title={r && r.siblings ? `${r.primaries} + ${r.siblings} siblings` : undefined}>
-                      {r ? int(r.primaries + r.siblings) : '…'}
+                    <td className="num" data-testid={`campuses-${c.id}`} title={r && r.siblings ? `${r.siblings} sibling(s) shown in the sibling table below` : undefined}>
+                      {r ? int(r.primaries) : '…'}
                     </td>
                     <td className="num">
                       {tbdOpen ? (
@@ -505,7 +615,7 @@ export function SettingsEditor({
                       </>
                     ) : null}
                     <td>{r ? <CapBadge status={r.capStatus} category={c} /> : null}</td>
-                    <td className="num font-semibold" data-testid={`budget-${c.id}`}>{r ? rs(r.budget) : '…'}</td>
+                    <td className="num font-semibold" data-testid={`budget-${c.id}`}>{r ? rs(ownBudget(r)) : '…'}</td>
                     <td>
                       <button type="button" className="btn" aria-expanded={open === c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>
                         {open === c.id ? 'Close list' : 'List view'}
@@ -531,7 +641,7 @@ export function SettingsEditor({
             <tr className="font-semibold bg-surface/60" data-testid="campus-total">
               <td />
               <td colSpan={5}>Total, campus categories</td>
-              <td className="num">{int(sum(campusCats, (r) => r.primaries + r.siblings))}</td>
+              <td className="num">{int(sum(campusCats, (r) => r.primaries))}</td>
               <td className="num">{int(sum(campusCats, (r) => r.tbd))}</td>
               <td colSpan={tbdCols - 1 + capCols} />
               <td className="num">{rs(campusTotal)}</td>
@@ -545,10 +655,11 @@ export function SettingsEditor({
       </section>
 
       <section className="card p-4 overflow-x-auto" data-testid="rm-siblings">
-        <h2 className="font-semibold text-brand-deep mb-1">Sibling R&amp;M Plan campuses (not in any category)</h2>
+        <h2 className="font-semibold text-brand-deep mb-1">Sibling campuses</h2>
         <p className="text-ink-soft mb-2">
-          Campuses on the R&amp;M Plan 2026-27 list that share an e-compound with another campus but landed in no category above. Each is costed at the rate of the category its own MQI matches. The rest are split by MQI band (no category)
-          or by survey plan category (no App survey in this cycle); each line uses its own rate if entered, else its group&apos;s default (default inflation applied). Siblings of shortlisted campuses are already costed with them above.
+          <b>Siblings of shortlisted campuses</b>: campuses sharing an e-compound with a campus in a category above, costed with it at that category&apos;s rate (they also count against its cap).{' '}
+          <b>R&amp;M Plan siblings</b>: campuses on the R&amp;M Plan 2026-27 list that share an e-compound with another campus but landed in no category above. Each is costed at the rate of the category its own MQI matches. The rest are split by MQI band (no category)
+          or by survey plan category (no App survey in this cycle); each line uses its own rate if entered, else its group&apos;s default (default inflation applied).
         </p>
         <table className="tbl">
           <thead>
@@ -562,7 +673,26 @@ export function SettingsEditor({
             </tr>
           </thead>
           <tbody>
-            {sibRows.filter((r) => !isLine(r)).map((r) => sibRow(r, <span className="text-ink-faint">as the category</span>, r.category.name.replace('R&M Plan siblings – ', '')))}
+            <tr className="bg-surface/40" data-testid="sib-group-shortlisted">
+              <td className="font-semibold">Siblings of shortlisted campuses — at their category&apos;s rate</td>
+              <td />
+              <td colSpan={2} className="num text-ink-faint">{withSiblings.length ? '' : 'none'}</td>
+              <td className="num">{rs(shortlistedSibTotal)}</td>
+              <td />
+            </tr>
+            {withSiblings.length ? (
+              <tr>
+                <td colSpan={6} className="pl-6">
+                  <SiblingBreakup placed={withSiblings.flatMap((r) => r.selected.filter((p) => p.role === 'sibling'))} hostName={hostName} />
+                </td>
+              </tr>
+            ) : null}
+            <tr className="bg-surface/40">
+              <td className="font-semibold" colSpan={6}>
+                R&amp;M Plan siblings (not in any category)
+              </td>
+            </tr>
+            {sibRows.filter((r) => !isLine(r)).map((r) => sibRow(r, <span className="text-ink-faint">as the category</span>, <span className="pl-4">{r.category.name.replace('R&M Plan siblings – ', '')}</span>))}
             {(['other', 'unknown'] as const).map((group) => {
               const lines = sibRows.filter((r) => r.category.id.startsWith(`rmsib:${group}:`));
               const field = group === 'other' ? 'otherLastYearRate' : 'unknownLastYearRate';
@@ -596,9 +726,9 @@ export function SettingsEditor({
               );
             })}
             <tr className="font-semibold bg-surface/60" data-testid="rm-siblings-total">
-              <td colSpan={3}>Total, sibling R&amp;M Plan campuses</td>
-              <td className="num">{int(sibRows.reduce((n, r) => n + r.primaries, 0))}</td>
-              <td className="num">{rs(sibTotal)}</td>
+              <td colSpan={3}>Total, sibling campuses</td>
+              <td className="num">{int(withSiblings.reduce((n, r) => n + r.siblings, 0) + sibRows.reduce((n, r) => n + r.primaries, 0))}</td>
+              <td className="num">{rs(shortlistedSibTotal + sibTotal)}</td>
               <td />
             </tr>
           </tbody>
@@ -673,8 +803,8 @@ export function SettingsEditor({
               <td className="num">Rs {rs(campusTotal)}M</td>
             </tr>
             <tr>
-              <td>Sibling R&amp;M Plan campuses</td>
-              <td className="num">Rs {rs(sibTotal)}M</td>
+              <td>Sibling campuses</td>
+              <td className="num">Rs {rs(shortlistedSibTotal + sibTotal)}M</td>
             </tr>
             <tr>
               <td>Anticipated categories</td>
@@ -682,7 +812,7 @@ export function SettingsEditor({
             </tr>
             <tr className="font-semibold text-brand-deep text-[15px]">
               <td>Grand total</td>
-              <td className="num" data-testid="grand-total-value">Rs {rs(campusTotal + sibTotal + anticipatedTotal)}M</td>
+              <td className="num" data-testid="grand-total-value">Rs {rs(campusTotal + shortlistedSibTotal + sibTotal + anticipatedTotal)}M</td>
             </tr>
           </tbody>
         </table>
