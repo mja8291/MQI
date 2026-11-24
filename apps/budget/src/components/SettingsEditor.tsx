@@ -658,13 +658,13 @@ export function SettingsEditor({
         <h2 className="font-semibold text-brand-deep mb-1">Sibling campuses</h2>
         <p className="text-ink-soft mb-2">
           <b>Siblings of shortlisted campuses</b>: campuses sharing an e-compound with a campus in a category above, costed with it at that category&apos;s rate (they also count against its cap).{' '}
-          <b>R&amp;M Plan siblings</b>: campuses on the R&amp;M Plan 2026-27 list that share an e-compound with another campus but landed in no category above. Each is costed at the rate of the category its own MQI matches. The rest are split by MQI band (no category)
-          or by survey plan category (no App survey in this cycle); each line uses its own rate if entered, else its group&apos;s default (default inflation applied).
+          <b>R&amp;M Plan siblings</b>: campuses on the R&amp;M Plan 2026-27 list that share an e-compound with another campus but landed in no category above. Each is costed at the rate of the category its own MQI matches. The rest are split by MQI band
+          or by survey plan category; each line uses its own rate if entered, else its group&apos;s default (default inflation applied).
         </p>
         <table className="tbl">
           <thead>
             <tr>
-              <th>Group (by own MQI)</th>
+              <th>Group</th>
               <th className="num">Last year cost / campus (Rs M)</th>
               <th className="num">Rate (Rs M)</th>
               <th className="num">Campuses</th>
@@ -689,14 +689,14 @@ export function SettingsEditor({
             ) : null}
             <tr className="bg-surface/40">
               <td className="font-semibold" colSpan={6}>
-                R&amp;M Plan siblings (not in any category)
+                R&amp;M Plan siblings
               </td>
             </tr>
             {sibRows.filter((r) => !isLine(r)).map((r) => sibRow(r, <span className="text-ink-faint">as the category</span>, <span className="pl-4">{r.category.name.replace('R&M Plan siblings – ', '')}</span>))}
             {(['other', 'unknown'] as const).map((group) => {
               const lines = sibRows.filter((r) => r.category.id.startsWith(`rmsib:${group}:`));
               const field = group === 'other' ? 'otherLastYearRate' : 'unknownLastYearRate';
-              const title = group === 'other' ? 'No category (MQI known) — split by MQI band' : 'Unknown MQI (no App survey in this cycle) — split by survey plan category';
+              const title = group === 'other' ? 'No category — split by MQI band' : 'Unknown MQI — split by survey plan category';
               return (
                 <Fragment key={group}>
                   <tr className="bg-surface/40" data-testid={`sib-group-${group}`}>
@@ -719,7 +719,7 @@ export function SettingsEditor({
                         value={sibCfg.rates?.[key]}
                         onChange={(v) => setSib({ rates: { ...(sibCfg.rates ?? {}), [key]: v } })}
                       />,
-                      <span className="pl-4">{r.category.name.replace(/^R&M Plan siblings – (no category|unknown MQI): /, '')}</span>,
+                      <span className="pl-4">{r.category.name.replace(/^R&M Plan siblings – (no category|unknown MQI): /, '').replace(' (not surveyed in this cycle)', '')}</span>,
                     );
                   })}
                 </Fragment>
