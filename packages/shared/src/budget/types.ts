@@ -27,6 +27,8 @@ export interface BudgetCampus {
   unsafe: UnsafeLevel | null;
   surveyId?: string;
   surveyDate?: string;
+  /** W92: on the R&M Plan 2026-27 list (matched on its School IDs). */
+  rmPlanned?: boolean;
 }
 
 /** How a campus-backed category picks its campuses. Stored as data in the scenario. */
@@ -89,6 +91,12 @@ export interface ScenarioConfig {
   categories: BudgetCategory[];
   /** Assumption register entries keyed by assumptionKey(). */
   assumptions: Record<string, AssumptionMeta>;
+  /**
+   * W92: R&M Plan campuses that share an e-compound and are in no category are costed in their own
+   * table, by the category their own MQI matches. These two rates (last year's cost per campus, Rs M,
+   * default inflation applied) cover the ones no category matches and the ones with no survey.
+   */
+  rmPlanSiblings?: { otherLastYearRate?: number | null; unknownLastYearRate?: number | null };
 }
 
 export interface Scenario {
@@ -148,6 +156,8 @@ export interface CategoryResult {
   budget: number;
   capStatus: CapStatus;
   warnings: string[];
+  /** W92: a row of the "Sibling R&M Plan campuses" table (not a category of the scenario). */
+  section?: 'rmPlanSibling';
 }
 
 export interface RegionLine {

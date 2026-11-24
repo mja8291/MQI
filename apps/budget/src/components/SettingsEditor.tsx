@@ -282,6 +282,11 @@ export function SettingsEditor({
   const sum = (list: BudgetCategory[], f: (r: CategoryResult) => number) => list.reduce((s, c) => s + (live(c.id) ? f(live(c.id)!) : 0), 0);
   const campusTotal = sum(campusCats, (r) => r.budget);
   const anticipatedTotal = sum(anticipated, (r) => r.budget);
+  // W92: R&M Plan siblings not in any category, by the category their own MQI matches.
+  const sibRows = (result?.categories ?? []).filter((r) => r.section === 'rmPlanSibling');
+  const sibTotal = sibRows.reduce((s, r) => s + r.budget, 0);
+  const sibCfg = config.rmPlanSiblings ?? {};
+  const setSib = (patch: NonNullable<ScenarioConfig['rmPlanSiblings']>) => onChange({ ...config, rmPlanSiblings: { ...sibCfg, ...patch } });
   const move = (id: string, dir: -1 | 1) => {
     const order = campusCats.map((c) => c.id);
     const i = order.indexOf(id);
@@ -447,6 +452,96 @@ export function SettingsEditor({
         </button>
       </section>
 
+      <section className="card p-4 overflow-x-auto" data-testid="rm-siblings">
+        <h2 className="font-semibold text-brand-deep mb-1">Sibling R&amp;M Plan campuses (not in any category)</h2>
+        <p className="text-ink-soft mb-2">
+          Campuses on the R&amp;M Plan 2026-27 list that share an e-compound with another campus but landed in no category above. Each is costed at the rate of the category its own MQI matches; the
+          last two rows use the rates you enter here (default inflation applied). Siblings of shortlisted campuses are already costed with them above.
+        </p>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Group (by own MQI)</th>
+              <th className="num">Last year cost / campus (Rs M)</th>
+              <th className="num">Rate (Rs M)</th>
+              <th className="num">Campuses</th>
+              <th className="num">Budget (Rs M)</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {sibRows.map((r) => {
+              const own = r.category.id.endsWith(':other') ? 'otherLastYearRate' : r.category.id.endsWith(':unknown') ? 'unknownLastYearRate' : null;
+              return (
+                <Fragment key={r.category.id}>
+                  <tr>
+                    <td>
+                      <span className="inline-block h-2.5 w-2.5 rounded-full mr-2 align-middle" style={{ background: r.category.colour ?? '#999' }} />
+                      {r.category.name.replace('R&M Plan siblings – ', '')}
+                    </td>
+                    <td className="num">
+                      {own ? (
+                        <Num label={`Last year cost of ${r.category.name}`} value={sibCfg[own]} onChange={(v) => setSib({ [own]: v })} />
+                      ) : (
+                        <span className="text-ink-faint">as the category</span>
+                      )}
+                    </td>
+                    <td className="num">{r.category.lastYearRate === null ? <span className="text-warn">not set</span> : rs(r.rate)}</td>
+                    <td className="num" data-testid={`sib-campuses-${r.category.id}`}>{int(r.primaries)}</td>
+                    <td className="num font-semibold">{rs(r.budget)}</td>
+                    <td>
+                      {r.primaries ? (
+                        <button type="button" className="btn" aria-expanded={open === r.category.id} onClick={() => setOpen(open === r.category.id ? null : r.category.id)}>
+                          {open === r.category.id ? 'Close list' : 'List view'}
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                  {open === r.category.id ? (
+                    <tr>
+                      <td colSpan={6}>
+                        <table className="tbl">
+                          <thead>
+                            <tr>
+                              <th>Campus</th>
+                              <th>Campus ID</th>
+                              <th className="num">MQI</th>
+                              <th>Band</th>
+                              <th>Region</th>
+                              <th>E-compound</th>
+                              <th className="num">Rs M</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {r.selected.map((p) => (
+                              <tr key={p.campus.campusId}>
+                                <td className="font-semibold">{p.campus.name}</td>
+                                <td>{p.campus.campusId}</td>
+                                <td className="num">{score(p.campus.score)}</td>
+                                <td>{p.campus.band ?? ''}</td>
+                                <td>{p.campus.region}</td>
+                                <td>{p.campus.eCompoundNo}</td>
+                                <td className="num">{rs(p.rate)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+            <tr className="font-semibold bg-surface/60" data-testid="rm-siblings-total">
+              <td colSpan={3}>Total, sibling R&amp;M Plan campuses</td>
+              <td className="num">{int(sibRows.reduce((n, r) => n + r.primaries, 0))}</td>
+              <td className="num">{rs(sibTotal)}</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
       <section className="card p-4 overflow-x-auto">
         <h2 className="font-semibold text-brand-deep mb-1">Anticipated categories (not tied to campuses)</h2>
         <p className="text-ink-soft mb-2">Count × rate, or a lump sum.</p>
@@ -515,12 +610,16 @@ export function SettingsEditor({
               <td className="num">Rs {rs(campusTotal)}M</td>
             </tr>
             <tr>
+              <td>Sibling R&amp;M Plan campuses</td>
+              <td className="num">Rs {rs(sibTotal)}M</td>
+            </tr>
+            <tr>
               <td>Anticipated categories</td>
               <td className="num">Rs {rs(anticipatedTotal)}M</td>
             </tr>
             <tr className="font-semibold text-brand-deep text-[15px]">
               <td>Grand total</td>
-              <td className="num" data-testid="grand-total-value">Rs {rs(campusTotal + anticipatedTotal)}M</td>
+              <td className="num" data-testid="grand-total-value">Rs {rs(campusTotal + sibTotal + anticipatedTotal)}M</td>
             </tr>
           </tbody>
         </table>

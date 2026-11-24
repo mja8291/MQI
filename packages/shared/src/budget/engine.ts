@@ -228,6 +228,11 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
     };
   });
 
+  // W92: R&M Plan campuses sharing an e-compound that no category took, grouped by their own MQI.
+  const sibRows = rmPlanSiblingRows(campuses, campusCats, placement, config);
+  results.splice(results.filter((r) => r.category.kind === 'campus').length, 0, ...sibRows);
+  for (const r of sibRows) warnings.push(...r.warnings);
+
   // Region and zone breakdown: selected campuses and TBD slots; anticipated categories have no region.
   const regionMap = new Map<string, RegionLine>();
   const line = (region: string) => {
@@ -289,7 +294,7 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
         }
       : null;
   if (ceiling && ceiling.overrun > EPS) warnings.push(`Total Rs ${total.toFixed(2)}M is Rs ${ceiling.overrun.toFixed(2)}M over the ceiling of Rs ${ceilingRs!.toFixed(2)}M.`);
-  for (const r of results) warnings.push(...r.warnings);
+  for (const r of results) if (!r.section) warnings.push(...r.warnings);
   const unplaced = campuses.filter((c) => c.score !== null && !placement.has(c.campusId)).length;
   return {
     categories: results,
@@ -301,6 +306,67 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
     unplaced,
     warnings,
   };
+}
+
+export const RM_SIBLING_PREFIX = 'rmsib:';
+
+/**
+ * W92: campuses on the R&M Plan list that share their e-compound with another campus and landed in no
+ * category. Each goes to the first campus category whose rule its own MQI matches (ignoring bottom-N
+ * limits and caps, and never one it was removed from), costed at that category's rate; the rest go to
+ * "No category" or, without a survey, "Unknown MQI", at the scenario's two sibling rates.
+ */
+export function rmPlanSiblingRows(
+  campuses: readonly BudgetCampus[],
+  campusCats: readonly BudgetCategory[],
+  placement: Map<string, { cat: number }>,
+  config: ScenarioConfig,
+): CategoryResult[] {
+  const ecCount = new Map<string, number>();
+  for (const c of campuses) {
+    const ec = c.eCompoundNo.trim();
+    if (ec) ecCount.set(ec, (ecCount.get(ec) ?? 0) + 1);
+  }
+  const picked = campuses.filter((c) => c.rmPlanned && (ecCount.get(c.eCompoundNo.trim()) ?? 0) > 1 && !placement.has(c.campusId));
+  const groups = new Map<string, { category: BudgetCategory; list: BudgetCampus[] }>();
+  const sib = config.rmPlanSiblings ?? {};
+  const other: BudgetCategory = { id: `${RM_SIBLING_PREFIX}other`, name: 'R&M Plan siblings – no category (MQI known)', kind: 'campus', lastYearRate: sib.otherLastYearRate ?? null, colour: '#98a2b3' };
+  const unknown: BudgetCategory = { id: `${RM_SIBLING_PREFIX}unknown`, name: 'R&M Plan siblings – unknown MQI (no survey)', kind: 'campus', lastYearRate: sib.unknownLastYearRate ?? null, colour: '#d0d5dd' };
+  for (const c of picked) {
+    let target: BudgetCategory = unknown;
+    if (c.score !== null) {
+      const cat = campusCats.find((k) => k.rule && k.rule.type !== 'manual' && !(k.excludeIds ?? []).includes(c.campusId) && matches(k.rule, c));
+      target = cat ? { ...cat, id: `${RM_SIBLING_PREFIX}${cat.id}`, name: `R&M Plan siblings – ${cat.name}`, tbdCount: 0, tbdByRegion: {}, capCount: null, capRs: null, includeIds: [], excludeIds: [] } : other;
+    }
+    const g = groups.get(target.id) ?? { category: target, list: [] };
+    g.list.push(c);
+    groups.set(target.id, g);
+  }
+  const order = [...campusCats.map((k) => `${RM_SIBLING_PREFIX}${k.id}`), other.id, unknown.id];
+  // The two rows with their own rate always show (so the rate can be entered); the others only when used.
+  for (const k of [other, unknown]) if (!groups.has(k.id)) groups.set(k.id, { category: k, list: [] });
+  return [...groups.values()]
+    .sort((x, y) => order.indexOf(x.category.id) - order.indexOf(y.category.id))
+    .map(({ category, list }) => {
+      const rate = rateFor(category, config);
+      const sorted = [...list].sort((a, b) => (a.score ?? 999) - (b.score ?? 999) || a.name.localeCompare(b.name));
+      return {
+        category,
+        precedence: null,
+        rate,
+        inflationPct: inflationFor(category, config),
+        selected: sorted.map((c, i): PlacedCampus => ({ campus: c, role: 'primary', tag: 'R&M Plan sibling', rate, unit: i + 1 })),
+        waitlist: [],
+        primaries: sorted.length,
+        siblings: 0,
+        tbd: 0,
+        anticipatedCount: 0,
+        budget: sorted.length * rate,
+        capStatus: 'none' as CapStatus,
+        warnings: sorted.length && category.lastYearRate === null ? [`${category.name}: rate not set.`] : [],
+        section: 'rmPlanSibling' as const,
+      };
+    });
 }
 
 // ---- scenarios ----

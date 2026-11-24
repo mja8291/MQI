@@ -15,7 +15,7 @@ import type { Ctx } from './context';
 import { fail } from './errors';
 import { withLock } from './lock';
 import type { Env, TablePort } from './ports';
-import { dashboard, forgetDashboard } from './reads';
+import { dashboard, forgetDashboard, fullSchools } from './reads';
 import { toRow } from './responses';
 import { Table } from './system';
 import type { Row } from './system';
@@ -179,7 +179,10 @@ export function campuses(ctx: Ctx, raw: unknown): BudgetCampusesResult {
   if (!row) return fail('NOT_FOUND', 'Budget cycle not found.');
   const cycle = toCycle(row);
   const d = dashboard(ctx);
-  const { campuses: list, summary } = joinCampusSurveys(master, d.schools, { from: cycle.surveyFrom, to: cycle.surveyTo });
+  const { campuses: joined, summary } = joinCampusSurveys(master, d.schools, { from: cycle.surveyFrom, to: cycle.surveyTo });
+  // W92: campuses on the R&M Plan 2026-27 list, exactly as the App marks them for the BOQ reminder (W64/W68).
+  const planned = new Set(fullSchools(ctx).schools.filter((x) => x.rmPlanned).map((x) => x.schoolId));
+  const list = planned.size ? joined.map((c) => (planned.has(c.campusId) ? { ...c, rmPlanned: true } : c)) : joined;
   return { campuses: list, summary, generatedAt: d.generatedAt ?? ctx.nowIso };
 }
 

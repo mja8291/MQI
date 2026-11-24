@@ -54,6 +54,8 @@ describe('R&M Budget server', () => {
     const res = ok(call<BudgetCampusesResult>('budget.campuses', { cycleId: cycle.id }, s));
     expect(res.campuses.find((c) => c.campusId === '947')).toMatchObject({ score: 45, band: 'Poor', eCompoundNo: 'S/1/10', schoolIds: ['1001', '1002'] });
     expect(res.campuses.find((c) => c.campusId === '948')).toMatchObject({ score: null });
+    // W92: the R&M Plan 2026-27 list (School ID 948 in the dev data) marks its campus, and only it.
+    expect(res.campuses.filter((c) => c.rmPlanned).map((c) => c.campusId)).toEqual(['948']);
     expect(res.summary).toMatchObject({ campuses: 5, noSurvey: 4 });
 
     const config = defaultScenarioConfig();

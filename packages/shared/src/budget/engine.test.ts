@@ -31,6 +31,31 @@ const cat = (r: ReturnType<typeof runBudget>, id: string) => r.categories.find((
 const ids = (list: { campus: BudgetCampus }[]) => list.map((p) => p.campus.campusId);
 
 describe('budgetEngine', () => {
+  it('W92: R&M Plan siblings in no category are costed by their own MQI; others by the entered rates; total includes them', () => {
+    const host = campus({ campusId: 'H', score: 40, eCompoundNo: 'EC1' }); // Poor: its sibling joins it
+    const hostSib = { ...campus({ campusId: 'HS', score: 95, eCompoundNo: 'EC1' }), rmPlanned: true };
+    const exA = campus({ campusId: 'EA', score: 95, eCompoundNo: 'EC2' }); // Excellent, not planned
+    const avgPlanned = { ...campus({ campusId: 'AP', score: 60, eCompoundNo: 'EC2' }), rmPlanned: true }; // removed from Average below
+    const exPlanned = { ...campus({ campusId: 'XP', score: 90, eCompoundNo: 'EC3' }), rmPlanned: true };
+    const exPartner = campus({ campusId: 'XQ', score: 92, eCompoundNo: 'EC3' });
+    const noSurvey = { ...campus({ campusId: 'NS', score: null, eCompoundNo: 'EC3' }), rmPlanned: true };
+    const alone = { ...campus({ campusId: 'AL', score: 91, eCompoundNo: 'EC4' }), rmPlanned: true }; // no sibling: left out
+    const cfg = config([POOR, { ...AVG, excludeIds: ['AP'] }, { id: 'avg2', name: 'Average 2', kind: 'campus', rule: { type: 'band', bands: ['Average'] }, lastYearRate: 1 }], {
+      rmPlanSiblings: { otherLastYearRate: 0.5, unknownLastYearRate: 0.4 },
+    });
+    const r = runBudget([host, hostSib, exA, avgPlanned, exPlanned, exPartner, noSurvey, alone], cfg);
+    const rows = r.categories.filter((c) => c.section === 'rmPlanSibling');
+    const byId = Object.fromEntries(rows.map((c) => [c.category.id, ids(c.selected)]));
+    expect(byId['rmsib:avg2']).toBeUndefined(); // AP is taken by "Average 2" as a normal campus (it was only removed from Average)
+    expect(ids(cat(r, 'avg2').selected)).toEqual(['AP', 'EA']); // with its e-compound sibling
+    expect(byId['rmsib:other']).toEqual(['XP']);
+    expect(byId['rmsib:unknown']).toEqual(['NS']);
+    expect(ids(cat(r, 'poor').selected).sort()).toEqual(['H', 'HS']); // a shortlisted campus's sibling stays with it
+    // Rows sit after the campus categories; the total includes them.
+    expect(r.categories.findIndex((c) => c.section) ).toBe(3);
+    expect(r.total).toBeCloseTo(2 * 2 + 2 * 1 + 0.5 + 0.4);
+  });
+
   it('W91: blank caps are not applied; a campus removed from a list falls to the next category, an added one goes in, a removed sibling stays out', () => {
     const p1 = campus({ campusId: 'P1', score: 40, eCompoundNo: 'EC9' });
     const sib = campus({ campusId: 'S9', score: 92, eCompoundNo: 'EC9' });
