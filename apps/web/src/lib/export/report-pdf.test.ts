@@ -115,7 +115,8 @@ describe("W70 report PDF", () => {
     expect(model.structural.drilling.holes).toHaveLength(2);
     const bytes = await renderReportPdf(model, { generatedAt: at });
     if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-drill.pdf"), bytes);
-    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(10);
+    // W93: this sample's alerts take more than 6 lines, so they continue on a page after page 1.
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(11);
   });
 });
 
@@ -159,6 +160,16 @@ describe("W86 report PDF", () => {
     const bytes = await renderReportPdf(many, { generatedAt: at });
     if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/\.pdf$/, "-alerts.pdf"), bytes);
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(pagesBefore + 1);
+  });
+
+  it("W93: up to 6 lines of alerts stay on page 1; a 7th line moves the rest to a page right after it", async () => {
+    const plain = buildReportModel(source);
+    const pages = async (n: number) =>
+      (await PDFDocument.load(await renderReportPdf({ ...plain, alerts: Array.from({ length: n }, (_, i) => `Ceiling cracks/seepage unsafe in Class ${i + 1}: cracks`) }, { generatedAt: at }))).getPageCount();
+    const base = await pages(1);
+    expect(await pages(6)).toBe(base);
+    expect(await pages(7)).toBe(base + 1);
+    if (process.env.REPORT_OUT) writeFileSync(process.env.REPORT_OUT.replace(/.pdf$/, "-alerts19.pdf"), await renderReportPdf({ ...plain, alerts: Array.from({ length: 19 }, (_, i) => `Ceiling cracks/seepage unsafe in Class ${i + 1} Blue (Second): cracks and a longer description of the place`) }, { generatedAt: at }));
   });
 
   it("a photo's caption carries the surveyor's note for that item and place", async () => {

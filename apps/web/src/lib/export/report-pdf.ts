@@ -250,12 +250,16 @@ function summaryPage(ctx: Ctx) {
   // banner); further alerts are listed in full on the next page.
   const r = 92;
   const GAUGE_BLOCK = r + 28 + 64 + 8; // threshold labels above the arc, score and band text below
-  const allLines = m.alerts.flatMap((a) => wrap(ctx, a, 9.5, W - 2 * M - 70).map((l, i) => ({ l, first: i === 0 })));
-  const maxLines = Math.max(2, Math.floor((y - 16 - GAUGE_BLOCK - FOOT - 30) / 13));
-  const overflow = allLines.length > maxLines;
-  const alertLines = overflow
-    ? [...allLines.slice(0, maxLines - 1), { l: `… ${m.alerts.length - allLines.slice(0, maxLines - 1).filter((x) => x.first).length} more: every alert is listed on the next page.`, first: false }]
-    : allLines;
+  // W93 (2026-11-24): at most 6 lines of alerts on page 1 (whole alerts only); the rest continue on a
+  // page inserted right after it, with a note at both places.
+  const MAX_ALERT_LINES = Math.min(6, Math.max(2, Math.floor((y - 16 - GAUGE_BLOCK - FOOT - 43) / 13)));
+  const wrapped = m.alerts.map((a) => wrap(ctx, a, 9.5, W - 2 * M - 70));
+  let shown = 0;
+  for (let used = 0; shown < wrapped.length && used + wrapped[shown]!.length <= MAX_ALERT_LINES; shown++) used += wrapped[shown]!.length;
+  if (shown === 0 && wrapped.length) shown = 1; // a single very long alert still starts here
+  const overflow = shown < m.alerts.length;
+  const alertLines: { l: string; first: boolean; note?: boolean }[] = wrapped.slice(0, shown).flatMap((ls) => ls.map((l, i) => ({ l, first: i === 0 })));
+  if (overflow) alertLines.push({ l: `Continued on page 2: ${m.alerts.length - shown} more of ${m.alerts.length} safety alerts.`, first: false, note: true });
   const bh = m.alerts.length ? 30 + alertLines.length * 13 : 30;
   const red = m.alerts.length > 0;
   rect(p, M, y - bh, W - 2 * M, bh, { fill: red ? C.redBg : C.greenBg, border: red ? C.red : C.green, bw: 1 });
@@ -266,9 +270,9 @@ function summaryPage(ctx: Ctx) {
     const level = m.safetyLevel ? `${UNSAFE_LEVEL_LABEL[m.safetyLevel].toUpperCase()} — ` : "";
     text(p, ctx, `${level}SAFETY ALERTS (${m.alerts.length}) — action needed regardless of the overall score`, M + 42, y - 19, 11, { bold: true, color: C.red });
     let ly = y - 33;
-    for (const { l, first } of alertLines) {
+    for (const { l, first, note } of alertLines) {
       if (first) p.drawCircle({ x: M + 48, y: ly + 3, size: 1.8, color: C.red });
-      text(p, ctx, l, M + 56, ly, 9.5);
+      text(p, ctx, l, M + 56, ly, 9.5, note ? { bold: true, color: C.red } : {});
       ly -= 13;
     }
   } else {
@@ -314,26 +318,28 @@ function summaryPage(ctx: Ctx) {
     }
     ny -= 3;
   }
-  if (overflow) alertsPage(ctx);
+  if (overflow) alertsPage(ctx, shown);
 }
 
-/** W86: every safety alert in full, when the summary banner had no room for them all. */
-function alertsPage(ctx: Ctx) {
+/** W86/W93: the safety alerts page 1 had no room for, on the page right after it. */
+function alertsPage(ctx: Ctx, from: number) {
   const m = ctx.model;
-  let p = newPage(ctx, "Safety alerts");
+  let p = newPage(ctx, "Safety alerts (continued)");
   let y = H - BAR - 26;
-  const head = () => {
-    const level = m.safetyLevel ? `${UNSAFE_LEVEL_LABEL[m.safetyLevel].toUpperCase()} — ` : "";
-    text(p, ctx, `${level}SAFETY ALERTS (${m.alerts.length})`, M, y, 13, { bold: true, color: C.red });
-    y -= 22;
+  const level = m.safetyLevel ? `${UNSAFE_LEVEL_LABEL[m.safetyLevel].toUpperCase()} — ` : "";
+  const head = (first: boolean) => {
+    text(p, ctx, `${level}SAFETY ALERTS (${m.alerts.length}), continued`, M, y, 13, { bold: true, color: C.red });
+    y -= 17;
+    text(p, ctx, first ? `Continued from page 1: alerts ${from + 1} to ${m.alerts.length} of ${m.alerts.length}.` : "Continued from the previous page.", M, y, 9.5, { bold: true, color: C.soft });
+    y -= 20;
   };
-  head();
-  for (const a of m.alerts) {
+  head(true);
+  for (const a of m.alerts.slice(from)) {
     const lines = wrap(ctx, a, 10, W - 2 * M - 20);
     if (y - lines.length * 14 < FOOT + 8) {
       p = newPage(ctx, "Safety alerts (continued)");
       y = H - BAR - 26;
-      head();
+      head(false);
     }
     p.drawCircle({ x: M + 6, y: y + 3, size: 2, color: C.red });
     for (const l of lines) {
