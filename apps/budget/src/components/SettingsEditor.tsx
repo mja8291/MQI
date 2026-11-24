@@ -3,6 +3,7 @@ import { UNSAFE_LEVEL_LABEL, rateFor } from '@mqi/shared';
 import type { BudgetCampus, BudgetCategory, BudgetResult, CategoryResult, CategoryRule, PlacedCampus, RatingBand, ScenarioConfig } from '@mqi/shared';
 import { dateTime, int, rs, score } from '../lib/format';
 import { CapBadge } from './CapBadge';
+import { BandBreakdown } from './BandBreakdown';
 
 const SEEDED = new Set(['critical', 'partial', 'poor', 'average', 'bottomGood', 'emergencies', 'minor', 'special']);
 const BANDS: RatingBand[] = ['Poor', 'Average', 'Good', 'Excellent'];
@@ -405,7 +406,10 @@ export function SettingsEditor({
                       <input type="color" className="mr-1 align-middle h-6 w-6" aria-label={`Colour of ${c.name}`} value={c.colour ?? '#667085'} onChange={(e) => setCat(c.id, { colour: e.target.value })} />
                       <input className="cell w-32" aria-label={`Name of ${c.name}`} value={c.name} onChange={(e) => setCat(c.id, { name: e.target.value })} />
                     </td>
-                    <td>{c.rule ? <RuleEditor rule={c.rule} name={c.name} onChange={(rule) => setCat(c.id, { rule })} /> : null}</td>
+                    <td>
+                      {c.rule ? <RuleEditor rule={c.rule} name={c.name} onChange={(rule) => setCat(c.id, { rule })} /> : null}
+                      <BandBreakdown result={r} />
+                    </td>
                     <td className="num">
                       <Num label={`Last year cost of ${c.name}`} value={c.lastYearRate} onChange={(v) => setCat(c.id, { lastYearRate: v })} />
                     </td>

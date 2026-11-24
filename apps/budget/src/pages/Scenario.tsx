@@ -8,6 +8,7 @@ import { useCycleCampuses, useData } from '../lib/data';
 import { dateTime, int, rs, signed } from '../lib/format';
 import { SettingsEditor } from '../components/SettingsEditor';
 import { CAP_LABEL, CapBadge } from '../components/CapBadge';
+import { BandBreakdown } from '../components/BandBreakdown';
 import { ExportButtons } from '../components/ExportButtons';
 
 type Tab = 'dashboard' | 'settings' | 'assumptions';
@@ -179,6 +180,7 @@ function Dashboard({ scenario, result }: { scenario: Scenario; result: BudgetRes
                   ) : (
                     <span className="font-semibold">{c.category.name}</span>
                   )}
+                  <BandBreakdown result={c} />
                 </td>
                 <td className="num">{c.category.kind === 'campus' ? int(c.primaries) : c.category.lumpSum != null ? 'Lump sum' : int(c.anticipatedCount)}</td>
                 <td className="num">{c.category.kind === 'campus' ? int(c.siblings) : ''}</td>
