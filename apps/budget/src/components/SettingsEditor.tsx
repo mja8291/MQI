@@ -308,7 +308,17 @@ export function SettingsEditor({
         : { id, name: 'New item', kind, lastYearRate: null, count: 0, colour: '#667085' };
     onChange({ ...config, categories: kind === 'campus' ? [...campusCats, c, ...anticipated] : [...cats, c] });
   };
-  const CAMPUS_COLS = 16;
+  // W94: TBD and Cap columns fold away (one summary column each) and open on demand.
+  const [tbdOpen, setTbdOpen] = useState(false);
+  const [capOpen, setCapOpen] = useState(false);
+  const tbdCols = tbdOpen ? 2 : 1;
+  const capCols = capOpen ? 3 : 1;
+  const CAMPUS_COLS = 10 + tbdCols + capCols;
+  const Fold = ({ label, isOpen, onClick }: { label: string; isOpen: boolean; onClick: () => void }) => (
+    <button type="button" className="font-semibold text-brand underline whitespace-nowrap" aria-expanded={isOpen} onClick={onClick} title={isOpen ? `Hide the ${label} columns` : `Show the ${label} columns`}>
+      {label} {isOpen ? '◂' : '▸'}
+    </button>
+  );
 
   return (
     <div className="space-y-4 text-[13px]">
@@ -357,13 +367,20 @@ export function SettingsEditor({
               <th className="num whitespace-normal w-24">Last year cost / campus (Rs M)</th>
               <th className="num whitespace-normal w-20" title="Leave blank to use the default inflation">Inflation % (blank = default)</th>
               <th className="num">Rate (Rs M)</th>
-              <th className="num">Campuses</th>
-              <th className="num">Siblings</th>
-              <th className="num">TBD</th>
-              <th>TBD by region</th>
-              <th className="num">Cap (projects)</th>
-              <th className="num">Cap (Rs M)</th>
-              <th>Cap</th>
+              <th className="num" title="Every campus costed in this category, e-compound siblings of its campuses included">Campuses (incl. siblings)</th>
+              <th className="num">
+                <Fold label="TBD" isOpen={tbdOpen} onClick={() => setTbdOpen((v) => !v)} />
+              </th>
+              {tbdOpen ? <th>TBD by region</th> : null}
+              {capOpen ? (
+                <>
+                  <th className="num">Cap (projects)</th>
+                  <th className="num">Cap (Rs M)</th>
+                </>
+              ) : null}
+              <th>
+                <Fold label="Cap" isOpen={capOpen} onClick={() => setCapOpen((v) => !v)} />
+              </th>
               <th className="num">Budget (Rs M)</th>
               <th />
               <th />
@@ -396,11 +413,17 @@ export function SettingsEditor({
                       <Num label={`Inflation of ${c.name}`} width="w-16" value={c.inflationPct} onChange={(v) => setCat(c.id, { inflationPct: v })} />
                     </td>
                     <td className="num" data-testid={`rate-${c.id}`}>{c.lastYearRate === null ? <span className="text-warn">not set</span> : rs(rateFor(c, config))}</td>
-                    <td className="num" data-testid={`campuses-${c.id}`}>{r ? int(r.primaries) : '…'}</td>
-                    <td className="num">{r ? int(r.siblings) : '…'}</td>
-                    <td className="num">
-                      <Num label={`TBD of ${c.name}`} width="w-16" step="1" value={c.tbdCount ?? 0} onChange={(v) => setCat(c.id, { tbdCount: Math.floor(v ?? 0) })} />
+                    <td className="num" data-testid={`campuses-${c.id}`} title={r && r.siblings ? `${r.primaries} + ${r.siblings} siblings` : undefined}>
+                      {r ? int(r.primaries + r.siblings) : '…'}
                     </td>
+                    <td className="num">
+                      {tbdOpen ? (
+                        <Num label={`TBD of ${c.name}`} width="w-16" step="1" value={c.tbdCount ?? 0} onChange={(v) => setCat(c.id, { tbdCount: Math.floor(v ?? 0) })} />
+                      ) : (
+                        int(c.tbdCount ?? 0)
+                      )}
+                    </td>
+                    {tbdOpen ? (
                     <td>
                       <ByRegion
                         name={c.name}
@@ -410,12 +433,17 @@ export function SettingsEditor({
                         onChange={(tbdByRegion) => setCat(c.id, { tbdByRegion, tbdCount: Math.max(c.tbdCount ?? 0, Object.values(tbdByRegion).reduce((s, n) => s + n, 0)) })}
                       />
                     </td>
-                    <td className="num">
-                      <Num label={`Cap count of ${c.name}`} width="w-16" step="1" placeholder="none" value={c.capCount} onChange={(v) => setCat(c.id, { capCount: v === null ? null : Math.floor(v) })} />
-                    </td>
-                    <td className="num">
-                      <Num label={`Cap Rs of ${c.name}`} width="w-20" placeholder="none" value={c.capRs} onChange={(v) => setCat(c.id, { capRs: v })} />
-                    </td>
+                    ) : null}
+                    {capOpen ? (
+                      <>
+                        <td className="num">
+                          <Num label={`Cap count of ${c.name}`} width="w-16" step="1" placeholder="none" value={c.capCount} onChange={(v) => setCat(c.id, { capCount: v === null ? null : Math.floor(v) })} />
+                        </td>
+                        <td className="num">
+                          <Num label={`Cap Rs of ${c.name}`} width="w-20" placeholder="none" value={c.capRs} onChange={(v) => setCat(c.id, { capRs: v })} />
+                        </td>
+                      </>
+                    ) : null}
                     <td>{r ? <CapBadge status={r.capStatus} category={c} /> : null}</td>
                     <td className="num font-semibold" data-testid={`budget-${c.id}`}>{r ? rs(r.budget) : '…'}</td>
                     <td>
@@ -438,10 +466,9 @@ export function SettingsEditor({
             <tr className="font-semibold bg-surface/60" data-testid="campus-total">
               <td />
               <td colSpan={5}>Total, campus categories</td>
-              <td className="num">{int(sum(campusCats, (r) => r.primaries))}</td>
-              <td className="num">{int(sum(campusCats, (r) => r.siblings))}</td>
+              <td className="num">{int(sum(campusCats, (r) => r.primaries + r.siblings))}</td>
               <td className="num">{int(sum(campusCats, (r) => r.tbd))}</td>
-              <td colSpan={4} />
+              <td colSpan={tbdCols - 1 + capCols} />
               <td className="num">{rs(campusTotal)}</td>
               <td colSpan={2} />
             </tr>
