@@ -255,108 +255,6 @@ function ListView({ result, campuses, category, onChange }: { result: CategoryRe
   );
 }
 
-const BAND_ROWS = ['Poor', 'Average', 'Good', 'Excellent', 'No survey'] as const;
-
-/**
- * W98: siblings of shortlisted campuses broken up by their own MQI band, with the Critically unsafe /
- * Partially unsafe / Safe split of each band; budget at each sibling's category rate. A band's list opens below it.
- */
-function SiblingBreakup({ placed, hostName }: { placed: PlacedCampus[]; hostName: Map<string, string> }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const bandOf = (p: PlacedCampus) => p.campus.band ?? 'No survey';
-  const rows = BAND_ROWS.map((band) => {
-    const list = placed.filter((p) => bandOf(p) === band);
-    return {
-      band,
-      list,
-      critical: list.filter((p) => p.campus.unsafe === 'critical').length,
-      partial: list.filter((p) => p.campus.unsafe === 'partial').length,
-      safe: list.filter((p) => !p.campus.unsafe && p.campus.score !== null).length,
-      budget: list.reduce((t, p) => t + p.rate, 0),
-    };
-  }).filter((r) => r.list.length);
-  const total = (f: (r: (typeof rows)[number]) => number) => rows.reduce((t, r) => t + f(r), 0);
-  return (
-    <table className="tbl" data-testid="sibling-breakup">
-      <thead>
-        <tr>
-          <th>MQI band</th>
-          <th className="num">Critically unsafe</th>
-          <th className="num">Partially unsafe</th>
-          <th className="num">Safe</th>
-          <th className="num">Campuses</th>
-          <th className="num">Budget (Rs M)</th>
-          <th />
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r) => (
-          <Fragment key={r.band}>
-            <tr>
-              <td>{r.band}</td>
-              <td className="num">{r.critical ? int(r.critical) : ''}</td>
-              <td className="num">{r.partial ? int(r.partial) : ''}</td>
-              <td className="num">{r.safe ? int(r.safe) : ''}</td>
-              <td className="num font-semibold">{int(r.list.length)}</td>
-              <td className="num font-semibold">{rs(r.budget)}</td>
-              <td>
-                <button type="button" className="btn" aria-expanded={open === r.band} onClick={() => setOpen(open === r.band ? null : r.band)}>
-                  {open === r.band ? 'Close list' : 'List view'}
-                </button>
-              </td>
-            </tr>
-            {open === r.band ? (
-              <tr>
-                <td colSpan={7}>
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>Campus</th>
-                        <th>Campus ID</th>
-                        <th className="num">MQI</th>
-                        <th>Unsafe</th>
-                        <th>Costed with</th>
-                        <th>Category</th>
-                        <th>Region</th>
-                        <th>E-compound</th>
-                        <th className="num">Rs M</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {r.list.map((p) => (
-                        <tr key={p.campus.campusId}>
-                          <td className="font-semibold">{p.campus.name}</td>
-                          <td>{p.campus.campusId}</td>
-                          <td className="num">{score(p.campus.score)}</td>
-                          <td>{p.campus.unsafe ? UNSAFE_LEVEL_LABEL[p.campus.unsafe] : p.campus.score !== null ? 'Safe' : ''}</td>
-                          <td>{p.hostId ? (hostName.get(p.hostId) ?? p.hostId) : ''}</td>
-                          <td>{p.tag.replace(/ sibling$/, '')}</td>
-                          <td>{p.campus.region}</td>
-                          <td>{p.campus.eCompoundNo}</td>
-                          <td className="num">{rs(p.rate)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </td>
-              </tr>
-            ) : null}
-          </Fragment>
-        ))}
-        <tr className="font-semibold">
-          <td>All siblings of shortlisted campuses</td>
-          <td className="num">{int(total((r) => r.critical))}</td>
-          <td className="num">{int(total((r) => r.partial))}</td>
-          <td className="num">{int(total((r) => r.safe))}</td>
-          <td className="num">{int(total((r) => r.list.length))}</td>
-          <td className="num">{rs(total((r) => r.budget))}</td>
-          <td />
-        </tr>
-      </tbody>
-    </table>
-  );
-}
-
 export function SettingsEditor({
   config,
   onChange,
@@ -397,28 +295,28 @@ export function SettingsEditor({
   const sibTotal = sibRows.reduce((s, r) => s + r.budget, 0);
   const sibCfg = config.rmPlanSiblings ?? {};
   const setSib = (patch: NonNullable<ScenarioConfig['rmPlanSiblings']>) => onChange({ ...config, rmPlanSiblings: { ...sibCfg, ...patch } });
-  const isLine = (r: CategoryResult) => /^rmsib:(other|unknown):/.test(r.category.id);
-  /** W96: one row of the sibling table (a category match, or a band / survey-plan line), with its list. */
-  const sibRow = (r: CategoryResult, rateCell: React.ReactNode, label: React.ReactNode) => (
-    <Fragment key={r.category.id}>
+  /**
+   * W101: one row of the simplified Sibling campuses table, with its campus list (band, safety, main
+   * campus or survey plan).
+   */
+  const sibLine = (o: { key: string; label: React.ReactNode; catRate?: number | null; rateCell: React.ReactNode; rate: number | null; list: PlacedCampus[]; budget: number }) => (
+    <Fragment key={o.key}>
       <tr>
+        <td>{o.label}</td>
+        <td className="num">{o.catRate === undefined ? '' : o.catRate === null ? <span className="text-warn">not set</span> : rs(o.catRate)}</td>
+        <td className="num">{o.rateCell}</td>
+        <td className="num">{o.rate === null ? <span className="text-warn">not set</span> : rs(o.rate)}</td>
+        <td className="num" data-testid={`sib-campuses-${o.key}`}>{int(o.list.length)}</td>
+        <td className="num font-semibold">{rs(o.budget)}</td>
         <td>
-          <span className="inline-block h-2.5 w-2.5 rounded-full mr-2 align-middle" style={{ background: r.category.colour ?? '#999' }} />
-          {label}
-        </td>
-        <td className="num">{rateCell}</td>
-        <td className="num">{r.category.lastYearRate === null ? <span className="text-warn">not set</span> : rs(r.rate)}</td>
-        <td className="num" data-testid={`sib-campuses-${r.category.id}`}>{int(r.primaries)}</td>
-        <td className="num font-semibold">{rs(r.budget)}</td>
-        <td>
-          <button type="button" className="btn" aria-expanded={open === r.category.id} onClick={() => setOpen(open === r.category.id ? null : r.category.id)}>
-            {open === r.category.id ? 'Close list' : 'List view'}
+          <button type="button" className="btn" aria-expanded={open === o.key} onClick={() => setOpen(open === o.key ? null : o.key)}>
+            {open === o.key ? 'Close list' : 'List view'}
           </button>
         </td>
       </tr>
-      {open === r.category.id ? (
+      {open === o.key ? (
         <tr>
-          <td colSpan={6}>
+          <td colSpan={7}>
             <table className="tbl">
               <thead>
                 <tr>
@@ -426,22 +324,22 @@ export function SettingsEditor({
                   <th>Campus ID</th>
                   <th className="num">MQI</th>
                   <th>Band</th>
-                  <th>Main campus</th>
-                  <th>Survey plan</th>
+                  <th>Safety</th>
+                  <th>Main campus / survey plan</th>
                   <th>Region</th>
                   <th>E-compound</th>
                   <th className="num">Rs M</th>
                 </tr>
               </thead>
               <tbody>
-                {r.selected.map((p) => (
+                {o.list.map((p) => (
                   <tr key={p.campus.campusId}>
                     <td className="font-semibold">{p.campus.name}</td>
                     <td>{p.campus.campusId}</td>
                     <td className="num">{score(p.campus.score)}</td>
-                    <td>{p.campus.band ?? ''}</td>
-                    <td>{p.hostId ? (hostName.get(p.hostId) ?? p.hostId) : ''}</td>
-                    <td>{[p.campus.planCategory, p.campus.planAssessment].filter(Boolean).join(' · ')}</td>
+                    <td>{p.campus.band ?? 'No survey'}</td>
+                    <td>{p.campus.unsafe ? UNSAFE_LEVEL_LABEL[p.campus.unsafe] : p.campus.score !== null ? 'Safe' : ''}</td>
+                    <td>{p.hostId ? `With ${hostName.get(p.hostId) ?? p.hostId}` : [p.campus.planCategory, p.campus.planAssessment].filter(Boolean).join(' · ')}</td>
                     <td>{p.campus.region}</td>
                     <td>{p.campus.eCompoundNo}</td>
                     <td className="num">{rs(p.rate)}</td>
@@ -658,14 +556,14 @@ export function SettingsEditor({
       <section className="card p-4 overflow-x-auto" data-testid="rm-siblings">
         <h2 className="font-semibold text-brand-deep mb-1">Sibling campuses</h2>
         <p className="text-ink-soft mb-2">
-          <b>Siblings of shortlisted campuses</b>: campuses sharing an e-compound with a campus in a category above, costed with it at that category&apos;s rate unless you enter a sibling rate below (they also count against its cap).{' '}
-          <b>R&amp;M Plan siblings</b>: campuses on the R&amp;M Plan 2026-27 list that share an e-compound with another campus but landed in no category above. Each is costed at the rate of the category its own MQI matches. The rest are split by MQI band
-          or by survey plan category; each line uses its own rate if entered, else its group&apos;s default (default inflation applied).
+          <b>A. Siblings of shortlisted campuses</b>: share an e-compound with a campus in a category above; costed at that category&apos;s rate unless you enter another (they count against its cap).{' '}
+          <b>B. R&amp;M Plan siblings</b>: on the R&amp;M Plan list, share an e-compound, in no category; costed at the rate of the category their own MQI matches, or at the rate entered on their line.
         </p>
         <table className="tbl">
           <thead>
             <tr>
-              <th>Group</th>
+              <th>Line</th>
+              <th className="num">Category rate (Rs M)</th>
               <th className="num">Last year cost / campus (Rs M)</th>
               <th className="num">Rate (Rs M)</th>
               <th className="num">Campuses</th>
@@ -675,94 +573,66 @@ export function SettingsEditor({
           </thead>
           <tbody>
             <tr className="bg-surface/40" data-testid="sib-group-shortlisted">
-              <td className="font-semibold">Siblings of shortlisted campuses — at their category&apos;s rate</td>
-              <td />
-              <td colSpan={2} className="num text-ink-faint">{withSiblings.length ? '' : 'none'}</td>
-              <td className="num">{rs(shortlistedSibTotal)}</td>
+              <td className="font-semibold" colSpan={5}>A. Siblings of shortlisted campuses — by main campus&apos;s category</td>
+              <td className="num font-semibold">{rs(shortlistedSibTotal)}</td>
               <td />
             </tr>
-            {withSiblings.length ? (
+            {withSiblings.length ? null : (
               <tr>
-                <td colSpan={6} className="pl-6">
-                  {/* W100: the sibling rate per category is editable; blank = the category's own rate. */}
-                  <table className="tbl mb-3" data-testid="sibling-rates">
-                    <thead>
-                      <tr>
-                        <th>Main campus&apos;s category</th>
-                        <th className="num">Category rate (Rs M)</th>
-                        <th className="num">Sibling last year cost / campus (Rs M)</th>
-                        <th className="num">Sibling rate (Rs M)</th>
-                        <th className="num">Siblings</th>
-                        <th className="num">Budget (Rs M)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {withSiblings.map((r) => {
-                        const sr = r.selected.find((p) => p.role === 'sibling')?.rate ?? r.rate;
-                        return (
-                          <tr key={r.category.id}>
-                            <td>{r.category.name}</td>
-                            <td className="num">{r.category.lastYearRate === null ? <span className="text-warn">not set</span> : rs(r.rate)}</td>
-                            <td className="num">
-                              <Num
-                                label={`Sibling last year cost of ${r.category.name}`}
-                                placeholder="same"
-                                value={r.category.siblingLastYearRate}
-                                onChange={(v) => setCat(r.category.id, { siblingLastYearRate: v })}
-                              />
-                            </td>
-                            <td className="num">{rs(sr)}</td>
-                            <td className="num">{int(r.siblings)}</td>
-                            <td className="num font-semibold">{rs(sibCost(r))}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  <SiblingBreakup placed={withSiblings.flatMap((r) => r.selected.filter((p) => p.role === 'sibling'))} hostName={hostName} />
-                </td>
+                <td colSpan={7} className="text-ink-faint pl-4">None.</td>
               </tr>
-            ) : null}
+            )}
+            {withSiblings.map((r) => {
+              const list = r.selected.filter((p) => p.role === 'sibling');
+              return sibLine({
+                key: `sibof:${r.category.id}`,
+                label: <span className="pl-4">{r.category.name}</span>,
+                catRate: r.category.lastYearRate === null ? null : r.rate,
+                rateCell: (
+                  <Num label={`Sibling last year cost of ${r.category.name}`} placeholder="same" value={r.category.siblingLastYearRate} onChange={(v) => setCat(r.category.id, { siblingLastYearRate: v })} />
+                ),
+                rate: r.category.lastYearRate === null && r.category.siblingLastYearRate == null ? null : (list[0]?.rate ?? r.rate),
+                list,
+                budget: sibCost(r),
+              });
+            })}
             <tr className="bg-surface/40">
-              <td className="font-semibold" colSpan={6}>
-                R&amp;M Plan siblings
-              </td>
+              <td className="font-semibold" colSpan={5}>B. R&amp;M Plan siblings — by own MQI or survey plan</td>
+              <td className="num font-semibold">{rs(sibTotal)}</td>
+              <td />
             </tr>
-            {sibRows.filter((r) => !isLine(r)).map((r) => sibRow(r, <span className="text-ink-faint">as the category</span>, <span className="pl-4">{r.category.name.replace('R&M Plan siblings – ', '')}</span>))}
-            {(['other', 'unknown'] as const).map((group) => {
-              const lines = sibRows.filter((r) => r.category.id.startsWith(`rmsib:${group}:`));
-              const field = group === 'other' ? 'otherLastYearRate' : 'unknownLastYearRate';
-              const title = group === 'other' ? 'No category — split by MQI band' : 'Unknown MQI — split by survey plan category';
-              return (
-                <Fragment key={group}>
-                  <tr className="bg-surface/40" data-testid={`sib-group-${group}`}>
-                    <td className="font-semibold">{title}</td>
-                    <td className="num">
-                      <Num label={`Default last year cost for ${title}`} value={sibCfg[field]} onChange={(v) => setSib({ [field]: v })} />
-                      <div className="text-[11px] text-ink-faint">default for its lines</div>
-                    </td>
-                    <td colSpan={2} className="num text-ink-faint">{lines.length ? '' : 'none'}</td>
-                    <td className="num">{rs(lines.reduce((t, r) => t + r.budget, 0))}</td>
-                    <td />
-                  </tr>
-                  {lines.map((r) => {
-                    const key = r.category.id.slice('rmsib:'.length);
-                    return sibRow(
-                      r,
-                      <Num
-                        label={`Last year cost of ${r.category.name}`}
-                        placeholder="default"
-                        value={sibCfg.rates?.[key]}
-                        onChange={(v) => setSib({ rates: { ...(sibCfg.rates ?? {}), [key]: v } })}
-                      />,
-                      <span className="pl-4">{r.category.name.replace(/^R&M Plan siblings – (no category|unknown MQI): /, '').replace(' (not surveyed in this cycle)', '')}</span>,
-                    );
-                  })}
-                </Fragment>
-              );
+            {sibRows.length ? null : (
+              <tr>
+                <td colSpan={7} className="text-ink-faint pl-4">None.</td>
+              </tr>
+            )}
+            {sibRows.map((r) => {
+              const m = /^rmsib:(other|unknown):(.*)$/.exec(r.category.id);
+              const key = m ? `${m[1]}:${m[2]}` : '';
+              const fallback = m ? (m[1] === 'other' ? sibCfg.otherLastYearRate : sibCfg.unknownLastYearRate) : null;
+              const label = m
+                ? `${m[1] === 'other' ? 'No category' : 'Not surveyed'}: ${m[2]!.replace(' (not surveyed in this cycle)', '')}`
+                : r.category.name.replace('R&M Plan siblings – ', '');
+              return sibLine({
+                key: r.category.id,
+                label: <span className="pl-4">{label}</span>,
+                rateCell: m ? (
+                  <Num
+                    label={`Last year cost of ${r.category.name}`}
+                    placeholder={fallback != null ? String(fallback) : 'rate'}
+                    value={sibCfg.rates?.[key]}
+                    onChange={(v) => setSib({ rates: { ...(sibCfg.rates ?? {}), [key]: v } })}
+                  />
+                ) : (
+                  <span className="text-ink-faint">as the category</span>
+                ),
+                rate: r.category.lastYearRate === null ? null : r.rate,
+                list: r.selected,
+                budget: r.budget,
+              });
             })}
             <tr className="font-semibold bg-surface/60" data-testid="rm-siblings-total">
-              <td colSpan={3}>Total, sibling campuses</td>
+              <td colSpan={4}>Total, sibling campuses</td>
               <td className="num">{int(withSiblings.reduce((n, r) => n + r.siblings, 0) + sibRows.reduce((n, r) => n + r.primaries, 0))}</td>
               <td className="num">{rs(shortlistedSibTotal + sibTotal)}</td>
               <td />
