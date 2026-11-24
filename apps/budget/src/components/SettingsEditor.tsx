@@ -352,7 +352,8 @@ export function SettingsEditor({
     onChange({ ...config, categories: [...order.map((x) => cats.find((c) => c.id === x)!), ...anticipated] });
   };
   const remove = (c: BudgetCategory) => {
-    if (!window.confirm(`Remove the category "${c.name}" from this scenario?`)) return;
+    const where = c.kind === 'campus' ? ' Its campuses move to the next category they qualify for, or to no category.' : '';
+    if (!window.confirm(`Remove the category "${c.name}" from this scenario?${where} Undo changes (or not saving) brings it back.`)) return;
     const assumptions = Object.fromEntries(Object.entries(config.assumptions).filter(([k]) => !k.startsWith(`cat:${c.id}:`)));
     onChange({ ...config, categories: cats.filter((x) => x.id !== c.id), assumptions });
   };
@@ -510,7 +511,12 @@ export function SettingsEditor({
                         {open === c.id ? 'Close list' : 'List view'}
                       </button>
                     </td>
-                    <td>{SEEDED.has(c.id) ? null : <button type="button" className="btn btn-danger" onClick={() => remove(c)}>Remove</button>}</td>
+                    <td>
+                      {/* W97: any campus category can be removed, the default ones too. */}
+                      <button type="button" className="btn btn-danger" aria-label={`Remove category ${c.name}`} onClick={() => remove(c)}>
+                        Remove
+                      </button>
+                    </td>
                   </tr>
                   {open === c.id ? (
                     <tr>
