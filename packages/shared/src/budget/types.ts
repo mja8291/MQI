@@ -75,6 +75,8 @@ export interface BudgetCategory {
    */
   includeIds?: string[];
   excludeIds?: string[];
+  /** W100: last year's cost per sibling campus (Rs M), inflated like the category; blank = the category's rate. */
+  siblingLastYearRate?: number | null;
 }
 
 /** Where a figure came from (assumption register). */

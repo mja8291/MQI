@@ -127,6 +127,8 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
 
   const results: CategoryResult[] = config.categories.map((category) => {
     const rate = rateFor(category, config);
+    // W100: e-compound siblings at the category rate unless a sibling rate is entered for it.
+    const sibRate = category.siblingLastYearRate != null ? category.siblingLastYearRate * (1 + inflationFor(category, config) / 100) : rate;
     const inflationPct = inflationFor(category, config);
     const catWarnings: string[] = [];
     if (category.kind === 'anticipated') {
@@ -185,17 +187,18 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
           role: p.role,
           tag: p.role === 'sibling' ? `${category.name} sibling` : '',
           ...(p.hostId ? { hostId: p.hostId } : {}),
-          rate,
+          rate: p.role === 'sibling' ? sibRate : rate,
           unit: u + 1,
         };
       });
       const n = placed.length;
-      const fits = (capCount === null || usedCount + n <= capCount) && (capRs === null || usedRs + n * rate <= capRs + EPS);
+      const cost = placed.reduce((t, p) => t + p.rate, 0);
+      const fits = (capCount === null || usedCount + n <= capCount) && (capRs === null || usedRs + cost <= capRs + EPS);
       if (neverTrim || (!cut && fits)) {
         if (!fits) over = true;
         selected.push(...placed);
         usedCount += n;
-        usedRs += n * rate;
+        usedRs += cost;
       } else {
         cut = true;
         waitlist.push(...placed);
@@ -222,7 +225,7 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
       siblings: selected.filter((p) => p.role === 'sibling').length,
       tbd,
       anticipatedCount: 0,
-      budget: selected.length * rate + tbd * rate,
+      budget: selected.reduce((t, p) => t + p.rate, 0) + tbd * rate,
       capStatus,
       warnings: catWarnings,
     };

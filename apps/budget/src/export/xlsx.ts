@@ -51,7 +51,9 @@ function scenarioSheets(wb: ExcelJS.Workbook, book: Book, s: BookScenario, prefi
   let row = 5;
   for (const l of lines) {
     cw.getRow(row).values = [l.category, l.unit, l.campusId, l.name, l.region, l.zone, l.area, l.eCompoundNo, l.score ?? 'No survey', l.band, l.unsafe, l.role, l.tag];
-    cw.getCell(row, 14).value = { formula: `VLOOKUP(A${row},${q(names.summary)}!$A:$G,7,FALSE)`, result: r2(l.rate) };
+    // W100: a sibling at its own entered rate keeps that figure; everything else follows the category rate.
+    const ownSibRate = l.role === 'Sibling' && Math.abs(l.rate - (res.categories.find((c) => c.category.name === l.category)?.rate ?? l.rate)) > 1e-9;
+    cw.getCell(row, 14).value = ownSibRate ? r2(l.rate) : { formula: `VLOOKUP(A${row},${q(names.summary)}!$A:$G,7,FALSE)`, result: r2(l.rate) };
     cw.getCell(row, 14).numFmt = MONEY;
     row++;
   }
@@ -87,7 +89,10 @@ function scenarioSheets(wb: ExcelJS.Workbook, book: Book, s: BookScenario, prefi
     ws.getCell(r, 7).value = r2(c.rate);
     ws.getCell(r, 7).numFmt = MONEY;
     ws.getCell(r, 7).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF7E0' } };
-    ws.getCell(r, 8).value = { formula: `(C${r}+D${r}+E${r}+F${r})*G${r}`, result: r2(c.budget) };
+    ws.getCell(r, 8).value =
+      c.sibRate != null
+        ? { formula: `(C${r}+E${r}+F${r})*G${r}+D${r}*${r2(c.sibRate)}`, result: r2(c.budget) } // W100: siblings at their own rate
+        : { formula: `(C${r}+D${r}+E${r}+F${r})*G${r}`, result: r2(c.budget) };
     ws.getCell(r, 8).numFmt = MONEY;
     ws.getCell(r, 9).value = c.capCount ?? '';
     ws.getCell(r, 10).value = c.capRs ?? '';
@@ -119,7 +124,7 @@ function scenarioSheets(wb: ExcelJS.Workbook, book: Book, s: BookScenario, prefi
     ws.getCell(lyRow + 3, 8).value = { formula: `MAX(0,H${tr}-H${lyRow + 2})`, result: r2(res.ceiling.overrun) };
     ws.getCell(lyRow + 3, 8).numFmt = MONEY;
   }
-  ws.getCell(lyRow + 5, 1).value = 'Rates (yellow) can be changed: counts come from the Campuses sheet and budgets recalculate. Siblings are costed at their host category\'s rate.';
+  ws.getCell(lyRow + 5, 1).value = 'Rates (yellow) can be changed: counts come from the Campuses sheet and budgets recalculate. Siblings are costed at their host category\'s rate, or at the sibling rate entered for it.';
   ws.getCell(lyRow + 5, 1).font = { italic: true, color: { argb: 'FF4B5C50' } };
   if (res.warnings.length) {
     ws.getCell(lyRow + 7, 1).value = 'Warnings';

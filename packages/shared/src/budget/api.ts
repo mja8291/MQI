@@ -34,6 +34,7 @@ export const categorySchema = z.object({
   // W91: list adjustments (funding source removed; old saves drop it).
   includeIds: z.array(z.string().max(20)).max(3000).optional(),
   excludeIds: z.array(z.string().max(20)).max(3000).optional(),
+  siblingLastYearRate: money.nullable().optional(),
 });
 
 const metaSchema = z.object({ source: z.string().max(300), owner: z.string().max(120), date: z.string().max(20), note: z.string().max(1000) });

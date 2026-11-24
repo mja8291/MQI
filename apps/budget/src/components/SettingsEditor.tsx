@@ -388,7 +388,8 @@ export function SettingsEditor({
   const ownBudget = (r: CategoryResult) => (r.primaries + r.tbd) * r.rate;
   const campusTotal = sum(campusCats, ownBudget);
   const withSiblings = campusCats.map((c) => live(c.id)).filter((r): r is CategoryResult => !!r && r.siblings > 0);
-  const shortlistedSibTotal = withSiblings.reduce((t, r) => t + r.siblings * r.rate, 0);
+  const sibCost = (r: CategoryResult) => r.selected.filter((p) => p.role === 'sibling').reduce((t, p) => t + p.rate, 0);
+  const shortlistedSibTotal = withSiblings.reduce((t, r) => t + sibCost(r), 0);
   const hostName = new Map(campuses.map((c) => [c.campusId, c.name]));
   const anticipatedTotal = sum(anticipated, (r) => r.budget);
   // W92: R&M Plan siblings not in any category, by the category their own MQI matches.
@@ -657,7 +658,7 @@ export function SettingsEditor({
       <section className="card p-4 overflow-x-auto" data-testid="rm-siblings">
         <h2 className="font-semibold text-brand-deep mb-1">Sibling campuses</h2>
         <p className="text-ink-soft mb-2">
-          <b>Siblings of shortlisted campuses</b>: campuses sharing an e-compound with a campus in a category above, costed with it at that category&apos;s rate (they also count against its cap).{' '}
+          <b>Siblings of shortlisted campuses</b>: campuses sharing an e-compound with a campus in a category above, costed with it at that category&apos;s rate unless you enter a sibling rate below (they also count against its cap).{' '}
           <b>R&amp;M Plan siblings</b>: campuses on the R&amp;M Plan 2026-27 list that share an e-compound with another campus but landed in no category above. Each is costed at the rate of the category its own MQI matches. The rest are split by MQI band
           or by survey plan category; each line uses its own rate if entered, else its group&apos;s default (default inflation applied).
         </p>
@@ -683,6 +684,41 @@ export function SettingsEditor({
             {withSiblings.length ? (
               <tr>
                 <td colSpan={6} className="pl-6">
+                  {/* W100: the sibling rate per category is editable; blank = the category's own rate. */}
+                  <table className="tbl mb-3" data-testid="sibling-rates">
+                    <thead>
+                      <tr>
+                        <th>Main campus&apos;s category</th>
+                        <th className="num">Category rate (Rs M)</th>
+                        <th className="num">Sibling last year cost / campus (Rs M)</th>
+                        <th className="num">Sibling rate (Rs M)</th>
+                        <th className="num">Siblings</th>
+                        <th className="num">Budget (Rs M)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {withSiblings.map((r) => {
+                        const sr = r.selected.find((p) => p.role === 'sibling')?.rate ?? r.rate;
+                        return (
+                          <tr key={r.category.id}>
+                            <td>{r.category.name}</td>
+                            <td className="num">{r.category.lastYearRate === null ? <span className="text-warn">not set</span> : rs(r.rate)}</td>
+                            <td className="num">
+                              <Num
+                                label={`Sibling last year cost of ${r.category.name}`}
+                                placeholder="same"
+                                value={r.category.siblingLastYearRate}
+                                onChange={(v) => setCat(r.category.id, { siblingLastYearRate: v })}
+                              />
+                            </td>
+                            <td className="num">{rs(sr)}</td>
+                            <td className="num">{int(r.siblings)}</td>
+                            <td className="num font-semibold">{rs(sibCost(r))}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                   <SiblingBreakup placed={withSiblings.flatMap((r) => r.selected.filter((p) => p.role === 'sibling'))} hostName={hostName} />
                 </td>
               </tr>
