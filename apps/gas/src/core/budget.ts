@@ -9,13 +9,14 @@ import {
   joinCampusSurveys,
   scenarioConfigSchema,
   uuidv7,
+  planIndex,
 } from '@mqi/shared';
 import type { BudgetCampusesResult, BudgetCycle, BudgetImportResult, BudgetState, CampusMaster, CampusSource, RegionZone, Scenario } from '@mqi/shared';
 import type { Ctx } from './context';
 import { fail } from './errors';
 import { withLock } from './lock';
 import type { Env, TablePort } from './ports';
-import { dashboard, forgetDashboard, fullSchools } from './reads';
+import { dashboard, forgetDashboard, fullSchools, planCampuses } from './reads';
 import { toRow } from './responses';
 import { Table } from './system';
 import type { Row } from './system';
@@ -182,7 +183,16 @@ export function campuses(ctx: Ctx, raw: unknown): BudgetCampusesResult {
   const { campuses: joined, summary } = joinCampusSurveys(master, d.schools, { from: cycle.surveyFrom, to: cycle.surveyTo });
   // W92: campuses on the R&M Plan 2026-27 list, exactly as the App marks them for the BOQ reminder (W64/W68).
   const planned = new Set(fullSchools(ctx).schools.filter((x) => x.rmPlanned).map((x) => x.schoolId));
-  const list = planned.size ? joined.map((c) => (planned.has(c.campusId) ? { ...c, rmPlanned: true } : c)) : joined;
+  // W96: each campus's Campus Survey Plan category (same matching as the dashboard: shared School ID, else name).
+  const findPlan = planIndex(planCampuses(ctx));
+  const list = joined.map((c) => {
+    const plan = findPlan({ schoolId: (c.schoolIds?.length ? c.schoolIds : [c.campusId]).join(' | '), name: c.name });
+    return {
+      ...c,
+      ...(planned.has(c.campusId) ? { rmPlanned: true } : {}),
+      ...(plan ? { planCategory: plan.category, planAssessment: plan.assessment } : {}),
+    };
+  });
   return { campuses: list, summary, generatedAt: d.generatedAt ?? ctx.nowIso };
 }
 

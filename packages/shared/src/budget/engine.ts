@@ -310,6 +310,35 @@ export function runBudget(campuses: readonly BudgetCampus[], config: ScenarioCon
 
 export const RM_SIBLING_PREFIX = 'rmsib:';
 
+/** W96: the "unknown MQI" lines, in this order. */
+export const UNKNOWN_LINES = [
+  'Done without App (Unsafe)',
+  'Done without App (Safe)',
+  'Done without App',
+  'PSSP/PSRP Deduction',
+  'Last 5 Year Exemption',
+  'Survey with App (not surveyed in this cycle)',
+  'Not in the survey plan',
+] as const;
+
+/** W96: which "unknown MQI" line a campus without a survey in the cycle belongs to. */
+export function planLine(c: BudgetCampus): (typeof UNKNOWN_LINES)[number] {
+  switch (c.planCategory) {
+    case 'Done without App': {
+      const a = (c.planAssessment ?? '').trim().toLowerCase();
+      return a === 'unsafe' ? 'Done without App (Unsafe)' : a === 'safe' ? 'Done without App (Safe)' : 'Done without App';
+    }
+    case 'PSSP/PSRP Deduction':
+      return 'PSSP/PSRP Deduction';
+    case 'Last 5 Year Exemption':
+      return 'Last 5 Year Exemption';
+    case 'Survey with App':
+      return 'Survey with App (not surveyed in this cycle)';
+    default:
+      return 'Not in the survey plan';
+  }
+}
+
 /**
  * W92: campuses on the R&M Plan list that share their e-compound with another campus and landed in no
  * category. Each goes to the first campus category whose rule its own MQI matches (ignoring bottom-N
@@ -330,21 +359,36 @@ export function rmPlanSiblingRows(
   const picked = campuses.filter((c) => c.rmPlanned && (ecCount.get(c.eCompoundNo.trim()) ?? 0) > 1 && !placement.has(c.campusId));
   const groups = new Map<string, { category: BudgetCategory; list: BudgetCampus[] }>();
   const sib = config.rmPlanSiblings ?? {};
-  const other: BudgetCategory = { id: `${RM_SIBLING_PREFIX}other`, name: 'R&M Plan siblings – no category (MQI known)', kind: 'campus', lastYearRate: sib.otherLastYearRate ?? null, colour: '#98a2b3' };
-  const unknown: BudgetCategory = { id: `${RM_SIBLING_PREFIX}unknown`, name: 'R&M Plan siblings – unknown MQI (no survey)', kind: 'campus', lastYearRate: sib.unknownLastYearRate ?? null, colour: '#d0d5dd' };
+  // W96: the two catch-all groups are split into lines: by MQI band (no category) and by Campus Survey
+  // Plan category (unknown MQI). A line takes its own rate, else its group's.
+  const line = (group: 'other' | 'unknown', label: string, colour: string): BudgetCategory => {
+    const key = `${group}:${label}`;
+    const own = sib.rates?.[key];
+    const fallback = group === 'other' ? sib.otherLastYearRate : sib.unknownLastYearRate;
+    return {
+      id: `${RM_SIBLING_PREFIX}${key}`,
+      name: `R&M Plan siblings – ${group === 'other' ? 'no category' : 'unknown MQI'}: ${label}`,
+      kind: 'campus',
+      lastYearRate: own ?? fallback ?? null,
+      colour,
+    };
+  };
   for (const c of picked) {
-    let target: BudgetCategory = unknown;
+    let target: BudgetCategory;
     if (c.score !== null) {
       const cat = campusCats.find((k) => k.rule && k.rule.type !== 'manual' && !(k.excludeIds ?? []).includes(c.campusId) && matches(k.rule, c));
-      target = cat ? { ...cat, id: `${RM_SIBLING_PREFIX}${cat.id}`, name: `R&M Plan siblings – ${cat.name}`, tbdCount: 0, tbdByRegion: {}, capCount: null, capRs: null, includeIds: [], excludeIds: [] } : other;
+      target = cat
+        ? { ...cat, id: `${RM_SIBLING_PREFIX}${cat.id}`, name: `R&M Plan siblings – ${cat.name}`, tbdCount: 0, tbdByRegion: {}, capCount: null, capRs: null, includeIds: [], excludeIds: [] }
+        : line('other', c.band ?? 'No band', '#98a2b3');
+    } else {
+      target = line('unknown', planLine(c), '#d0d5dd');
     }
     const g = groups.get(target.id) ?? { category: target, list: [] };
     g.list.push(c);
     groups.set(target.id, g);
   }
-  const order = [...campusCats.map((k) => `${RM_SIBLING_PREFIX}${k.id}`), other.id, unknown.id];
-  // The two rows with their own rate always show (so the rate can be entered); the others only when used.
-  for (const k of [other, unknown]) if (!groups.has(k.id)) groups.set(k.id, { category: k, list: [] });
+  const lineOrder = [...['Poor', 'Average', 'Good', 'Excellent', 'No band'].map((b) => `other:${b}`), ...UNKNOWN_LINES.map((l) => `unknown:${l}`)];
+  const order = [...campusCats.map((k) => `${RM_SIBLING_PREFIX}${k.id}`), ...lineOrder.map((k) => `${RM_SIBLING_PREFIX}${k}`)];
   return [...groups.values()]
     .sort((x, y) => order.indexOf(x.category.id) - order.indexOf(y.category.id))
     .map(({ category, list }) => {

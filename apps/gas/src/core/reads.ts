@@ -104,7 +104,7 @@ export function campusDetails(ctx: Ctx, raw: unknown): { campus: ReportCampus | 
 }
 
 /** v2 (W63): the campus breakup, from the Campus Survey Plan tab (none while the tab is missing or empty). */
-function planCampuses(ctx: Ctx): PlanCampus[] {
+export function planCampuses(ctx: Ctx): PlanCampus[] {
   const header = ctx.env.responses.header(PLAN_TAB);
   const last = ctx.env.responses.lastRow(PLAN_TAB);
   if (!header || last < 2) return [];

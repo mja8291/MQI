@@ -31,6 +31,31 @@ const cat = (r: ReturnType<typeof runBudget>, id: string) => r.categories.find((
 const ids = (list: { campus: BudgetCampus }[]) => list.map((p) => p.campus.campusId);
 
 describe('budgetEngine', () => {
+  it('W96: no-category siblings split by MQI band, unknown-MQI siblings by survey plan category; a line rate overrides its group rate', () => {
+    const mk = (id: string, score: number | null, ec: string, extra: Partial<BudgetCampus> = {}) => ({ ...campus({ campusId: id, score, eCompoundNo: ec }), rmPlanned: true, ...extra });
+    const list = [
+      mk('E1', 95, 'A'),
+      mk('G1', 80, 'A'),
+      mk('U1', null, 'A', { planCategory: 'Done without App', planAssessment: 'Unsafe' }),
+      mk('S1', null, 'B', { planCategory: 'Done without App', planAssessment: 'Safe' }),
+      mk('P1', null, 'B', { planCategory: 'PSSP/PSRP Deduction' }),
+      mk('W1', null, 'B', { planCategory: 'Survey with App' }),
+      mk('N1', null, 'B'),
+    ];
+    const r = runBudget(list, config([POOR], { rmPlanSiblings: { otherLastYearRate: 1, unknownLastYearRate: 2, rates: { 'unknown:Done without App (Unsafe)': 5 } } }));
+    const rows = r.categories.filter((c) => c.section === 'rmPlanSibling');
+    expect(rows.map((c) => [c.category.id.replace('rmsib:', ''), ids(c.selected).join(','), c.rate])).toEqual([
+      ['other:Good', 'G1', 1],
+      ['other:Excellent', 'E1', 1],
+      ['unknown:Done without App (Unsafe)', 'U1', 5],
+      ['unknown:Done without App (Safe)', 'S1', 2],
+      ['unknown:PSSP/PSRP Deduction', 'P1', 2],
+      ['unknown:Survey with App (not surveyed in this cycle)', 'W1', 2],
+      ['unknown:Not in the survey plan', 'N1', 2],
+    ]);
+    expect(r.total).toBeCloseTo(1 + 1 + 5 + 2 * 4);
+  });
+
   it('W92: R&M Plan siblings in no category are costed by their own MQI; others by the entered rates; total includes them', () => {
     const host = campus({ campusId: 'H', score: 40, eCompoundNo: 'EC1' }); // Poor: its sibling joins it
     const hostSib = { ...campus({ campusId: 'HS', score: 95, eCompoundNo: 'EC1' }), rmPlanned: true };
@@ -48,8 +73,8 @@ describe('budgetEngine', () => {
     const byId = Object.fromEntries(rows.map((c) => [c.category.id, ids(c.selected)]));
     expect(byId['rmsib:avg2']).toBeUndefined(); // AP is taken by "Average 2" as a normal campus (it was only removed from Average)
     expect(ids(cat(r, 'avg2').selected)).toEqual(['AP', 'EA']); // with its e-compound sibling
-    expect(byId['rmsib:other']).toEqual(['XP']);
-    expect(byId['rmsib:unknown']).toEqual(['NS']);
+    expect(byId['rmsib:other:Excellent']).toEqual(['XP']);
+    expect(byId['rmsib:unknown:Not in the survey plan']).toEqual(['NS']);
     expect(ids(cat(r, 'poor').selected).sort()).toEqual(['H', 'HS']); // a shortlisted campus's sibling stays with it
     // Rows sit after the campus categories; the total includes them.
     expect(r.categories.findIndex((c) => c.section) ).toBe(3);

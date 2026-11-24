@@ -29,6 +29,10 @@ export interface BudgetCampus {
   surveyDate?: string;
   /** W92: on the R&M Plan 2026-27 list (matched on its School IDs). */
   rmPlanned?: boolean;
+  /** W96: its Campus Survey Plan category ('' when listed without one); absent when not in the plan. */
+  planCategory?: string;
+  /** W96: "Safe"/"Unsafe" for a campus done without the App. */
+  planAssessment?: string;
 }
 
 /** How a campus-backed category picks its campuses. Stored as data in the scenario. */
@@ -96,7 +100,12 @@ export interface ScenarioConfig {
    * table, by the category their own MQI matches. These two rates (last year's cost per campus, Rs M,
    * default inflation applied) cover the ones no category matches and the ones with no survey.
    */
-  rmPlanSiblings?: { otherLastYearRate?: number | null; unknownLastYearRate?: number | null };
+  rmPlanSiblings?: {
+    otherLastYearRate?: number | null;
+    unknownLastYearRate?: number | null;
+    /** W96: a rate for one line (key e.g. "other:Excellent", "unknown:Done without App (Safe)"); blank = its group's rate. */
+    rates?: Record<string, number | null>;
+  };
 }
 
 export interface Scenario {
